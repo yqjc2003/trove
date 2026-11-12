@@ -12,8 +12,9 @@ license: Apache-2.0
 
 1. **AI 解读由你（Agent）负责。** 服务端不抓正文、不调用任何模型。你必须先拿到正文，自己产出 `title` / `summary` / `tags`，再调用写入接口。
 2. **标签语义完全由你决定。** 系统没有预设分类清单，也**不会**把你的标签映射到「工作 / 生活 / 家庭」等固定分类。**你解读出什么领域/主题的标签，就原样提交什么标签**（中文或英文都行，服务端只做大小写与空白归一）。
-3. **每个用户拥有独立的一套标签。** 其他用户的标签你既看不到也用不了。
-4. **重复录入是 upsert，不会产生重复条目。** 详见「重复录入」一节。
+3. **但标签命名空间要克制。** 用户的标签空间是长期资产，碎片化（`gis` 与 `gis数据`、`springboot` 与 `spring boot`）会让检索越来越难用。**新增标签前必须先过一遍 `tag-resolver.mjs`**（见「标签归一」一节）—— 能复用既有标签就别新造。
+4. **每个用户拥有独立的一套标签。** 其他用户的标签你既看不到也用不了。
+5. **重复录入是 upsert，不会产生重复条目。** 详见「重复录入」一节。
 
 ## 环境准备
 
@@ -69,9 +70,11 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
         ↓
 ② 取得正文：node scripts/fetch-content.mjs "<url1>" "<url2>" ...
         ↓
-③ 你自己解读：产出 title / summary / tags
+③ 你自己解读：产出 title / summary / 候选标签
         ↓
-④ 写入：node scripts/trove-api.mjs save-many '[{...}, {...}]'
+③.5 标签归一：node scripts/tag-resolver.mjs resolve "<所有候选标签>" ...
+        ↓
+④ 写入：node scripts/trove-api.mjs save-many '[{...}]'（标签用归一后的）
         ↓
 ⑤ 汇报：新增 N 条 / 更新 M 条 / 失败 K 条
 ```
@@ -97,7 +100,45 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
 标签建议：
 - 归一由服务端做（小写、去 `#`、折叠空白），你直接给有意义的名称即可。
 - 中文标签完全支持。
-- 存之前先调 `node scripts/trove-api.mjs tags` 看看既有标签。**已有语义匹配的标签就复用**，避免同义标签碎片化；确需新标签才新增。
+- **来源站点不是主题标签**（掘金 / 知乎 / CSDN / 公众号……）——`items.source` 记录的是**采集通道**（`skill` / `mcp` / `manual` / `bookmark` / `github`），不是发布平台。要标注「这篇来自掘金」时可以有意识地用它，resolver 只给提示、不强制。
+- **产出的是「候选标签」，必须先过「标签归一」再写入。**
+
+### ③.5 标签归一（**必做**）
+
+标签空间是长期资产。碎片化一旦成规模就没法收拾，所以**新增任何标签前先查一遍既有标签**：
+
+```bash
+node scripts/tag-resolver.mjs resolve "标签1" "标签2" "标签3"
+```
+
+批量场景把**所有条目用到的候选标签一次传进去**（去重由脚本处理），一次拿回整张映射表。
+
+返回的每个候选有三种 `action`：
+
+| action | 含义 | 你该怎么做 |
+|---|---|---|
+| `reuse` | 命名空间里已有等价标签 | **直接用 `resolved`**，不要新造 |
+| `candidate` | 有相近的既有标签，但**不一定等价** | 读 `reason` 和 `candidates`：能表达你的语义就用 `resolved`；不能就换候选或新建。**不要默认新建** |
+| `new` | 确实没有相近的 | 才允许新建 |
+
+配套还有 `warning` 字段：命中「来源站点名」黑名单时会提示别用。
+
+**匹配规则**（resolver 内部逻辑，你只需理解结论）：
+
+| 关系 | 例子 | 处理 |
+|---|---|---|
+| 归一后同词 | `springboot` / `spring boot` | 复用既有那一个（统一拼写） |
+| 等价组 | `jdk8` → `jdk`、`gis数据` → `gis` | 统一到 `canonical` |
+| 同族但不等价 | `java` / `java nio` / `java并发` | **只提示，不自动替换**——它们确实不同 |
+| 上下位 | `向量数据库` ⊃ `数据库` | 给出候选，由你判断 |
+
+等价组 / 同族组定义在 `data/tag-aliases.json`，可以随时增删：
+
+- `equivalent` —— 真正等价的同一个概念，`canonical` 是首选写法。**命中后 resolver 直接复用 canonical**。
+- `related` —— 同一族但不等价，只作提醒。
+- `avoid` —— 不该作为标签的来源站点名。
+
+> 发现新的同义标签时，**顺手把等价组补进 `data/tag-aliases.json`**，下次就自动收拢了。
 
 ### ④ 写入
 
@@ -132,6 +173,7 @@ node scripts/trove-api.mjs save-many '[{"url":"...","title":"...","summary":"...
 |---|---|---|
 | 单次提交条数 | ≤ 50 | 服务端拒绝，请分批 |
 | 每个收藏的标签数 | ≤ 3 | `422 MAX_TAGS_EXCEEDED`，请砍到 3 个 |
+| 新增标签前必须过 resolver | `action=reuse` 不得新造同名标签 | 命名空间碎片化 |
 | title 长度 | ≤ 300 | 422 |
 | summary 长度 | ≤ 1000 | 422 |
 
@@ -159,8 +201,21 @@ node scripts/trove-api.mjs save-many '[{"url":"...","title":"...","summary":"...
 ```bash
 node scripts/trove-api.mjs search --q 关键词 --limit 10   # 确认是否已收录
 node scripts/trove-api.mjs stats                          # 总数 / 未读 / 超期
-node scripts/trove-api.mjs tags                           # 既有标签
+node scripts/trove-api.mjs tags                           # 既有标签（完整 JSON）
 ```
+
+标签命名空间工具：
+
+```bash
+node scripts/tag-resolver.mjs list                             # 紧凑列出既有标签（name×count）
+node scripts/tag-resolver.mjs resolve "标签" [...]              # 解析候选标签 → 复用哪个既有标签
+node scripts/tag-resolver.mjs audit                            # 找出既有标签里的近重复分组
+node scripts/tag-resolver.mjs merge <from> <to> [--dry-run]   # 把 from 合并进 to
+```
+
+`merge` 会把挂了 `from` 的收藏逐条改挂到 `to`，再删掉 `from` 标签。
+**先 `--dry-run` 看影响面**（会打印受影响的条目与新的标签集），确认后再执行。
+注意 Agent 通道每个收藏至多 3 个标签：合并不会增加标签数，但如果某条收藏本来就超过 3 个，合并会失败并被单独列出（需在 Web 端手工调整）。
 
 接口返回错误时，脚本会打印 `{ "error": { "code": "...", "message": "..." } }` 并以非 0 退出码结束。常见码：
 
