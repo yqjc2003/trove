@@ -1,8 +1,13 @@
 'use client';
 
 import { useState, useTransition } from 'react';
+import Link from 'next/link';
 
-import { createTagAction, deleteTagAction, renameTagAction } from '@/app/actions/tags';
+import {
+  createTagAction,
+  deleteTagAction,
+  renameTagAction,
+} from '@/app/actions/tags';
 import type { Tag } from '@/types';
 
 /**
@@ -28,7 +33,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
       }
       setName('');
       setError(null);
-      setNotice(null);
+      setNotice('标签已创建。');
     });
   }
 
@@ -42,6 +47,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
       setEditingId(null);
       setEditingName('');
       setError(null);
+      setNotice('标签已改名，收藏关联保持不变。');
     });
   }
 
@@ -60,6 +66,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
         return;
       }
       setError(null);
+      setNotice('标签已删除，收藏仍保留。');
     });
   }
 
@@ -86,7 +93,11 @@ export function TagManager({ tags }: { tags: Tag[] }) {
           autoComplete="off"
           spellCheck={false}
         />
-        <button type="submit" className="btn" disabled={pending || !name.trim()}>
+        <button
+          type="submit"
+          className="btn"
+          disabled={pending || !name.trim()}
+        >
           新建
         </button>
       </form>
@@ -96,7 +107,27 @@ export function TagManager({ tags }: { tags: Tag[] }) {
           {error}
         </p>
       ) : null}
-      {notice ? <p className="small muted">{notice}</p> : null}
+      {notice ? (
+        <p className="small muted" role="status">
+          {notice}
+        </p>
+      ) : null}
+      {name.trim() &&
+      tags.some((t) =>
+        t.name.toLowerCase().includes(name.trim().toLowerCase()),
+      ) ? (
+        <p className="small muted">
+          已有相近名称：
+          {tags
+            .filter((t) =>
+              t.name.toLowerCase().includes(name.trim().toLowerCase()),
+            )
+            .slice(0, 5)
+            .map((t) => t.name)
+            .join('、')}
+          。可直接复用已有标签。
+        </p>
+      ) : null}
 
       {tags.length === 0 ? (
         <p className="faint small" style={{ marginTop: 16 }}>
@@ -104,93 +135,100 @@ export function TagManager({ tags }: { tags: Tag[] }) {
         </p>
       ) : (
         <div className="table-scroll">
-        <table className="table-simple">
-          <thead>
-            <tr>
-              <th>标签</th>
-              <th style={{ textAlign: 'right' }}>收藏数</th>
-              <th style={{ textAlign: 'right' }}>来源</th>
-              <th style={{ textAlign: 'right' }}>操作</th>
-            </tr>
-          </thead>
-          <tbody>
-            {tags.map((t) => (
-              <tr key={t.id}>
-                <td>
-                  {editingId === t.id ? (
-                    <input
-                      className="input"
-                      name="tag_name"
-                      value={editingName}
-                      onChange={(e) => setEditingName(e.target.value)}
-                      aria-label={`标签 ${t.name} 的新名称`}
-                      autoComplete="off"
-                      spellCheck={false}
-                      autoFocus
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') {
-                          e.preventDefault();
-                          rename(t.id);
-                        }
-                        if (e.key === 'Escape') setEditingId(null);
-                      }}
-                    />
-                  ) : (
-                    <span>{t.name}</span>
-                  )}
-                </td>
-                <td style={{ textAlign: 'right' }}>{t.count ?? 0}</td>
-                <td style={{ textAlign: 'right' }}>
-                  <span className="faint small">{t.origin === 'user' ? '手动' : 'AI'}</span>
-                </td>
-                <td>
-                  {editingId === t.id ? (
-                    <>
-                      <button
-                        type="button"
-                        className="btn-quiet"
-                        disabled={pending}
-                        onClick={() => rename(t.id)}
-                      >
-                        保存
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-quiet"
-                        disabled={pending}
-                        onClick={() => setEditingId(null)}
-                      >
-                        取消
-                      </button>
-                    </>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        className="btn-quiet"
-                        disabled={pending}
-                        onClick={() => {
-                          setEditingId(t.id);
-                          setEditingName(t.name);
-                        }}
-                      >
-                        改名
-                      </button>
-                      <button
-                        type="button"
-                        className="btn-quiet btn-danger"
-                        disabled={pending}
-                        onClick={() => remove(t)}
-                      >
-                        删除
-                      </button>
-                    </>
-                  )}
-                </td>
+          <table className="table-simple">
+            <thead>
+              <tr>
+                <th>标签</th>
+                <th style={{ textAlign: 'right' }}>收藏数</th>
+                <th style={{ textAlign: 'right' }}>来源</th>
+                <th style={{ textAlign: 'right' }}>操作</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {tags.map((t) => (
+                <tr key={t.id}>
+                  <td>
+                    {editingId === t.id ? (
+                      <input
+                        className="input"
+                        name="tag_name"
+                        value={editingName}
+                        onChange={(e) => setEditingName(e.target.value)}
+                        aria-label={`标签 ${t.name} 的新名称`}
+                        autoComplete="off"
+                        spellCheck={false}
+                        autoFocus
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            rename(t.id);
+                          }
+                          if (e.key === 'Escape') setEditingId(null);
+                        }}
+                      />
+                    ) : (
+                      <Link href={`/items?tag=${encodeURIComponent(t.name)}`}>
+                        {t.name}
+                      </Link>
+                    )}
+                  </td>
+                  <td style={{ textAlign: 'right' }}>{t.count ?? 0}</td>
+                  <td style={{ textAlign: 'right' }}>
+                    <span className="faint small">
+                      {t.origin === 'user' ? '我创建' : 'Agent 发现'}
+                    </span>
+                  </td>
+                  <td>
+                    {editingId === t.id ? (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-quiet"
+                          disabled={pending}
+                          onClick={() => rename(t.id)}
+                        >
+                          保存
+                        </button>
+                        <p className="small faint">
+                          影响 {t.count ?? 0} 条收藏，关联保持不变。
+                        </p>
+                        <button
+                          type="button"
+                          className="btn-quiet"
+                          disabled={pending}
+                          onClick={() => setEditingId(null)}
+                        >
+                          取消
+                        </button>
+                      </>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          className="btn-quiet"
+                          disabled={pending}
+                          onClick={() => {
+                            setEditingId(t.id);
+                            setEditingName(t.name);
+                          }}
+                        >
+                          改名
+                        </button>
+                        <button
+                          type="button"
+                          className="btn-quiet btn-danger"
+                          disabled={pending}
+                          onClick={() => remove(t)}
+                        >
+                          删除
+                        </button>
+                      </>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

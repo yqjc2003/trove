@@ -5,8 +5,8 @@ import { Nav } from '@/components/Nav';
 import { createServerSupabaseClient, isSupabaseConfigured } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
-  title: 'trove — 个人收藏管理',
-  description: '把散落的链接统一收敛到一处：标签、笔记、归档与阅读追踪。',
+  title: 'trove — 收集、回看、留下理解',
+  description: '把散落的链接收进个人藏库，重新打开，留下自己的理解。',
 };
 
 export const viewport: Viewport = {

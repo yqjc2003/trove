@@ -17,15 +17,17 @@ export default async function NewItemPage() {
     <main className="page">
       <div className="wrap-narrow">
         <p className="small faint" style={{ marginBottom: 20 }}>
-          <Link href="/items">← 返回收藏列表</Link>
+          <Link href="/items">返回藏库</Link>
         </p>
 
-        <h1>新增收藏</h1>
+        <h1>收一条链接</h1>
         <p className="page-sub">
           手工添加一条链接。内容形态按域名自动识别，标签数量不限。
         </p>
 
-        <ItemCreateForm options={tags.map((t) => ({ id: t.id, name: t.name }))} />
+        <ItemCreateForm
+          options={tags.map((t) => ({ id: t.id, name: t.name }))}
+        />
       </div>
     </main>
   );

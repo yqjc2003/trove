@@ -87,6 +87,20 @@ describe('items 服务', () => {
     expect((await listItems(ctx, { tags: ['x', 'y'] })).total).toBe(1);
   });
 
+  it('待回看镜头遵守个人阈值且排除已读与归档', async () => {
+    const ctx = fakeContext(db);
+    const collected_at = new Date(Date.now() - 20 * 86400000).toISOString();
+    for (const name of ['unread', 'read', 'archived']) {
+      const saved = await saveItem(ctx, { url: `https://example.com/${name}`, title: name });
+      await db.updateItem(saved.id, { collected_at, read_at: name === 'read' ? new Date().toISOString() : null, status: name === 'archived' ? 'archived' : 'active' });
+    }
+    db.profile.reminder_days = 30;
+    expect((await listItems(ctx, { overdue: true, status: 'all' })).total).toBe(0);
+    db.profile.reminder_days = 7;
+    const result = await listItems(ctx, { overdue: true, status: 'all' });
+    expect(result.items.map((item) => item.title)).toEqual(['unread']);
+  });
+
   it('标签过滤条件走写入路径的同一套归一（大小写 / # / 空白）', async () => {
     const ctx = fakeContext(db);
     await saveItem(ctx, { url: 'https://example.com/1', title: 'A', tags: ['React'] });

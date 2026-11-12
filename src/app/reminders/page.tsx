@@ -23,12 +23,12 @@ export default async function RemindersPage() {
       <div className="wrap">
         <div className="page-head">
           <div>
-            <h1>待读</h1>
+            <h1>待回看清单</h1>
             <p className="page-sub">
               收藏超过 {days} 天且从未打开过的条目。
             </p>
           </div>
-          <span className="section-count">{reminders.length} 条</span>
+          <Link href="/" className="btn">回到单条回看</Link>
         </div>
 
         {reminders.length === 0 ? (
@@ -40,9 +40,7 @@ export default async function RemindersPage() {
           <>
             <ReminderPanel entries={reminders} />
             <p className="small faint" style={{ marginTop: 24 }}>
-              提醒阈值可在
-              <Link href="/settings"> 设置页 </Link>
-              调整。
+              当前显示最早的至多 200 条未读收藏中符合阈值的条目。完整结果可在 <Link href="/items?overdue=true">藏库待回看镜头</Link> 翻页查看；阈值可在 <Link href="/settings">我的语言</Link> 调整。
             </p>
           </>
         )}

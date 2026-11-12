@@ -105,7 +105,9 @@ export class TroveDb {
     if (collected_to) query = query.lte('collected_at', collected_to);
 
     if (overdue) {
-      query = query.is('read_at', null).lt('collected_at', overdueCutoff().toISOString());
+      const profile = await this.getProfile();
+      query = query.eq('status', 'active').is('read_at', null)
+        .lt('collected_at', overdueCutoff(new Date(), profile?.reminder_days ?? 14).toISOString());
     }
 
     if (q && q.trim()) {

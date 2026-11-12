@@ -26,7 +26,10 @@ function first(v: string | string[] | undefined): string | undefined {
 function list(v: string | string[] | undefined): string[] {
   if (v === undefined) return [];
   const arr = Array.isArray(v) ? v : [v];
-  return arr.flatMap((x) => x.split(',')).map((x) => x.trim()).filter(Boolean);
+  return arr
+    .flatMap((x) => x.split(','))
+    .map((x) => x.trim())
+    .filter(Boolean);
 }
 
 async function ItemsList({ searchParams }: PageProps) {
@@ -51,11 +54,21 @@ async function ItemsList({ searchParams }: PageProps) {
           ? (contentTypeRaw as ContentType)
           : undefined,
       source:
-        sourceRaw && ['manual', 'skill', 'mcp', 'github', 'bookmark'].includes(sourceRaw)
+        sourceRaw &&
+        ['manual', 'skill', 'mcp', 'github', 'bookmark'].includes(sourceRaw)
           ? (sourceRaw as ItemSource)
           : undefined,
-      status: statusRaw === 'archived' || statusRaw === 'all' ? statusRaw : 'active',
+      status:
+        statusRaw === 'archived' || statusRaw === 'all' ? statusRaw : 'active',
       read: readRaw === 'read' || readRaw === 'unread' ? readRaw : 'all',
+      overdue: first(sp.overdue) === 'true',
+      sort:
+        first(sp.sort) === 'click_count' || first(sp.sort) === 'title'
+          ? (first(sp.sort) as 'click_count' | 'title')
+          : 'collected_at',
+      order: first(sp.order) === 'asc' ? 'asc' : 'desc',
+      collected_from: first(sp.collected_from),
+      collected_to: first(sp.collected_to),
       limit: PAGE_SIZE,
       offset: Number.isFinite(offsetRaw) && offsetRaw > 0 ? offsetRaw : 0,
     }),
@@ -70,15 +83,23 @@ async function ItemsList({ searchParams }: PageProps) {
   return (
     <>
       <FilterBar tags={tags.map((t) => ({ id: t.id, name: t.name }))} />
+      <p className="results-count small faint" role="status">
+        找到 {total} 条收藏
+      </p>
 
       {result.items.length === 0 ? (
         <EmptyState
           title="没有匹配的收藏"
           text="换个关键词，或清空筛选条件试试。"
           action={
-            <Link href="/items/new" className="btn btn-sm">
-              手工新增一条
-            </Link>
+            <div className="row-actions">
+              <Link href="/items" className="btn">
+                清空镜头
+              </Link>
+              <Link href="/items/new" className="btn btn-sm">
+                手工收一条链接
+              </Link>
+            </div>
           }
         />
       ) : (
@@ -142,14 +163,14 @@ function buildQuery(
 export default function ItemsPage({ searchParams }: PageProps) {
   return (
     <main className="page">
-      <div className="wrap">
+      <div className="wrap wrap-library">
         <div className="page-head">
           <div>
-            <h1>收藏</h1>
-            <p className="page-sub">按名称、域名、类型与标签检索。</p>
+            <h1>藏库</h1>
+            <p className="page-sub">你曾经觉得有价值的，都在这里。</p>
           </div>
           <Link href="/items/new" className="btn btn-primary">
-            新增收藏
+            收一条链接
           </Link>
         </div>
 

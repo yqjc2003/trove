@@ -1,76 +1,100 @@
 import Link from 'next/link';
-
 import { getServerContext } from '@/lib/server-context';
 import { getStats, listReminders } from '@/lib/services/reminders';
 import { listItems } from '@/lib/services/items';
-import { EmptyState, StatBlock } from '@/components/StatBlock';
-import { ItemRow } from '@/components/ItemRow';
-import { ReminderPanel } from '@/components/ReminderPanel';
+import { ReviewDesk } from '@/components/ReviewDesk';
 
 export const dynamic = 'force-dynamic';
-
 export default async function DashboardPage() {
   const ctx = await getServerContext();
   if (!ctx) return null;
-
-  const [stats, reminders, recent] = await Promise.all([
+  const [stats, reminders, unread] = await Promise.all([
     getStats(ctx),
     listReminders(ctx),
-    listItems(ctx, { status: 'active', limit: 10, sort: 'collected_at', order: 'desc' }),
+    listItems(ctx, {
+      status: 'active',
+      read: 'unread',
+      limit: 100,
+      sort: 'collected_at',
+      order: 'asc',
+    }),
   ]);
-
+  const items = reminders.length
+    ? reminders.slice(0, 100).map((r) => r.item)
+    : unread.items;
   return (
     <main className="page">
-      <div className="wrap">
-        <div className="page-head">
+      <div className="wrap wrap-wide">
+        <header className="page-head">
           <div>
-            <h1>概览</h1>
-            <p className="page-sub">收藏的总量、待读与超期情况。</p>
+            <h1>今天，先回收一条。</h1>
+            <p className="page-sub">曾经收下的好东西，值得再打开一次。</p>
           </div>
+          <Link className="small muted" href="/items?read=unread">
+            查看未读收藏
+          </Link>
+        </header>
+        <div className="workspace">
+          <ReviewDesk items={items} overdue={reminders.length > 0} />
+          <aside className="context-rail">
+            <h2>你的藏库</h2>
+            <p className="small faint">最近至多 200 条收藏的概况</p>
+            <dl className="quiet-stats">
+              <div>
+                <dt>收藏</dt>
+                <dd>{stats.total}</dd>
+              </div>
+              <div>
+                <dt>未读</dt>
+                <dd>{stats.unread}</dd>
+              </div>
+              <div>
+                <dt>待回看</dt>
+                <dd>{stats.overdue}</dd>
+              </div>
+              <div>
+                <dt>本周收集</dt>
+                <dd>{stats.added_7d}</dd>
+              </div>
+            </dl>
+            <p className="small muted">
+              {reminders.length
+                ? '先回看超过提醒阈值的链接。'
+                : '从最早收下、还未打开的链接开始。'}
+              每轮最多呈现 100 条候选。
+            </p>
+            <div className="rail-section">
+              <h2>顺着主题走</h2>
+              <div className="rail-links">
+                {stats.by_tag.slice(0, 6).map((t) => (
+                  <Link
+                    key={t.name}
+                    href={`/items?tag=${encodeURIComponent(t.name)}`}
+                  >
+                    {t.name}
+                    <span>{t.count}</span>
+                  </Link>
+                ))}
+              </div>
+            </div>
+            <div className="rail-section">
+              <Link href="/stream">看看最近收下了什么</Link>
+              <p className="small faint">
+                链接由 Agent 整理，你决定它们的价值。
+              </p>
+            </div>
+            {stats.total === 0 ? (
+              <div className="rail-section">
+                <Link className="btn" href="/items/new">
+                  收下第一条链接
+                </Link>
+                <p className="page-sub">
+                  <Link href="/settings#connections">连接你的 Agent</Link>
+                </p>
+              </div>
+            ) : null}
+          </aside>
         </div>
-
-        <div className="stats">
-          <StatBlock value={stats.total} label="总收藏" />
-          <StatBlock value={stats.unread} label="未读" />
-          <StatBlock value={stats.overdue} label="超期未读" alert={stats.overdue > 0} />
-          <StatBlock value={stats.added_7d} label="近 7 天新增" />
-        </div>
-
-        <section className="section">
-          <div className="section-head">
-            <h2>超期提醒</h2>
-            <span className="section-count">{reminders.length} 条</span>
-          </div>
-          {reminders.length === 0 ? (
-            <EmptyState
-              title="没有超期未读的收藏"
-              text="收藏超过提醒阈值且从未打开过的条目会出现在这里。"
-            />
-          ) : (
-            <ReminderPanel entries={reminders} />
-          )}
-        </section>
-
-        <section className="section">
-          <div className="section-head">
-            <h2>最近收藏</h2>
-            <Link href="/items" className="small muted">
-              查看全部
-            </Link>
-          </div>
-          {recent.items.length === 0 ? (
-            <EmptyState
-              title="还没有收藏"
-              text="用 Skill 或 MCP 把链接收进来，或在设置页生成 API Key。"
-            />
-          ) : (
-            <ul className="rows">
-              {recent.items.map((item) => (
-                <ItemRow key={item.id} item={item} />
-              ))}
-            </ul>
-          )}
-        </section>
       </div>
     </main>
   );

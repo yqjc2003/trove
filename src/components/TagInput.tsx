@@ -60,23 +60,26 @@ export function TagInput({
             </button>
           </span>
         ))}
-        {tags.length === 0 ? <span className="faint small">尚未打标签</span> : null}
+        {tags.length === 0 ? (
+          <span className="faint small">尚未打标签</span>
+        ) : null}
       </div>
 
-      <form
-        className="form-row"
-        style={{ marginTop: 12 }}
-        onSubmit={(e) => {
-          e.preventDefault();
-          addTag(input);
-        }}
-      >
+      <div className="form-row" style={{ marginTop: 12 }}>
         <input
           className="input"
           name="tag"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={placeholder.endsWith('…') ? placeholder : `${placeholder}…`}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              addTag(input);
+            }
+          }}
+          placeholder={
+            placeholder.endsWith('…') ? placeholder : `${placeholder}…`
+          }
           disabled={disabled}
           list={listId}
           aria-label="标签名"
@@ -90,10 +93,15 @@ export function TagInput({
               <option key={o.id} value={o.name} />
             ))}
         </datalist>
-        <button type="submit" className="btn btn-sm" disabled={disabled}>
+        <button
+          type="button"
+          className="btn btn-sm"
+          disabled={disabled || !input.trim()}
+          onClick={() => addTag(input)}
+        >
           添加
         </button>
-      </form>
+      </div>
 
       {error ? (
         <p className="small danger" role="alert">

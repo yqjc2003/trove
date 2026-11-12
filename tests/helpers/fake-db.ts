@@ -115,9 +115,9 @@ export class FakeTroveDb {
 
     if (overdue) {
       const cutoff = new Date(
-        Date.now() - 14 * 24 * 60 * 60 * 1000,
+        Date.now() - this.profile.reminder_days * 24 * 60 * 60 * 1000,
       ).toISOString();
-      list = list.filter((i) => !i.read_at && i.collected_at < cutoff);
+      list = list.filter((i) => i.status === 'active' && !i.read_at && i.collected_at < cutoff);
     }
 
     if (q && q.trim()) {

@@ -1,201 +1,272 @@
 'use client';
-
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
-
+import { SOURCE_LABELS, TYPE_LABELS } from '@/lib/ui-labels';
 import type { TagOption } from '@/components/TagInput';
 
-const CONTENT_TYPES = [
-  { value: 'article', label: '文章' },
-  { value: 'video', label: '视频' },
-  { value: 'repo', label: '仓库' },
-  { value: 'tool', label: '工具' },
-  { value: 'social', label: '社交' },
-  { value: 'doc', label: '文档' },
-  { value: 'other', label: '其他' },
-];
-
-const SOURCES = [
-  { value: 'manual', label: '手动' },
-  { value: 'skill', label: 'Skill' },
-  { value: 'mcp', label: 'MCP' },
-  { value: 'github', label: 'GitHub' },
-  { value: 'bookmark', label: '收藏夹' },
-];
-
-/** 列表筛选栏。筛选状态全部放在 URL query 里，可分享、可回退。 */
-export function FilterBar({
-  tags,
-  showStatus = true,
-}: {
-  tags: TagOption[];
-  showStatus?: boolean;
-}) {
+export function FilterBar({ tags }: { tags: TagOption[] }) {
   const router = useRouter();
   const params = useSearchParams();
   const [pending, startTransition] = useTransition();
-  const [q, setQ] = useState(params.get('q') ?? '');
-
+  const [tagQuery, setTagQuery] = useState('');
   const activeTags = params.getAll('tag');
-
   function push(next: URLSearchParams) {
-    startTransition(() => {
-      router.replace(`/items?${next.toString()}`, { scroll: false });
-    });
-  }
-
-  function setParam(key: string, value: string | null) {
-    const next = new URLSearchParams(params.toString());
-    if (value === null || value === '') next.delete(key);
-    else next.set(key, value);
     next.delete('offset');
+    startTransition(() => router.push(`/items?${next}`, { scroll: false }));
+  }
+  function setParam(key: string, value: string) {
+    const next = new URLSearchParams(params.toString());
+    if (value) next.set(key, value);
+    else next.delete(key);
     push(next);
   }
-
   function toggleTag(name: string) {
     const next = new URLSearchParams(params.toString());
-    const current = next.getAll('tag');
     next.delete('tag');
-    const updated = current.includes(name)
-      ? current.filter((t) => t !== name)
-      : [...current, name];
-    for (const t of updated) next.append('tag', t);
-    next.delete('offset');
+    const values = activeTags.includes(name)
+      ? activeTags.filter((t) => t !== name)
+      : [...activeTags, name];
+    values.forEach((t) => next.append('tag', t));
     push(next);
   }
-
-  function submitSearch(e: React.FormEvent) {
-    e.preventDefault();
-    setParam('q', q.trim() || null);
+  const lens =
+    params.get('status') === 'archived'
+      ? 'archive'
+      : params.get('overdue') === 'true'
+        ? 'overdue'
+        : params.get('sort') === 'click_count'
+          ? 'frequent'
+          : params.get('read') === 'unread'
+            ? 'unread'
+            : 'all';
+  function selectLens(value: string) {
+    const next = new URLSearchParams(params.toString());
+    ['status', 'read', 'overdue', 'sort', 'order'].forEach((key) =>
+      next.delete(key),
+    );
+    if (value === 'archive') next.set('status', 'archived');
+    if (value === 'unread') next.set('read', 'unread');
+    if (value === 'overdue') next.set('overdue', 'true');
+    if (value === 'frequent') next.set('sort', 'click_count');
+    push(next);
   }
-
-  const currentType = params.get('content_type');
-  const currentSource = params.get('source');
-  const currentRead = params.get('read');
-
+  const conditions = [...params.entries()].filter(([key]) =>
+    [
+      'q',
+      'tag',
+      'domain',
+      'source',
+      'content_type',
+      'status',
+      'read',
+      'overdue',
+      'sort',
+      'order',
+      'collected_from',
+      'collected_to',
+    ].includes(key),
+  );
+  function conditionLabel(key: string, value: string) {
+    if (key === 'tag') return `标签：${value}`;
+    if (key === 'q') return `关键词：${value}`;
+    if (key === 'domain') return `域名：${value}`;
+    if (key === 'source')
+      return `来源：${SOURCE_LABELS[value as keyof typeof SOURCE_LABELS] ?? value}`;
+    if (key === 'content_type')
+      return `形态：${TYPE_LABELS[value as keyof typeof TYPE_LABELS] ?? value}`;
+    if (key === 'status')
+      return value === 'all'
+        ? '包含归档'
+        : value === 'archived'
+          ? '已归档'
+          : '未归档';
+    if (key === 'read')
+      return value === 'unread'
+        ? '未读'
+        : value === 'read'
+          ? '已读'
+          : '所有阅读状态';
+    if (key === 'overdue') return '待回看';
+    if (key === 'sort')
+      return value === 'click_count'
+        ? '按打开次数'
+        : value === 'title'
+          ? '按标题'
+          : '按收藏时间';
+    if (key === 'order') return value === 'asc' ? '升序' : '降序';
+    return `${key === 'collected_from' ? '收集自' : '收集至'}：${value}`;
+  }
   return (
-    <div className="filters">
-      <form onSubmit={submitSearch} className="form-row" role="search">
+    <div className="filters" aria-busy={pending}>
+      <form
+        key={params.get('q') ?? ''}
+        role="search"
+        className="form-row library-search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          setParam(
+            'q',
+            String(new FormData(e.currentTarget).get('q') ?? '').trim(),
+          );
+        }}
+      >
         <label className="sr-only" htmlFor="item-search">
-          搜索收藏
+          搜索标题、摘要或链接
         </label>
         <input
           id="item-search"
           className="input"
           name="q"
-          value={q}
-          onChange={(e) => setQ(e.target.value)}
-          placeholder="标题、摘要或链接…"
+          defaultValue={params.get('q') ?? ''}
+          placeholder="找回一个想法、一篇文章、一个工具…"
           autoComplete="off"
-          spellCheck={false}
-          enterKeyHint="search"
         />
-        <button type="submit" className="btn btn-sm">
-          搜索
+        <button className="btn btn-primary" disabled={pending}>
+          搜索藏库
         </button>
-        {q && q !== (params.get('q') ?? '') ? (
+      </form>
+      <div className="lens-tabs" aria-label="快捷镜头">
+        {[
+          ['all', '全部'],
+          ['unread', '未读'],
+          ['overdue', '待回看'],
+          ['frequent', '常打开'],
+          ['archive', '已归档'],
+        ].map(([value, label]) => (
           <button
-            type="button"
-            className="btn-quiet"
-            onClick={() => {
-              setQ('');
-              setParam('q', null);
+            key={value}
+            className="lens-tab"
+            aria-pressed={lens === value}
+            onClick={() => selectLens(value)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <details className="filter-details">
+        <summary>
+          收窄范围
+          {activeTags.length ? ` · 同时包含 ${activeTags.length} 个标签` : ''}
+        </summary>
+        <div className="filter-fields">
+          <label>
+            内容形态
+            <select
+              className="input"
+              value={params.get('content_type') ?? ''}
+              onChange={(e) => setParam('content_type', e.target.value)}
+            >
+              <option value="">所有形态</option>
+              {Object.entries(TYPE_LABELS).map(([v, label]) => (
+                <option value={v} key={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <label>
+            采集来源
+            <select
+              className="input"
+              value={params.get('source') ?? ''}
+              onChange={(e) => setParam('source', e.target.value)}
+            >
+              <option value="">所有来源</option>
+              {Object.entries(SOURCE_LABELS).map(([v, label]) => (
+                <option value={v} key={v}>
+                  {label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <form
+            key={params.get('domain') ?? ''}
+            onSubmit={(e) => {
+              e.preventDefault();
+              setParam(
+                'domain',
+                String(
+                  new FormData(e.currentTarget).get('domain') ?? '',
+                ).trim(),
+              );
             }}
           >
-            清除
-          </button>
-        ) : null}
-      </form>
-
-      {tags.length > 0 ? (
-        <div className="filter-group" style={{ marginTop: 12 }}>
-          <span className="filter-label">标签</span>
-          {tags.map((t) => (
+            <label htmlFor="domain-filter">域名</label>
+            <div className="form-row">
+              <input
+                id="domain-filter"
+                className="input"
+                name="domain"
+                defaultValue={params.get('domain') ?? ''}
+                placeholder="github.com"
+              />
+              <button className="btn">应用</button>
+            </div>
+          </form>
+        </div>
+        <label className="field">
+          <span className="field-label">标签 · 多选时同时包含（AND）</span>
+          <input
+            className="input"
+            value={tagQuery}
+            onChange={(e) => setTagQuery(e.target.value)}
+            placeholder="在你的标签中查找"
+          />
+        </label>
+        <div className="tag-options">
+          {tags
+            .filter((t) =>
+              t.name.toLowerCase().includes(tagQuery.toLowerCase()),
+            )
+            .map((t) => (
+              <button
+                key={t.id}
+                className="chip"
+                aria-pressed={activeTags.includes(t.name)}
+                onClick={() => toggleTag(t.name)}
+              >
+                {t.name}
+              </button>
+            ))}
+        </div>
+      </details>
+      <p className="filter-sentence">
+        {activeTags.length ? `同时包含「${activeTags.join('」和「')}」的` : ''}
+        {params.get('q') ? `匹配「${params.get('q')}」的` : ''}
+        {lens === 'archive'
+          ? '已归档收藏'
+          : lens === 'overdue'
+            ? '超期未读收藏'
+            : lens === 'unread'
+              ? '未读收藏'
+              : '收藏'}
+        {lens === 'frequent' ? '，按打开次数排列' : ''}。
+      </p>
+      {conditions.length ? (
+        <div className="active-conditions">
+          {conditions.map(([key, value]) => (
             <button
-              key={t.id}
-              type="button"
               className="chip"
-              aria-pressed={activeTags.includes(t.name)}
-              onClick={() => toggleTag(t.name)}
+              key={`${key}-${value}`}
+              onClick={() => {
+                if (key === 'tag') toggleTag(value);
+                else setParam(key, '');
+              }}
+              aria-label={`移除${conditionLabel(key, value)}`}
             >
-              {t.name}
+              {conditionLabel(key, value)} ×
             </button>
           ))}
+          <button
+            className="btn-quiet"
+            onClick={() => push(new URLSearchParams())}
+          >
+            清空镜头
+          </button>
         </div>
       ) : null}
-
-      <div className="filter-group" style={{ marginTop: 12 }}>
-        <span className="filter-label">类型</span>
-        <button
-          type="button"
-          className="chip"
-          aria-pressed={!currentType}
-          onClick={() => setParam('content_type', null)}
-        >
-          全部
-        </button>
-        {CONTENT_TYPES.map((c) => (
-          <button
-            key={c.value}
-            type="button"
-            className="chip"
-            aria-pressed={currentType === c.value}
-            onClick={() => setParam('content_type', currentType === c.value ? null : c.value)}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="filter-group" style={{ marginTop: 12 }}>
-        <span className="filter-label">来源</span>
-        <button
-          type="button"
-          className="chip"
-          aria-pressed={!currentSource}
-          onClick={() => setParam('source', null)}
-        >
-          全部
-        </button>
-        {SOURCES.map((s) => (
-          <button
-            key={s.value}
-            type="button"
-            className="chip"
-            aria-pressed={currentSource === s.value}
-            onClick={() => setParam('source', currentSource === s.value ? null : s.value)}
-          >
-            {s.label}
-          </button>
-        ))}
-      </div>
-
-      <div className="filter-group" style={{ marginTop: 12 }}>
-        <span className="filter-label">状态</span>
-        <button
-          type="button"
-          className="chip"
-          aria-pressed={currentRead === 'unread'}
-          onClick={() => setParam('read', currentRead === 'unread' ? null : 'unread')}
-        >
-          未读
-        </button>
-        {showStatus ? (
-          <button
-            type="button"
-            className="chip"
-            aria-pressed={params.get('status') === 'archived'}
-            onClick={() =>
-              setParam('status', params.get('status') === 'archived' ? null : 'archived')
-            }
-          >
-            已归档
-          </button>
-        ) : null}
-      </div>
-
-      <p className="faint small" style={{ marginTop: pending ? 8 : 0 }} aria-live="polite">
-        {pending ? '筛选中…' : ''}
+      <p className="small faint" role="status">
+        {pending ? '正在查找…' : ''}
       </p>
     </div>
   );

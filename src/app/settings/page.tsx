@@ -24,14 +24,14 @@ export default async function SettingsPage() {
       <div className="wrap">
         <div className="page-head">
           <div>
-            <h1>设置</h1>
-            <p className="page-sub">标签空间、接入凭据与提醒阈值。</p>
+            <h1>我的语言</h1>
+            <p className="page-sub">收藏慢慢积累，描述它们的词汇也由你定义。</p>
           </div>
         </div>
 
         <section className="section" style={{ marginTop: 0 }}>
           <div className="section-head">
-            <h2>标签</h2>
+            <h2>个人词汇表</h2>
             <span className="section-count">{tags.length} 个</span>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
@@ -45,7 +45,7 @@ export default async function SettingsPage() {
 
         <section className="section">
           <div className="section-head">
-            <h2>API Key</h2>
+            <h2 id="connections">连接 Agent</h2>
             <span className="section-count">{keys.length} 个</span>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
@@ -58,7 +58,7 @@ export default async function SettingsPage() {
 
         <section className="section">
           <div className="section-head">
-            <h2>超期提醒</h2>
+            <h2>回看节奏</h2>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
             收藏超过这个天数且从未打开过，就会进入待读清单。

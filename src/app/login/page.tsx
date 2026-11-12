@@ -158,7 +158,7 @@ function LoginForm() {
       <div className="wrap-narrow">
         <h1 translate="no">trove</h1>
         <p className="page-sub">
-          把散落在各处收藏的链接，统一收敛到一处：标签、笔记、归档与阅读追踪。
+          把散落的链接收在一起。重新打开，留下自己的理解。
         </p>
 
         <div className="section">

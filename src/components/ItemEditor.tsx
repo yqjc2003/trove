@@ -39,7 +39,7 @@ export function ItemEditor({
     return (
       <div>
         <h1>{title}</h1>
-        {summary ? <p className="row-summary">{summary}</p> : null}
+        {summary ? <p className="detail-summary">{summary}</p> : null}
         <div className="row-actions">
           <button type="button" className="btn-quiet" onClick={() => setEditing(true)}>
             编辑标题与摘要

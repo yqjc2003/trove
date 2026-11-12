@@ -29,9 +29,9 @@ export function ReminderPanel({
           <p className="row-meta">
             <span>{item.domain}</span>
             <span>收藏于 {formatDate(item.collected_at)}</span>
-            <span>已积压 {days_overdue} 天</span>
+            <span>已收下 {days_overdue} 天</span>
           </p>
-          {showLink ? null : null}
+          {showLink ? <div className="row-actions"><a className="btn" href={`/r/${item.id}`} target="_blank" rel="noopener noreferrer">打开并阅读<span className="sr-only">（新标签页）</span></a></div> : null}
         </li>
       ))}
     </ul>

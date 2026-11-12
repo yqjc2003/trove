@@ -2,43 +2,66 @@
 
 import { useState, useTransition } from 'react';
 
-import { addNoteAction, deleteNoteAction, updateNoteAction } from '@/app/actions/notes';
+import {
+  addNoteAction,
+  deleteNoteAction,
+  updateNoteAction,
+} from '@/app/actions/notes';
 import { MarkdownView } from '@/components/MarkdownView';
 import { formatDateTime } from '@/lib/format';
 import type { Note } from '@/types';
 
 /** Markdown 笔记编辑器：多条笔记，可增删改，带预览切换。 */
-export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] }) {
+export function NoteEditor({
+  itemId,
+  notes,
+}: {
+  itemId: string;
+  notes: Note[];
+}) {
   const [draft, setDraft] = useState('');
   const [preview, setPreview] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingBody, setEditingBody] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+  const [notice, setNotice] = useState('');
 
   function submitNew() {
     if (!draft.trim()) return;
+    setNotice('');
     startTransition(async () => {
-      const res = await addNoteAction(itemId, draft);
-      if (!res.ok) {
-        setError(res.error ?? '保存失败');
-        return;
+      try {
+        const res = await addNoteAction(itemId, draft);
+        if (!res.ok) {
+          setError(res.error ?? '保存失败');
+          return;
+        }
+        setDraft('');
+        setError(null);
+        setNotice('笔记已保存。');
+      } catch {
+        setError('连接失败，草稿已保留，请重试。');
       }
-      setDraft('');
-      setError(null);
     });
   }
 
   function submitEdit(noteId: string) {
+    setNotice('');
     startTransition(async () => {
-      const res = await updateNoteAction(noteId, editingBody);
-      if (!res.ok) {
-        setError(res.error ?? '保存失败');
-        return;
+      try {
+        const res = await updateNoteAction(noteId, editingBody);
+        if (!res.ok) {
+          setError(res.error ?? '保存失败');
+          return;
+        }
+        setEditingId(null);
+        setEditingBody('');
+        setError(null);
+        setNotice('笔记已更新。');
+      } catch {
+        setError('连接失败，修改已保留，请重试。');
       }
-      setEditingId(null);
-      setEditingBody('');
-      setError(null);
     });
   }
 
@@ -59,7 +82,9 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
           {notes.map((note) => (
             <li key={note.id} className="note">
               <div className="note-head">
-                <span className="note-time">{formatDateTime(note.created_at)}</span>
+                <span className="note-time">
+                  {formatDateTime(note.created_at)}
+                </span>
                 <span style={{ display: 'flex', gap: 12 }}>
                   <button
                     type="button"
@@ -89,6 +114,7 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
                     className="textarea textarea-mono"
                     name="note"
                     value={editingBody}
+                    disabled={pending}
                     onChange={(e) => setEditingBody(e.target.value)}
                     aria-label="编辑笔记"
                     autoComplete="off"
@@ -126,7 +152,7 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
 
       <div className="section">
         <div className="section-head">
-          <h2 id="new-note-heading">写一条新笔记</h2>
+          <h2 id="new-note-heading">留下你未来会需要的一句话</h2>
           <button
             type="button"
             className="btn-quiet"
@@ -136,6 +162,21 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
           </button>
         </div>
 
+        <div className="note-prompts" aria-label="笔记起笔">
+          {['值得记住', '想尝试', '与什么有关'].map((prompt) => (
+            <button
+              key={prompt}
+              className="chip"
+              disabled={pending}
+              onClick={() => {
+                setDraft((body) => `${body}${body ? '\n\n' : ''}${prompt}：`);
+                setPreview(false);
+              }}
+            >
+              {prompt}
+            </button>
+          ))}
+        </div>
         {preview ? (
           <div style={{ paddingTop: 12 }}>
             <MarkdownView body={draft} />
@@ -146,8 +187,9 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
             className="textarea textarea-mono"
             name="note"
             value={draft}
+            disabled={pending}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="支持 Markdown：代码块、列表、表格…"
+            placeholder="为什么收下它？什么值得下次再用？支持 Markdown。"
             autoComplete="off"
             aria-labelledby="new-note-heading"
             style={{ marginTop: 12 }}
@@ -167,9 +209,12 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
             onClick={submitNew}
             disabled={pending || !draft.trim()}
           >
-            保存笔记
+            {pending ? '保存中…' : '保存笔记'}
           </button>
         </div>
+        <p className="small muted" role="status">
+          {notice}
+        </p>
       </div>
     </div>
   );
