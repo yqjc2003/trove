@@ -1,6 +1,6 @@
 ---
 name: trove-capture
-description: Capture URLs into the user's Trove bookmark collection. Resolves single or multiple URLs, GitHub stars, or local Chrome/Edge bookmarks; extracts page content; generates a title, summary and up to 3 tags with AI; then saves them via the Trove REST API or MCP. Use when the user asks to 收藏 / 加入 trove / 保存这些链接 / 导入书签 / 同步 GitHub star / 整理收藏.
+description: Capture URLs into the user's Trove bookmark collection. Resolves URLs, GitHub stars, or local Chrome/Edge bookmarks; extracts content; generates a title, summary and a few broad, reusable tags; then saves via REST or MCP. Use when the user asks to 收藏 / 加入 trove / 保存这些链接 / 导入书签 / 同步 GitHub star / 整理收藏.
 license: Apache-2.0
 ---
 
@@ -11,7 +11,7 @@ license: Apache-2.0
 ## 核心原则
 
 1. **AI 解读由你（Agent）负责。** 服务端不抓正文、不调用任何模型。你必须先拿到正文，自己产出 `title` / `summary` / `tags`，再调用写入接口。
-2. **标签语义完全由你决定。** 系统没有预设分类清单，也**不会**把你的标签映射到「工作 / 生活 / 家庭」等固定分类。**你解读出什么领域/主题的标签，就原样提交什么标签**（中文或英文都行，服务端只做大小写与空白归一）。
+2. **标签用于聚合多篇收藏，抽象程度略高于文章关键词。** 优先用领域/技术栈，加一个确有帮助的学习方式或使用场景，例如 HashMap 源码文章用 `java`、`源码阅读`，不为单个类、方法或问题新增标签。系统没有预设分类清单，具体词汇仍由你根据内容和用户既有标签决定。
 3. **但标签命名空间要克制。** 用户的标签空间是长期资产，碎片化（`gis` 与 `gis数据`、`springboot` 与 `spring boot`）会让检索越来越难用。**新增标签前必须先过一遍 `tag-resolver.mjs`**（见「标签归一」一节）—— 能复用既有标签就别新造。
 4. **每个用户拥有独立的一套标签。** 其他用户的标签你既看不到也用不了。
 5. **重复录入是 upsert，不会产生重复条目。** 详见「重复录入」一节。
@@ -118,7 +118,25 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
 |---|---|
 | `title` | 必填，≤300 字符。用页面真实标题；没有就用域名 + 内容类型 |
 | `summary` | 可选，≤1000 字符。**说明这个链接是什么、解决什么问题**，不要复述标题 |
-| `tags` | 可选，**≤3 个**。标签名由你决定：领域、主题、技术栈、使用场景都可以 |
+| `tags` | 可选，通常 **1–2 个**，最多 **3 个**。使用可聚合多篇内容的领域、技术栈、学习方式或使用场景，不必凑满 |
+
+### 标签粒度：先归组，再归一
+
+标签是回看和检索时的入口，不是文章关键词清单。保存前先用 `node scripts/tag-resolver.mjs list` 浏览已有词汇，优先选语义合适的较宽标签，再用 resolver 检查拼写与近义词。
+
+- 将细节留在标题和摘要里：具体类名、API、方法名、错误码、版本号、单个算法/参数，通常不另建标签。
+- 优先复用合适的上位标签；已有很多细标签不等于应继续沿用同样粒度。新建前问自己：「这个标签能自然容纳多篇不同内容吗？与已有较宽标签相比，是否真的多了一个有用入口？」
+- 批量采集先通览内容，收敛为一小组可复用主题，再逐条分配；避免为每个网页各造一个专属标签。
+- 不粗化到失去用途，例如不用「技术」「学习」取代所有主题。稳定的技术栈或独立领域仍可作为标签；用户明确要求细分时尊重其选择。
+
+| 内容 | 合适的候选标签 | 通常不新增的细标签 |
+|---|---|---|
+| Java HashMap 扩容与源码解析 | `java`、`源码阅读` | `hashmap`、`resize`、`红黑树转换` |
+| Java ArrayList 扩容实现 | `java`、`源码阅读` | `arraylist`、`grow方法` |
+| MySQL 某条慢 SQL 的排查 | `mysql`、`性能优化` | `某个执行计划节点`、`具体错误码` |
+| React useEffect 依赖问题 | `react`、`开发实践` | `useeffect依赖数组`、`某个hook参数` |
+
+这些是粒度示例，不是预置分类或固定词表。只选择内容确实支持的标签，随后执行下面的归一流程。
 
 标签建议：
 - 归一由服务端做（小写、去 `#`、折叠空白），你直接给有意义的名称即可。
@@ -142,7 +160,7 @@ node scripts/tag-resolver.mjs resolve "标签1" "标签2" "标签3"
 |---|---|---|
 | `reuse` | 命名空间里已有等价标签 | **直接用 `resolved`**，不要新造 |
 | `candidate` | 有相近的既有标签，但**不一定等价** | 读 `reason` 和 `candidates`：能表达你的语义就用 `resolved`；不能就换候选或新建。**不要默认新建** |
-| `new` | 确实没有相近的 | 才允许新建 |
+| `new` | 没有匹配的既有名称 | 仍需通过上面的粒度判断；若已有合适的较宽标签，改用它，不因 `new` 自动新建 |
 
 配套还有 `warning` 字段：命中「来源站点名」黑名单时会提示别用。
 

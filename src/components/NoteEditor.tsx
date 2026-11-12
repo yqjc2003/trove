@@ -75,9 +75,7 @@ export function NoteEditor({
 
   return (
     <div>
-      {notes.length === 0 ? (
-        <p className="faint small">还没有笔记。</p>
-      ) : (
+      {notes.length > 0 ? (
         <ul className="rows">
           {notes.map((note) => (
             <li key={note.id} className="note">
@@ -148,11 +146,11 @@ export function NoteEditor({
             </li>
           ))}
         </ul>
-      )}
+      ) : null}
 
-      <div className="section">
+      <div className="note-compose">
         <div className="section-head">
-          <h2 id="new-note-heading">留下你未来会需要的一句话</h2>
+          <h2 id="new-note-heading">写下你的理解</h2>
           <button
             type="button"
             className="btn-quiet"
@@ -162,21 +160,6 @@ export function NoteEditor({
           </button>
         </div>
 
-        <div className="note-prompts" aria-label="笔记起笔">
-          {['值得记住', '想尝试', '与什么有关'].map((prompt) => (
-            <button
-              key={prompt}
-              className="chip"
-              disabled={pending}
-              onClick={() => {
-                setDraft((body) => `${body}${body ? '\n\n' : ''}${prompt}：`);
-                setPreview(false);
-              }}
-            >
-              {prompt}
-            </button>
-          ))}
-        </div>
         {preview ? (
           <div style={{ paddingTop: 12 }}>
             <MarkdownView body={draft} />

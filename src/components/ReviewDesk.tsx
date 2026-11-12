@@ -107,7 +107,15 @@ export function ReviewDesk({
             <span>{TYPE_LABELS[item.content_type]}</span>
           </p>
           <h2 className="desk-title">
-            <Link href={`/items/${item.id}`}>{item.title}</Link>
+            <a
+              href={`/r/${item.id}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={() => setOpened(item.id)}
+            >
+              {item.title}
+              <span className="sr-only">（在新标签页打开原文）</span>
+            </a>
           </h2>
           <p className="row-meta">
             {item.domain} · {formatDate(item.collected_at)} 收集 ·{' '}
@@ -129,6 +137,9 @@ export function ReviewDesk({
           </div>
           <div className="desk-actions">
             <OpenOriginal id={item.id} onOpen={() => setOpened(item.id)} />
+            <Link className="btn" href={`/items/${item.id}`}>
+              详情与笔记
+            </Link>
             <button
               className="btn"
               disabled={pending}

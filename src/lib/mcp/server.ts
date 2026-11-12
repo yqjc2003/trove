@@ -25,8 +25,13 @@ export interface McpAuthContext {
 
 /** 从 MCP 工具上下文里取出已验证的身份。 */
 export function authFromContext(ctx: unknown): McpAuthContext {
-  const http = (ctx as { http?: { authInfo?: { extra?: Record<string, unknown>; scopes?: string[] } } })
-    ?.http;
+  const http = (
+    ctx as {
+      http?: {
+        authInfo?: { extra?: Record<string, unknown>; scopes?: string[] };
+      };
+    }
+  )?.http;
   const authInfo = http?.authInfo;
   const userId = authInfo?.extra?.userId;
   return {
@@ -51,7 +56,11 @@ export function toolError(code: string, message: string, details?: unknown) {
     content: [
       {
         type: 'text' as const,
-        text: JSON.stringify({ error: { code, message, ...(details ? { details } : {}) } }, null, 2),
+        text: JSON.stringify(
+          { error: { code, message, ...(details ? { details } : {}) } },
+          null,
+          2,
+        ),
       },
     ],
     isError: true,
@@ -80,7 +89,13 @@ const saveItemSchema = z.object({
   url: z.string().min(1),
   title: z.string().min(1).max(300),
   summary: z.string().max(1000).optional(),
-  tags: z.array(z.string()).max(3).optional(),
+  tags: z
+    .array(z.string())
+    .max(3)
+    .optional()
+    .describe(
+      '通常 1–2 个可聚合多篇内容的宽主题标签，最多 3 个；优先复用既有领域/技术栈/学习方式，具体类名和 API 留在标题摘要。',
+    ),
   content_type: contentTypeEnum.optional(),
   source: sourceEnum.optional(),
   source_ref: z.string().max(300).optional(),
@@ -103,8 +118,10 @@ const searchSchema = z.object({
 const AI_GUIDANCE = [
   'AI 解读由调用方（Agent）负责，服务端不抓取正文、不调用任何模型。',
   '正确用法：先用 fetch-content 之类的工具拿到正文 → 自己产出 title（≤300）、summary（≤1000）、tags（≤3）→ 再调用本工具写入。',
-  '标签语义完全由你决定：系统没有预设分类清单，也不会把标签映射到「工作/生活」等固定分类，你解读出什么就存什么（可中文可英文，服务端只做大小写与空白归一）。',
-  '建议先调用 trove_list_tags，若已有语义匹配的标签就复用，避免同义标签碎片化。',
+  '标签是聚合多篇收藏的检索入口，粒度应略高于文章关键词。通常选 1–2 个，最多 3 个，不必凑满：优先领域/技术栈，必要时加学习方式或使用场景。',
+  '例如 Java HashMap、ArrayList 的源码文章可共用「java」「源码阅读」，通常不新建 hashmap、resize、具体方法/API/错误码/版本等细标签；具体细节写进标题和摘要。示例不是固定分类清单。',
+  '保存前先调用 trove_list_tags，优先复用合适的较宽标签。新建前判断是否能自然容纳多篇不同内容；已有细标签不等于应继续细分。批量采集先收敛共享主题，再逐条分配。用户明确要求细分时尊重其选择。',
+  '不把所有内容泛化为「技术」「学习」；系统没有预设分类清单，也不做服务端语义映射。',
 ].join('\n');
 
 /**
@@ -173,7 +190,8 @@ export function registerTroveTools(server: {
     'trove_get',
     {
       title: '查看收藏详情',
-      description: '按 id 读取一条收藏的完整信息，含标签、全部笔记与最近点击记录。',
+      description:
+        '按 id 读取一条收藏的完整信息，含标签、全部笔记与最近点击记录。',
       inputSchema: z.object({ id: z.string().uuid() }),
     },
     (async (args: { id: string }, ctx: unknown) => {
@@ -220,7 +238,10 @@ export function registerTroveTools(server: {
       description: `批量保存（最多 50 条）。单条失败不影响其余。\n${AI_GUIDANCE}`,
       inputSchema: z.object({ items: z.array(saveItemSchema).min(1).max(50) }),
     },
-    (async (args: { items: Array<z.infer<typeof saveItemSchema>> }, ctx: unknown) => {
+    (async (
+      args: { items: Array<z.infer<typeof saveItemSchema>> },
+      ctx: unknown,
+    ) => {
       const auth = authFromContext(ctx);
       try {
         if (!auth.scopes.includes('items:write')) {
@@ -239,8 +260,7 @@ export function registerTroveTools(server: {
     'trove_update',
     {
       title: '更新收藏',
-      description:
-        '更新一条收藏的可改字段。传 tags 即整体替换标签集合；不传则保持原样。',
+      description: `更新一条收藏的可改字段。传 tags 即整体替换标签集合；不传则保持原样。\n${AI_GUIDANCE}`,
       inputSchema: z.object({
         id: z.string().uuid(),
         title: z.string().min(1).max(300).optional(),
@@ -273,7 +293,8 @@ export function registerTroveTools(server: {
     'trove_archive',
     {
       title: '归档 / 取消归档',
-      description: '批量归档或取消归档。归档的条目不再出现在默认列表与待读清单中。',
+      description:
+        '批量归档或取消归档。归档的条目不再出现在默认列表与待读清单中。',
       inputSchema: z.object({
         ids: z.array(z.string().uuid()).min(1),
         archived: z.boolean().default(true),
@@ -311,7 +332,8 @@ export function registerTroveTools(server: {
     'trove_delete',
     {
       title: '删除收藏',
-      description: '彻底删除一条收藏（笔记与点击记录一并删除）。归档是可逆的替代方案。',
+      description:
+        '彻底删除一条收藏（笔记与点击记录一并删除）。归档是可逆的替代方案。',
       inputSchema: z.object({ id: z.string().uuid() }),
     },
     (async (args: { id: string }, ctx: unknown) => {
@@ -455,7 +477,7 @@ export function registerTroveTools(server: {
     {
       title: '列出标签',
       description:
-        '返回当前用户全部标签（含使用计数与来源）。保存前先调用它，优先复用既有标签以避免碎片化。',
+        '返回当前用户全部标签（含使用计数与来源）。保存前先调用它，优先复用语义合适的较宽主题。标签应聚合多篇内容，不因已有细标签而继续按类名、方法名或单篇问题细分。',
       inputSchema: z.object({}),
     },
     (async (_args: unknown, ctx: unknown) => {
@@ -464,7 +486,12 @@ export function registerTroveTools(server: {
         const service = serviceContext(auth);
         const tags = await listTags(service);
         return toolOk(
-          tags.map((t) => ({ id: t.id, name: t.name, count: t.count ?? 0, origin: t.origin })),
+          tags.map((t) => ({
+            id: t.id,
+            name: t.name,
+            count: t.count ?? 0,
+            origin: t.origin,
+          })),
         );
       } catch (e) {
         const err = toAppError(e);
@@ -510,8 +537,11 @@ export function registerTroveTools(server: {
 
         if (args.action === 'rename') {
           if (!args.tag_id) return toolError('VALIDATION_ERROR', '缺少 tag_id');
-          if (!args.new_name) return toolError('VALIDATION_ERROR', '缺少 new_name');
-          return toolOk({ tag: await renameTag(service, args.tag_id, args.new_name) });
+          if (!args.new_name)
+            return toolError('VALIDATION_ERROR', '缺少 new_name');
+          return toolOk({
+            tag: await renameTag(service, args.tag_id, args.new_name),
+          });
         }
 
         if (!args.tag_id) return toolError('VALIDATION_ERROR', '缺少 tag_id');

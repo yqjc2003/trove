@@ -14,7 +14,10 @@ export function ItemRow({
   return (
     <li className="row">
       <p className="row-title">
-        <Link href={`/items/${item.id}`}>{item.title}</Link>
+        <a href={`/r/${item.id}`} target="_blank" rel="noopener noreferrer">
+          {item.title}
+          <span className="sr-only">（在新标签页打开原文）</span>
+        </a>
       </p>
       <p className="row-meta">
         <span translate="no">{item.domain}</span>
@@ -28,14 +31,27 @@ export function ItemRow({
       {item.tags && item.tags.length > 0 ? (
         <div className="tags">
           {item.tags.map((t) => (
-            <Link key={t.id} className="tag" href={`/items?tag=${encodeURIComponent(t.name)}`}>
+            <Link
+              key={t.id}
+              className="tag"
+              href={`/items?tag=${encodeURIComponent(t.name)}`}
+            >
               {t.name}
             </Link>
           ))}
         </div>
       ) : null}
       {actions ? <div className="row-actions">{actions}</div> : null}
-      <div className="row-tail"><span>{SOURCE_LABELS[item.source]}</span><a href={`/r/${item.id}`} target="_blank" rel="noopener noreferrer" aria-label={`打开原文：${item.title}（新标签页）`}>打开原文 ↗</a></div>
+      <div className="row-tail">
+        <span>{SOURCE_LABELS[item.source]}</span>
+        <Link
+          className="btn-quiet"
+          href={`/items/${item.id}`}
+          aria-label={`查看详情：${item.title}`}
+        >
+          详情与笔记
+        </Link>
+      </div>
     </li>
   );
 }

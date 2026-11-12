@@ -7,8 +7,11 @@ import { ReviewDesk } from '@/components/ReviewDesk';
 import { TagInput } from '@/components/TagInput';
 import { FakeTroveDb, fakeContext } from '../helpers/fake-db';
 import { getItem, saveItem } from '@/lib/services/items';
+import ItemDetailPage from '@/app/items/[id]/page';
+import { getServerContext } from '@/lib/server-context';
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }));
+vi.mock('@/lib/server-context', () => ({ getServerContext: vi.fn() }));
 vi.mock('@/app/actions/items', () => ({
   setItemStatusAction: vi.fn(),
   updateItemFieldsAction: vi.fn(),
@@ -31,7 +34,10 @@ describe('收集流 / 回看台渲染约束', () => {
     expect(html).toContain('稍后再看');
     expect(html).toContain('当前候选 1 条');
     expect(html).toContain('/items?tag=%E6%95%B0%E6%8D%AE%E5%BA%93');
+    expect(html).toContain(`<h2 class="desk-title"><a href="/r/${item.id}"`);
+    expect(html).toContain(`href="/items/${item.id}"`);
     const row = renderToStaticMarkup(createElement(ItemRow, { item }));
+    expect(row).toContain(`<p class="row-title"><a href="/r/${item.id}"`);
     expect(row).toContain(`href="/items/${item.id}"`);
     expect(row).toContain(`href="/r/${item.id}"`);
   });
@@ -44,6 +50,22 @@ describe('收集流 / 回看台渲染约束', () => {
     expect(html).toContain(summary);
     expect(html).toContain('class="detail-summary"');
     expect(html).not.toContain('class="row-summary"');
+  });
+
+  it('详情只提供受控原文入口，整理操作默认折叠', async () => {
+    const ctx = fakeContext(new FakeTroveDb());
+    const saved = await saveItem(ctx, {
+      url: 'https://example.com/detail', title: '需要整理的收藏', summary: '完整摘要', tags: ['java'],
+    });
+    vi.mocked(getServerContext).mockResolvedValue(ctx);
+    const page = await ItemDetailPage({ params: Promise.resolve({ id: saved.id }) });
+    const html = renderToStaticMarkup(page);
+    expect(html).toContain(`href="/r/${saved.id}"`);
+    expect(html).not.toContain('href="https://example.com/detail"');
+    expect(html).toContain('<details class="item-organize">');
+    expect(html).not.toContain('直接访问');
+    expect(html).not.toContain('最近打开记录');
+    expect(html).toContain('id="notes"');
   });
 
   it('空回看台给出藏库入口，手工新增时标签输入不会嵌套表单', () => {

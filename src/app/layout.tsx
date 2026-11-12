@@ -2,7 +2,10 @@ import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
 import { Nav } from '@/components/Nav';
-import { createServerSupabaseClient, isSupabaseConfigured } from '@/lib/supabase/server';
+import {
+  createServerSupabaseClient,
+  isSupabaseConfigured,
+} from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
   title: 'trove — 收集、回看、留下理解',
@@ -23,14 +26,6 @@ function Shell({
 }) {
   return (
     <html lang="zh-CN">
-      <head>
-        <link rel="preconnect" href="https://fontsapi.zeoseven.com" crossOrigin="anonymous" />
-        <link
-          rel="stylesheet"
-          href="https://fontsapi.zeoseven.com/159/main/result.css"
-          precedence="default"
-        />
-      </head>
       <body>
         <a className="skip-link" href="#content">
           跳到正文
@@ -72,7 +67,8 @@ function SetupNotice() {
 
           <p className="small muted" style={{ marginTop: 16 }}>
             1. 把 <code className="mono">.env.example</code> 复制为{' '}
-            <code className="mono">.env.local</code> 并填入 Supabase 项目的凭据。
+            <code className="mono">.env.local</code> 并填入 Supabase
+            项目的凭据。
             <br />
             2. 执行 <code className="mono">pnpm db:push</code> 应用数据库迁移，
             或把 <code className="mono">db/migrations/0001_init.sql</code> 粘进

@@ -1,12 +1,10 @@
 /* ==========================================================================
    trove — 纸面校样
-   一种等宽字体排完全部界面：等距更纱黑体（Sarasa Mono SC）。
-   拉丁来自 Iosevka，汉字来自思源黑体，二者落在同一 1:2 宽度网格上，
-   中英混排不会忽宽忽窄。黑体，不是楷体或宋体，所以纸面但不旧。
-   这份切片只有 Regular。字重一律 400，并关掉 font-synthesis，
-   避免浏览器合成粗体把中英网格撑歪。层级靠字号、墨色和发丝线。
+   界面采用比例宽度的系统无衬线：Segoe UI Variable / 苹方 / 微软雅黑 UI。
+   正文以自然的字面与行距承载阅读，代码和密钥单独使用等宽字体。
+   字体来自设备本身，首屏不再依赖第三方字体请求。
+   层级靠字号、适度字重、墨色和发丝线。
    刻意不用：渐变、光晕、网格背景、卡片阴影、逐条淡入、负字距。
-   字体样式表由 layout 引入（unicode-range 分片，font-display: swap）。
    ========================================================================== */
 
 :root {
@@ -20,9 +18,11 @@
   --wash: #e7eae4;
   --danger: #8c3a34;
 
+  --font-sans:
+    'Segoe UI Variable Text', 'Segoe UI', 'PingFang SC', 'Hiragino Sans GB',
+    'Microsoft YaHei UI', 'Microsoft YaHei', sans-serif;
   --font-mono:
-    'Sarasa Mono SC', 'Sarasa Gothic SC', ui-monospace, 'Cascadia Mono',
-    'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', monospace;
+    'Cascadia Code', 'SFMono-Regular', Consolas, 'Liberation Mono', monospace;
 
   --wrap: 44rem;
 }
@@ -51,15 +51,11 @@ body {
   margin: 0;
   background: var(--paper);
   color: var(--ink);
-  font-family: var(--font-mono);
+  font-family: var(--font-sans);
   font-size: 15px;
   font-weight: 400;
   font-synthesis: none;
-  font-variant-ligatures: none;
-  font-feature-settings:
-    'liga' 0,
-    'calt' 0;
-  line-height: 1.75;
+  line-height: 1.8;
   letter-spacing: 0;
   -webkit-font-smoothing: antialiased;
 }
@@ -99,7 +95,7 @@ a.btn:focus-visible {
 h1,
 h2,
 h3 {
-  font-weight: 400;
+  font-weight: 500;
   letter-spacing: 0;
   line-height: 1.35;
   margin: 0;
@@ -1048,6 +1044,35 @@ summary {
   line-height: 1.55;
   overflow-wrap: anywhere;
 }
+.detail-page {
+  max-width: 800px;
+}
+.detail-meta {
+  margin: 0 0 16px;
+}
+.item-organize {
+  margin-top: 28px;
+  border-top: 1px solid var(--rule);
+  border-bottom: 1px solid var(--rule);
+}
+.organize-content {
+  padding: 4px 0 20px;
+}
+.organize-content .field-label {
+  margin: 20px 0 0;
+}
+.detail-notes {
+  margin-top: 36px;
+}
+.note-compose {
+  margin-top: 28px;
+}
+.detail-notes .note-compose:first-child {
+  margin-top: 0;
+}
+.note-compose h2 {
+  font-size: 17px;
+}
 .item-facts {
   margin: 16px 0 0;
 }
@@ -1118,9 +1143,19 @@ summary {
 }
 
 @media (max-width: 640px) {
-  a.tag { min-height: 44px; align-items: center; }
-  .tag button { min-width: 44px; }
-  .nav-brand, .nav-capture { min-height: 44px; display: inline-flex; align-items: center; }
+  a.tag {
+    min-height: 44px;
+    align-items: center;
+  }
+  .tag button {
+    min-width: 44px;
+  }
+  .nav-brand,
+  .nav-capture {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
+  }
   .nav-inner {
     gap: 12px 20px;
     padding-top: 14px;
