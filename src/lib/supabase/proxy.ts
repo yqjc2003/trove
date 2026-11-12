@@ -40,7 +40,9 @@ export async function updateSession(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const { pathname } = request.nextUrl;
-  const isPublic = PUBLIC_PATHS.some((p) => pathname.startsWith(p));
+  // 落地页 `/` 是公开入口；其它工作区路由仍需会话。
+  // 不能把 `/` 放入 PUBLIC_PATHS，否则 startsWith('/') 会误放行所有页面。
+  const isPublic = pathname === '/' || PUBLIC_PATHS.some((p) => pathname.startsWith(p));
   // API 路径不做页面跳转：无凭据时交给路由处理器的 withAuth 返回 401 JSON。
   // 否则 Skill / CLI 调 REST 会收到一个 307 跳转到登录页的 HTML，而不是可解析的错误。
   const isApi = pathname.startsWith('/api/');

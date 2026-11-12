@@ -56,7 +56,7 @@ export function Nav() {
     <nav className="nav">
       <div className="nav-inner">
         <Link href="/" className="nav-brand" translate="no">
-          trove
+          拾藏
         </Link>
         <div className="nav-links">
           {LINKS.map((l) => (

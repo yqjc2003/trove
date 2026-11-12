@@ -20,12 +20,16 @@ function safeNext(raw: string | null): string {
   return raw.startsWith('/') && !raw.startsWith('//') ? raw : '/';
 }
 
+function requestedMode(raw: string | null): Mode {
+  return raw === 'signup' || raw === 'magic' ? raw : 'password';
+}
+
 function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get('next'));
 
-  const [mode, setMode] = useState<Mode>('password');
+  const [mode, setMode] = useState<Mode>(() => requestedMode(params.get('mode')));
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   // OAuth 失败时 Supabase 会把错误参数回传到 /login，直接在初始化时推导，
@@ -156,9 +160,9 @@ function LoginForm() {
   return (
     <main className="page">
       <div className="wrap-narrow">
-        <h1 translate="no">trove</h1>
+        <h1>拾藏</h1>
         <p className="page-sub">
-          把散落的链接收在一起。重新打开，留下自己的理解。
+          把散落的链接收进来，再把真正重要的打开。
         </p>
 
         <div className="section">

@@ -1,4 +1,4 @@
-# trove
+# 拾藏（Cachet）
 
 个人收藏统一管理系统。把散落在各个 App、GitHub star、Chrome/Edge 收藏夹里的链接，
 通过 AI Agent 解读后收敛到一个带标签、笔记、归档与阅读追踪的统一存储里。

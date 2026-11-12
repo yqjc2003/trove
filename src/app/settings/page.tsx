@@ -3,6 +3,7 @@ import { listTags } from '@/lib/services/tags';
 import { TagManager } from '@/components/TagManager';
 import { ApiKeyManager } from '@/components/ApiKeyManager';
 import { ReminderDaysForm } from '@/components/ReminderDaysForm';
+import { ImportBookmarks } from '@/components/ImportBookmarks';
 
 export const dynamic = 'force-dynamic';
 
@@ -76,9 +77,14 @@ export default async function SettingsPage() {
             导出为 JSON（含收藏、标签、笔记与点击记录）。
           </p>
           <div className="row-actions" style={{ marginTop: 12 }}>
-            <a className="btn" href="/api/trove/export" download="trove-export.json">
+            <a className="btn" href="/api/trove/export" download="cachet-export.json">
               导出 JSON
             </a>
+          </div>
+          <div className="import-divider" />
+          <h3>导入浏览器收藏</h3>
+          <div style={{ marginTop: 12 }}>
+            <ImportBookmarks />
           </div>
         </section>
       </div>

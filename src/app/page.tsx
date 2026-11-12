@@ -3,11 +3,12 @@ import { getServerContext } from '@/lib/server-context';
 import { getStats, listReminders } from '@/lib/services/reminders';
 import { listItems } from '@/lib/services/items';
 import { ReviewDesk } from '@/components/ReviewDesk';
+import { LandingPage } from '@/components/LandingPage';
 
 export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
   const ctx = await getServerContext();
-  if (!ctx) return null;
+  if (!ctx) return <LandingPage />;
   const [stats, reminders, unread] = await Promise.all([
     getStats(ctx),
     listReminders(ctx),

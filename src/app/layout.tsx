@@ -8,8 +8,8 @@ import {
 } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
-  title: 'trove — 收集、回看、留下理解',
-  description: '把散落的链接收进个人藏库，重新打开，留下自己的理解。',
+  title: 'Cachet · 拾藏 — 收下此刻，找回价值',
+  description: '把浏览器收藏、视频与 GitHub Star 收进一个可回看的个人藏库。',
 };
 
 export const viewport: Viewport = {
@@ -46,7 +46,7 @@ function SetupNotice() {
   return (
     <main className="page">
       <div className="wrap-narrow">
-        <h1>trove</h1>
+        <h1>拾藏</h1>
         <p className="page-sub">服务还没有配置完成。</p>
 
         <div className="section">
