@@ -1,0 +1,27 @@
+# dependencies
+node_modules/
+.pnp
+.pnp.js
+
+# next.js
+.next/
+out/
+build/
+next-env.d.ts
+
+# typescript
+*.tsbuildinfo
+
+# env — .env.example 是模板，必须保留；其余一律忽略
+.env
+.env.local
+.env.*.local
+
+# supabase
+supabase/.temp
+
+# misc
+.DS_Store
+*.log
+.vercel
+coverage/

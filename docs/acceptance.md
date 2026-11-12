@@ -1,0 +1,74 @@
+# 手工验收清单
+
+自动化测试覆盖的是纯逻辑（URL 规范化、标签、upsert 字段矩阵、权限解析…）。
+以下清单需要**真实 Supabase 项目**才能跑，请在部署后逐条走一遍。
+
+前置：`.env.local` 已填好 Supabase 凭据，`db/migrations/0001_init.sql` 已应用，
+Vercel 生产环境变量已配置。
+
+---
+
+## 账号与空间
+
+1. **注册/登录** —— 邮箱注册 → 自动建 `profiles`（**不预置任何标签**）→ 登出 → 登录成功。
+2. **GitHub 登录** —— 点「使用 GitHub 登录」→ 回调后进入概览页。
+
+## 收藏与 Upsert
+
+3. **重复录入 = Upsert** —— 对同一 URL 连续录入两次 → `items` 只有 1 条；
+   第二次响应 `created=false`；`created_at` 不变、`updated_at` 刷新；
+   `collected_at` / 归档状态 / `read_at` / `click_count` 均不变。
+4. **Upsert 局部更新** —— 再次录入只带 `title`（不带 `tags` / `summary`）→
+   原标签与原摘要保留，标题被覆盖；带 `tags` → 标签整体替换；带 `notes` → 笔记**追加**而非覆盖。
+5. **规范化去重** —— `https://x.com/a?utm_source=t`、`https://www.x.com/a`、
+   `https://x.com/a#frag` 三者命中同一条。
+6. **标签上限** —— 写 4 个标签 → `422 MAX_TAGS_EXCEEDED`；直接 SQL 插入第 4 个 → 触发器拒绝；
+   且拒绝后 **item 未被创建/修改、原标签集合不变**。
+
+## 标签（分类即标签）
+
+7. **AI 标签原样入库** —— 用 Skill 录入一条链接，Agent 给出 3 个自定义标签
+   （如「数据库」「向量检索」「2026-Q1」）→ `tags` 表出现这 3 个（`origin='agent'`），
+   无任何预置分类混入。
+8. **用户 DIY 标签** —— 在 `/settings` 新建标签「读书」→ 出现在标签列表；
+   给某条收藏加这个标签（替换后仍 ≤3）→ 生效；在 `/items` 按「读书」筛选 → 只出该收藏。
+9. **标签改名** —— 把「读书」改名为「阅读」→ 所有绑定 item 的显示同步变化，
+   绑定关系与数量不变。
+10. **标签删除** —— 删除「阅读」→ 提示影响 N 条；确认后相关 item 的该标签消失，
+    item 本身不受影响。
+11. **标签隔离** —— 用户 B 看不到用户 A 的任何标签（列表、筛选、item 详情均不可见）；
+    B 的 Key 访问 A 的 item id → 404。
+
+## 点击追踪与提醒
+
+12. **点击追踪** —— Web 点「打开链接」→ 302 跳到目标站点；`click_events` 新增一行、
+    `click_count=1`、`read_at` 非空；再点 → `click_count=2`、`read_at` 不变。
+13. **超期提醒** —— 手工把某条 `collected_at` 改成 20 天前且 `read_at=null` →
+    出现在 `/reminders` 与仪表盘提醒区；点击它后消失。
+14. **归档** —— 归档 → 默认列表与提醒不再出现 → `/archive` 可见 → 取消归档后恢复，
+    `collected_at` 不变。
+
+## 检索与笔记
+
+15. **检索** —— 按域名、标签、内容形态、关键词各筛一次 → 结果集正确；
+    URL 含 `?utm_source=` 的条目能被 `q` 命中。
+16. **笔记** —— 写含代码块与列表的 Markdown → 保存 → 预览正确渲染；编辑与删除生效。
+
+## MCP 与 Skill
+
+17. **MCP** —— 用 `trv_` Key 直连 `/api/mcp`，`trove_save` → 条目归属正确用户；
+    重复 `trove_save` 同一 URL → `created=false` 且不新增；
+    `trove_manage_tag` 新建/改名/删除标签均生效；无 Key → 401 + `WWW-Authenticate` 挑战。
+18. **Skill** —— `bookmarks` 模式导入 Chrome 书签 ≥10 条（标题/摘要/≤3 标签齐全）；
+    `github-stars` 模式导入 star ≥5 条；`url` 模式单条/多条均可。
+19. **部署** —— Vercel 生产环境走一遍 1–18（API base 与 MCP url 指向生产域名）。
+
+---
+
+## 自动化门禁
+
+每次提交前：
+
+```bash
+pnpm lint && pnpm typecheck && pnpm test && pnpm build
+```
