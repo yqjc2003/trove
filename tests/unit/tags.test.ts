@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   MAX_TAGS_PER_ITEM,
   exceedsTagLimit,
+  normalizeTagFilters,
   normalizeTagName,
   normalizeTags,
 } from '@/lib/domain/tags';
@@ -89,5 +90,32 @@ describe('exceedsTagLimit', () => {
 
   it('去重后再计数', () => {
     expect(exceedsTagLimit(['a', 'a', 'a', 'a'])).toBe(false);
+  });
+});
+
+describe('normalizeTagFilters', () => {
+  it('与写入路径同一套归一：小写 / 去 # / 折叠空白', () => {
+    expect(normalizeTagFilters(['React', '#Vue', '  Data   Base  '])).toEqual([
+      'react',
+      'vue',
+      'data base',
+    ]);
+  });
+
+  it('去重且保持首次出现顺序', () => {
+    expect(normalizeTagFilters(['React', 'react', 'REACT'])).toEqual(['react']);
+  });
+
+  it('丢弃空名与非字符串', () => {
+    expect(normalizeTagFilters(['react', '', '   ', '#', 42, null])).toEqual(['react']);
+  });
+
+  it('不限制数量（过滤条件可以有多个标签）', () => {
+    expect(normalizeTagFilters(['a', 'b', 'c', 'd'])).toHaveLength(4);
+  });
+
+  it('非数组返回空数组', () => {
+    expect(normalizeTagFilters(undefined)).toEqual([]);
+    expect(normalizeTagFilters('react')).toEqual([]);
   });
 });

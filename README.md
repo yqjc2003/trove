@@ -125,7 +125,7 @@ GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把
    - 填入 Client ID / Client Secret 并启用
 3. **Supabase 加回调白名单** —— Dashboard → Authentication → URL Configuration → Redirect URLs
    - 加 `http://localhost:3000/auth/callback`（本地开发）
-   - 加 `https://<你的域名>/auth/callback`（生产）
+   - 加 `https://trove.sxyicheng.tech/auth/callback`（生产）
    - Site URL 设为生产域名
 
 应用侧的回调落地页是 `GET /auth/callback`：浏览器走 PKCE，OAuth 回来时只带一个 `?code=`，
@@ -140,7 +140,7 @@ GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<项目ref>.supabase.co` | Supabase 项目地址 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_...` | publishable key（可暴露给浏览器） |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | **服务端专用**，Dashboard → Project Settings → API Keys；注册流程也要用它建号 |
-| `NEXT_PUBLIC_SITE_URL` | `https://<你的域名>` | 生产站点地址，用于 MCP / Skill 回调与绝对链接 |
+| `NEXT_PUBLIC_SITE_URL` | `https://trove.sxyicheng.tech` | 生产站点地址，用于 MCP / Skill 回调与绝对链接 |
 
 > 仓库里不写任何 key 字面量（见 AGENTS.md 约定 10）。实际取值见本地 `.env.local`
 > 或 Dashboard → Project Settings → API Keys。
@@ -191,9 +191,9 @@ pnpm skill:install  # 把 Skill 装到 ~/.minimax/skills/
 
 | 方式 | 端点 | 认证 |
 |---|---|---|
-| Web | `/` `/items` `/items/[id]` `/archive` `/reminders` `/settings` | Supabase 会话 |
-| REST | `https://<site>/api/trove/*` | `Authorization: Bearer <trv_key>` |
-| MCP | `https://<site>/api/mcp` | `Authorization: Bearer <trv_key>` |
+| Web | `https://trove.sxyicheng.tech/` `/items` `/items/[id]` `/archive` `/reminders` `/settings` | Supabase 会话 |
+| REST | `https://trove.sxyicheng.tech/api/trove/*` | `Authorization: Bearer <trv_key>` |
+| MCP | `https://trove.sxyicheng.tech/api/mcp` | `Authorization: Bearer <trv_key>` |
 
 详见 [docs/api.md](docs/api.md)、[docs/mcp.md](docs/mcp.md)、[docs/skill.md](docs/skill.md)。
 

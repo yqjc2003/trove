@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import {
+  API_KEY_BODY_LENGTH,
   API_KEY_PREFIX,
   DEFAULT_SCOPES,
   generateApiKey,
@@ -31,6 +32,15 @@ describe('API Key', () => {
     expect(plaintext.startsWith(API_KEY_PREFIX)).toBe(true);
     expect(plaintext.length).toBe(API_KEY_PREFIX.length + 43);
     expect(/^[0-9A-Za-z]+$/.test(plaintext.slice(API_KEY_PREFIX.length))).toBe(true);
+  });
+
+  it('明文长度恒定：连开 200 把都不短一位', () => {
+    // 32 随机字节的 base62 只有 42 或 43 位（62^42 ≈ 2^250.08，约 1.7% 落在 42 位），
+    // 不补 0 的话这条断言会偶发挂。
+    for (let i = 0; i < 200; i += 1) {
+      const { plaintext } = generateApiKey();
+      expect(plaintext.length).toBe(API_KEY_PREFIX.length + API_KEY_BODY_LENGTH);
+    }
   });
 
   it('前缀是明文的前 12 位', () => {

@@ -21,7 +21,7 @@ license: Apache-2.0
 
 | 变量 | 说明 |
 |---|---|
-| `TROVE_API_BASE` | 例如 `https://trove.example.com/api/trove` |
+| `TROVE_API_BASE` | 例如 `https://trove.sxyicheng.tech/api/trove` |
 | `TROVE_API_KEY` | `trv_` 开头的长效 API Key |
 | `GITHUB_TOKEN` | 可选；读取 star 列表时必需（匿名调用会被限流） |
 

@@ -87,6 +87,20 @@ describe('items 服务', () => {
     expect((await listItems(ctx, { tags: ['x', 'y'] })).total).toBe(1);
   });
 
+  it('标签过滤条件走写入路径的同一套归一（大小写 / # / 空白）', async () => {
+    const ctx = fakeContext(db);
+    await saveItem(ctx, { url: 'https://example.com/1', title: 'A', tags: ['React'] });
+    await saveItem(ctx, { url: 'https://example.com/2', title: 'B', tags: ['Vue'] });
+
+    // 写入后库里存的是小写名，过滤条件必须同样归一，否则搜不到
+    expect((await listItems(ctx, { tags: ['React'] })).total).toBe(1);
+    expect((await listItems(ctx, { tags: ['react'] })).total).toBe(1);
+    expect((await listItems(ctx, { tags: ['#React'] })).total).toBe(1);
+    expect((await listItems(ctx, { tags: ['  React  '] })).total).toBe(1);
+    expect((await listItems(ctx, { tags: ['Vue'] })).total).toBe(1);
+    expect((await listItems(ctx, { tags: ['Angular'] })).total).toBe(0);
+  });
+
   it('默认只返回 active，status=all 才包含归档', async () => {
     const ctx = fakeContext(db);
     const saved = await saveItem(ctx, { url: 'https://example.com/a', title: 'T' });

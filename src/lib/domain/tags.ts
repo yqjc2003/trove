@@ -82,3 +82,31 @@ export function exceedsTagLimit(input: unknown): boolean {
   }
   return seen.size > MAX_TAGS_PER_ITEM;
 }
+
+/**
+ * 归一检索用的标签过滤条件。
+ *
+ * 写入时标签会归一（trim / 去 # / 折叠空白 / 小写），库里存的永远是归一后的名字；
+ * 过滤条件必须走同一条归一，否则用户输 "React" 搜不到存成 "react" 的条目。
+ *
+ * 与 normalizeTags 的两点不同：
+ *   · 不校验「至多 3 个」（过滤条件本就可以多个）
+ *   · 不抛错——归一不了的条件直接丢弃
+ */
+export function normalizeTagFilters(input: unknown): string[] {
+  if (!Array.isArray(input)) return [];
+
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const raw of input) {
+    if (typeof raw !== 'string') continue;
+    const name = normalizeTagName(raw);
+    if (name === null) continue;
+    if (seen.has(name)) continue;
+    seen.add(name);
+    result.push(name);
+  }
+
+  return result;
+}

@@ -1,7 +1,7 @@
 import { AppError } from '@/lib/domain/errors';
 import { detectContentType, isContentType, type ContentType } from '@/lib/domain/content-type';
 import { normalizeUrl } from '@/lib/domain/url';
-import { normalizeTags } from '@/lib/domain/tags';
+import { normalizeTags, normalizeTagFilters } from '@/lib/domain/tags';
 import {
   MAX_EXCERPT_LENGTH,
   MAX_NOTE_LENGTH,
@@ -254,6 +254,8 @@ export async function listItems(
 ): Promise<ItemListResult> {
   const result = await ctx.db.listItems({
     ...filters,
+    // 过滤条件与写入路径走同一套标签归一，否则 "React" 搜不到存成 "react" 的条目
+    tags: normalizeTagFilters(filters.tags),
     limit: clampLimit(filters.limit),
     offset: clampOffset(filters.offset),
   });
