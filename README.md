@@ -85,13 +85,32 @@ pnpm dev
 
 | 入口 | 什么时候用 | 说明 |
 |---|---|---|
-| **创建账号** | 第一次用 | 填邮箱 + 密码 → Supabase 发确认邮件 → 点链接完成注册 → 之后用「密码登录」 |
+| **创建账号** | 第一次用 | 填邮箱 + 密码 → **立即登录**，不需要点确认邮件 |
 | **密码登录** | 已有账号 | 直接登录；密码错时会提示去「创建账号」 |
-| **邮件验证码** | 不想记密码 | 发一次性登录链接；第一次用这个邮箱会自动建号 |
-| **使用 GitHub 登录** | 可选 | 默认关闭，未在后台启用时按钮会置灰并说明原因 |
+| **邮件验证码** | 不想记密码 | 发一次性登录链接；受 Supabase 免费 SMTP 额度限制（每小时约 2 封），不常用 |
+| **使用 GitHub 登录** | 可选 | 需要先在 Supabase 后台启用 GitHub provider，没启用时按钮置灰并说明原因 |
 
 注册成功即自动创建 `profiles` 行与**空白**的个人标签空间 —— 由数据库触发器
-`trve_handle_new_user` 完成，不预置任何标签。
+`trove_handle_new_user`（触发器名 `trg_on_auth_user_created`）完成，不预置任何标签。
+
+### 注册是「注册即登录」
+
+应用侧用 service-role 直接建号并把邮箱标记为已确认（`admin.createUser`），
+**不发确认邮件**，因此也不受 Supabase 免费 SMTP 每小时 2 封额度的限制
+（走公开 `signUp` 会直接吃到 `429 over_email_send_rate_limit`，新用户根本注册不了）。
+
+**取舍**：这等于放弃邮箱归属验证 —— 任何人都可以用任意邮箱注册。
+个人收藏工具可以接受；哪天要开放给多用户，把这一层换回确认邮件即可
+（改 `src/lib/auth/signup.ts` 的主路径）。
+
+前提与细节：
+
+- 注册需要 `SUPABASE_SERVICE_ROLE_KEY`（服务端专用，绝不能进前端）。没配时会
+  自动退回「发确认邮件」的旧流程，不会硬失败。
+- 密码少于 6 位在**应用层**就拦下，不会打到 Supabase。
+- 邮箱已存在时：密码对得上直接登录；密码不对提示「已经注册过了」，
+  不会覆盖或泄露已有账号。
+- 上一次注册被邮件额度打断、留下「已存在但未确认」的账号时，会自动确认并登录。
 
 ### 启用 GitHub 登录（三步）
 
@@ -120,7 +139,7 @@ GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把
 |---|---|---|
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<项目ref>.supabase.co` | Supabase 项目地址 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_...` | publishable key（可暴露给浏览器） |
-| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | **服务端专用**，Dashboard → Project Settings → API Keys |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | **服务端专用**，Dashboard → Project Settings → API Keys；注册流程也要用它建号 |
 | `NEXT_PUBLIC_SITE_URL` | `https://<你的域名>` | 生产站点地址，用于 MCP / Skill 回调与绝对链接 |
 
 > 仓库里不写任何 key 字面量（见 AGENTS.md 约定 10）。实际取值见本地 `.env.local`
@@ -135,6 +154,8 @@ db/migrations/0001_init.sql   建表 + RLS + 触发器 + RPC
 scripts/db-push.mjs           迁移执行器（逐文件事务化，幂等）
 src/app/                      页面（概览/收藏/详情/归档/待读/设置）+ API 路由 + MCP
 src/app/r/[id]/route.ts       302 重定向 + 点击追踪
+src/app/actions/auth.ts       注册 Server Action（建号 + 自动确认邮箱）
+src/lib/auth/                 凭据解析、API Key、注册流程编排
 src/lib/domain/               纯逻辑：URL 规范化、内容形态、标签、超期判定
 src/lib/db/trove-db.ts        唯一的数据访问入口（强制 user_id 过滤）
 src/lib/services/             业务逻辑（REST / MCP / Server Action 复用同一层）

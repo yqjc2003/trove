@@ -3,6 +3,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
+import { signUpAction } from '@/app/actions/auth';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
 
 type Mode = 'password' | 'signup' | 'magic';
@@ -93,26 +94,19 @@ function LoginForm() {
     setError(null);
     setNotice(null);
 
-    const supabase = createBrowserSupabaseClient();
-    const { data, error: err } = await supabase.auth.signUp({
-      email: email.trim(),
-      password,
-      options: {
-        emailRedirectTo: `${window.location.origin}/auth/callback?next=${encodeURIComponent(next)}`,
-      },
-    });
+    // 注册走 Server Action：自动确认邮箱需要 service-role，不能在前端做
+    const result = await signUpAction(email.trim(), password, next);
 
     setBusy(false);
-    if (err) {
-      setError(/already registered|already been registered/i.test(err.message) ? '这个邮箱已经注册过了，直接「密码登录」即可。' : err.message);
+    if (result.error) {
+      setError(result.error);
       return;
     }
-
-    // 需要邮箱确认时 session 为空；已自动确认则直接登录
-    if (data.session) {
+    if (result.signedIn) {
       redirect();
       return;
     }
+    // 只有在服务端没配 service-role 时才会走到这里
     setNotice('确认邮件已发送，点里面的链接完成注册后即可登录。');
   }
 

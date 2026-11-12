@@ -22,6 +22,10 @@
 11. **不要用 `current_setting('request.jwt.claim.role')` 判断角色** —— PostgREST 只设
     `request.jwt.claims`（整段 JSON），不设单个 claim 的 GUC，那个写法永远拿到 NULL。
     一律用 `auth.role()` / `auth.uid()`。
+12. **注册必须走 Server Action + service-role**（`src/app/actions/auth.ts`）：
+    service-role key 绝不能出现在浏览器端。注册逻辑与接线在
+    `src/lib/auth/signup.ts`，应用层与集成测试共用同一份 `buildSignUpDeps`，
+    不要在两边各写一套。
 
 ## Supabase 实测要点（踩过的坑，别再踩）
 
@@ -44,6 +48,31 @@
   的真因是 `confirmation_token` 等字符串列是 NULL 而不是空串。
   详见 <https://supabase.com/docs/guides/troubleshooting/database-error-saving-new-user>。
   最省事的做法还是走 Auth API 注册 + 在 Dashboard 里开自动确认。
+
+### 认证 / 注册的实测要点
+
+- **`mailer_autoconfirm` 改不了**（GoTrue 配置走平台环境变量，Postgres 侧改不了；
+  `auth.instances` 表是空的且只在多实例模式生效）。想在托管项目上免确认邮件，
+  只能走 Management API（需要 Personal Access Token）或应用侧自己确认。
+- **免费 SMTP 每小时只有 2 封额度**：托管项目默认 `mailer_autoconfirm = false`，
+  公开 `POST /auth/v1/signup` 会发确认邮件，额度耗尽后直接返回
+  `429 over_email_send_rate_limit`——**新用户根本注册不了**。
+- **注册改用 `admin.auth.admin.createUser({ email, password, email_confirm: true })`**：
+  它不发任何邮件，因此不受 SMTP 额度限制；实测建号即 `email_confirmed_at` 已填，
+  签发的 JWT `role` 仍是 `authenticated`，RLS 行为与公开注册完全一致。
+- **admin 建号不校验邮箱域名**：公开 `signUp` 会拒 `example.com` / 无 MX 的域
+  （`email_address_invalid`），`admin.createUser` 会照收。应用侧已接受
+  「不做邮箱归属验证」这个取舍，见 README 的「注册是『注册即登录』」。
+- **GoTrue 的错误码要按 `error_code` 判，别只看 `msg`**：
+  - 邮箱已存在 → `email_exists`（422，msg 是
+    `A user with this email address has already been registered`）
+  - 密码太短 → `weak_password`（422，msg 是 `Password should be at least 6 characters.`）
+  - 密码对但邮箱没确认 → `email_not_confirmed`（400，msg 是 `Email not confirmed`）
+  - 邮件额度耗尽 → `over_email_send_rate_limit`（429）
+- **「已存在但未确认」的账号要能自愈**：用 `admin.auth.admin.listUsers({ page, perPage })`
+  按邮箱找回 id，再 `updateUserById(id, { email_confirm: true })` 就能登录。
+- **GoTrue 防枚举**：对「已存在且已确认」的邮箱，公开 `signUp` 返回 200 但
+  **既没有 user 也没有 session**，不能当成「注册成功」。
 
 ## 数据访问收口
 
@@ -68,6 +97,28 @@ src/lib/db/trove-db.ts    唯一数据访问入口
 
 `src/lib/domain/` 必须是**纯函数**——不碰网络、不碰数据库，这样能离线跑单测。
 
+`src/lib/auth/` 是认证专用的一层（凭据解析、API Key、注册编排），
+同样遵守「依赖注入、离线可测」，不直接 `.from()` 业务表。
+
+## 注册流程
+
+```
+浏览器 → POST /login（Server Action：signUpAction）
+          ↓  薄壳：取客户端、算 emailRedirectTo、校验密码长度
+       buildSignUpDeps（src/lib/auth/signup.ts）
+          ↓  把真实客户端接成 SignUpDeps（应用层与集成测试共用同一份接线）
+       runSignUp（src/lib/auth/signup.ts）
+          ↓  纯编排，deps 注入，离线可单测
+       Supabase
+```
+
+- **主路径**：`admin.createUser({ email_confirm: true })` → `signInWithPassword` → 写 Cookie。
+  不发确认邮件，因此不受 SMTP 额度限制。
+- **兜底**（没配 service-role）：公开 `signUp` → 必要时
+  `updateUserById(id, { email_confirm: true })` → `signInWithPassword`。
+- **别把 `admin.createUser` 换成公开 `signUp`**：托管项目的免费 SMTP 每小时 2 封，
+  额度一耗公开注册就 429，等于注册功能不可用。
+
 ## Upsert 语义
 
 重复录入走 upsert，字段级规则见 README 的表格。实现要点：
@@ -87,6 +138,8 @@ src/lib/db/trove-db.ts    唯一数据访问入口
   - `TROVE_TEST_SUPABASE_URL` / `TROVE_TEST_ANON_KEY` / `TROVE_TEST_SERVICE_KEY`
   - `TROVE_TEST_EMAIL` / `TROVE_TEST_PASSWORD` —— 会话通道用（`session.test.ts`）
   - `TROVE_TEST_KEY` / `TROVE_TEST_KEY_B` —— API Key 通道用（`supabase.test.ts`）
+  - 注册通道（`signup.test.ts`）只要上面那组
+    `TROVE_TEST_SUPABASE_URL` / `TROVE_TEST_ANON_KEY` / `TROVE_TEST_SERVICE_KEY`
 - service 层测试用 `tests/helpers/fake-db.ts` 的 `FakeTroveDb`。
   它的 upsert 语义严格照抄 SQL（`p_payload ? 'field'` → 只覆盖显式出现的字段），
   改动时两边要同步。
