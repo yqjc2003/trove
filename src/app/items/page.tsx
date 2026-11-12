@@ -1,4 +1,5 @@
 import { Suspense } from 'react';
+import Link from 'next/link';
 
 import { getServerContext } from '@/lib/server-context';
 import { listItems } from '@/lib/services/items';
@@ -74,6 +75,11 @@ async function ItemsList({ searchParams }: PageProps) {
         <EmptyState
           title="没有匹配的收藏"
           text="换个关键词，或清空筛选条件试试。"
+          action={
+            <Link href="/items/new" className="btn btn-sm">
+              手工新增一条
+            </Link>
+          }
         />
       ) : (
         <>
@@ -142,6 +148,9 @@ export default function ItemsPage({ searchParams }: PageProps) {
             <h1>收藏</h1>
             <p className="page-sub">按名称、域名、类型与标签检索。</p>
           </div>
+          <Link href="/items/new" className="btn btn-primary">
+            新增收藏
+          </Link>
         </div>
 
         <Suspense fallback={<p className="faint small">加载中…</p>}>

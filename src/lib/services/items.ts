@@ -1,7 +1,7 @@
 import { AppError } from '@/lib/domain/errors';
 import { detectContentType, isContentType, type ContentType } from '@/lib/domain/content-type';
 import { normalizeUrl } from '@/lib/domain/url';
-import { normalizeTags, normalizeTagFilters } from '@/lib/domain/tags';
+import { normalizeTags, normalizeTagFilters, DEFAULT_TAG_LIMIT, type TagLimit } from '@/lib/domain/tags';
 import {
   MAX_EXCERPT_LENGTH,
   MAX_NOTE_LENGTH,
@@ -41,6 +41,21 @@ export interface BatchSaveError {
   message: string;
 }
 
+export interface ItemWriteOptions {
+  /**
+   * 标签数量上限。
+   *   · 省略 → Agent 通道的 3 个上限（REST / MCP / Skill 走这条）
+   *   · `null` → 不限数量（Web 手工整理走这条）
+   */
+  maxTags?: TagLimit;
+}
+
+/** 区分「没传」与「显式传 null（不限）」。 */
+function resolveTagLimit(opts?: ItemWriteOptions): TagLimit {
+  if (!opts || opts.maxTags === undefined) return DEFAULT_TAG_LIMIT;
+  return opts.maxTags;
+}
+
 export interface BatchSaveResult {
   items: SaveItemResult[];
   created: number;
@@ -60,6 +75,7 @@ export interface BatchSaveResult {
 export async function saveItem(
   ctx: ServiceContext,
   input: SaveItemInput,
+  opts?: ItemWriteOptions,
 ): Promise<SaveItemResult> {
   // ── 1. 校验（先校验后写，任何一步失败都不会留下半成品）────────────────
   const { url, normalizedUrl, domain } = normalizeUrl(input.url);
@@ -73,8 +89,8 @@ export async function saveItem(
     maxLength: MAX_SUMMARY_LENGTH,
   });
 
-  // 标签归一 + ≤3 校验（超限直接抛错，此时尚未写任何东西）
-  const tags = normalizeTags(input.tags);
+  // 标签归一 + 数量上限校验（超限直接抛错，此时尚未写任何东西）
+  const tags = normalizeTags(input.tags, resolveTagLimit(opts));
 
   const excerpt = assertString(input.content_excerpt, 'content_excerpt', {
     maxLength: MAX_EXCERPT_LENGTH,
@@ -141,6 +157,7 @@ export async function saveItem(
 export async function saveItems(
   ctx: ServiceContext,
   inputs: SaveItemInput[],
+  opts?: ItemWriteOptions,
 ): Promise<BatchSaveResult> {
   const items: SaveItemResult[] = [];
   const errors: BatchSaveError[] = [];
@@ -149,7 +166,7 @@ export async function saveItems(
 
   for (let i = 0; i < inputs.length; i += 1) {
     try {
-      const result = await saveItem(ctx, inputs[i]);
+      const result = await saveItem(ctx, inputs[i], opts);
       items.push(result);
       if (result.created) created += 1;
       else updated += 1;
@@ -177,6 +194,7 @@ export async function updateItem(
   ctx: ServiceContext,
   id: string,
   input: UpdateItemInput,
+  opts?: ItemWriteOptions,
 ): Promise<Item> {
   const current = await ctx.db.getItem(id);
   if (!current) throw new AppError('NOT_FOUND', '收藏不存在');
@@ -223,7 +241,7 @@ export async function updateItem(
 
   // 标签：传了才整体替换
   if (input.tags !== undefined) {
-    const tags = normalizeTags(input.tags);
+    const tags = normalizeTags(input.tags, resolveTagLimit(opts));
     await ctx.db.replaceItemTags(id, tags, 'user');
   }
 

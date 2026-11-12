@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 
-import { deleteItem, getItem, listItems, saveItem, saveItems } from '@/lib/services/items';
+import { deleteItem, getItem, listItems, saveItem, saveItems, updateItem } from '@/lib/services/items';
 import { AppError } from '@/lib/domain/errors';
 import { FakeTroveDb, fakeContext } from '../helpers/fake-db';
 
@@ -99,6 +99,44 @@ describe('items 服务', () => {
     expect((await listItems(ctx, { tags: ['  React  '] })).total).toBe(1);
     expect((await listItems(ctx, { tags: ['Vue'] })).total).toBe(1);
     expect((await listItems(ctx, { tags: ['Angular'] })).total).toBe(0);
+  });
+
+  it('默认走 Agent 通道的 3 个标签上限', async () => {
+    const ctx = fakeContext(db);
+    await expect(
+      saveItem(ctx, {
+        url: 'https://example.com/over',
+        title: '四个标签',
+        tags: ['a', 'b', 'c', 'd'],
+      }),
+    ).rejects.toThrow(AppError);
+  });
+
+  it('maxTags=null 时不限标签数量（Web 手工整理）', async () => {
+    const ctx = fakeContext(db);
+    const saved = await saveItem(
+      ctx,
+      {
+        url: 'https://example.com/manual',
+        title: '手工添加',
+        tags: ['a', 'b', 'c', 'd', 'e'],
+      },
+      { maxTags: null },
+    );
+
+    expect(saved.tags).toHaveLength(5);
+
+    // 改标签同样不限
+    const updated = await updateItem(ctx, saved.id, { tags: ['x', 'y', 'z', 'w'] }, { maxTags: null });
+    expect(updated.tags?.map((t) => t.name)).toEqual(['x', 'y', 'z', 'w']);
+  });
+
+  it('改标签时默认同样受 3 个上限约束', async () => {
+    const ctx = fakeContext(db);
+    const saved = await saveItem(ctx, { url: 'https://example.com/a', title: 'T' });
+    await expect(updateItem(ctx, saved.id, { tags: ['a', 'b', 'c', 'd'] })).rejects.toThrow(
+      AppError,
+    );
   });
 
   it('默认只返回 active，status=all 才包含归档', async () => {

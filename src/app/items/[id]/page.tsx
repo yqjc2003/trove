@@ -78,7 +78,7 @@ export default async function ItemDetailPage({
         <section className="section">
           <div className="section-head">
             <h2>标签</h2>
-            <span className="section-count">至多 3 个</span>
+            <span className="section-count">手工整理不限数量</span>
           </div>
           <div style={{ paddingTop: 16 }}>
             <TagPicker

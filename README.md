@@ -16,10 +16,30 @@
 - AI Agent 解读出什么标签就存什么标签 —— 不做语义映射、不预置分类清单
 - Web 页面支持 DIY：新建 / 改名 / 删除标签，以及修改任意一条收藏的标签
 - 按标签检索（可多选，AND 语义）
-- 每个收藏至多 **3** 个标签（应用层校验 + 数据库触发器双重保险）
+- 标签数量上限**按通道分层**（见下节）
 
 另有一个自动识别的**内容形态**字段（文章 / 视频 / 仓库 / 工具 / 社交 / 文档 / 其他），
 它是正交的技术维度，**不承载**「工作 / 生活 / 家庭」这类语义分类。
+
+### 手工添加收藏（Web）
+
+Web 端不只是只读的：`/items/new` 可以手工新建一条收藏（链接 / 标题 / 摘要 / 标签），
+列表页空状态与页头都有入口；标签也可以在详情页随时增删改。
+
+标签数量上限按**通道**分层：
+
+| 通道 | 入口 | 数据库角色 | 标签上限 |
+|---|---|---|---|
+| Agent 采集 | MCP / Skill / REST（API Key） | `service_role` | ≤ **3** |
+| 手工整理 | Web UI（Server Action，会话） | `authenticated` | **不限** |
+
+两道闸一起生效：
+
+- 应用层用 `ItemWriteOptions.maxTags` 显式传 `null` 表示放行（默认是 3）
+- 数据库层用 `auth.role()` 分流 —— `service_role` 限 3，`authenticated` 直接放行
+
+> REST 即便带着会话 Cookie 也仍按程序化通道处理（上限 3）：Web UI 走 Server Action，
+> 才是那条「不限数量」的通道。
 
 ### AI 解读在 Agent 侧
 
@@ -191,7 +211,7 @@ pnpm skill:install  # 把 Skill 装到 ~/.minimax/skills/
 
 | 方式 | 端点 | 认证 |
 |---|---|---|
-| Web | `https://trove.sxyicheng.tech/` `/items` `/items/[id]` `/archive` `/reminders` `/settings` | Supabase 会话 |
+| Web | `https://trove.sxyicheng.tech/` `/items` `/items/new` `/items/[id]` `/archive` `/reminders` `/settings` | Supabase 会话 |
 | REST | `https://trove.sxyicheng.tech/api/trove/*` | `Authorization: Bearer <trv_key>` |
 | MCP | `https://trove.sxyicheng.tech/api/mcp` | `Authorization: Bearer <trv_key>` |
 

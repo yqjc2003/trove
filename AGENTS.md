@@ -12,7 +12,9 @@
    不要在服务端做标签→分类映射。`content_type` 只承担技术维度。
 4. **AI 解读在 Agent 侧**：服务端不引入任何 LLM 依赖、不抓网页正文。
 5. **URL scheme 白名单**：只接受 http/https；`/r/[id]` 只 302 到 http(s)。
-6. **标签 ≤3**：应用层校验 + 数据库触发器（含 advisory lock）双重保险。
+6. **标签上限按通道分层**：Agent 通道（MCP / Skill / REST，API Key）每个收藏至多 3 个，
+   Web 手工通道（会话）不限。应用层用 `ItemWriteOptions.maxTags`（`null` = 不限），
+   数据库层用 `auth.role()` 分流（`service_role` 限 3，`authenticated` 放行）。
 7. **`collected_at` 不可被 upsert 覆盖**：`trove_upsert_item` 的 `on conflict do update`
    不含该列（也不含 status / archived_at / read_at / click_count / url）。
 8. **UI 保持极简**：不要渐变、发光、阴影卡片、逐条淡入、网格背景。

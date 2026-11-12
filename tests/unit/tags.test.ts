@@ -119,3 +119,33 @@ describe('normalizeTagFilters', () => {
     expect(normalizeTagFilters('react')).toEqual([]);
   });
 });
+
+describe('标签数量上限按通道分层', () => {
+  it('默认走 Agent 通道的 3 个上限', () => {
+    expect(() => normalizeTags(['a', 'b', 'c', 'd'])).toThrow(AppError);
+    try {
+      normalizeTags(['a', 'b', 'c', 'd']);
+    } catch (e) {
+      expect((e as AppError).code).toBe('MAX_TAGS_EXCEEDED');
+      expect((e as AppError).status).toBe(422);
+    }
+  });
+
+  it('max=null 表示不限数量（Web 手工整理）', () => {
+    const tags = normalizeTags(['a', 'b', 'c', 'd', 'e'], null);
+    expect(tags).toHaveLength(5);
+    expect(tags).toEqual(['a', 'b', 'c', 'd', 'e']);
+  });
+
+  it('max 可自定义', () => {
+    expect(normalizeTags(['a', 'b', 'c'], 3)).toHaveLength(3);
+    expect(() => normalizeTags(['a', 'b', 'c', 'd'], 3)).toThrow(AppError);
+  });
+
+  it('exceedsTagLimit 同样支持 null 与自定义上限', () => {
+    expect(exceedsTagLimit(['a', 'b', 'c', 'd'])).toBe(true);
+    expect(exceedsTagLimit(['a', 'b', 'c', 'd'], null)).toBe(false);
+    expect(exceedsTagLimit(['a', 'b', 'c', 'd'], 5)).toBe(false);
+    expect(exceedsTagLimit(['a', 'b'], 1)).toBe(true);
+  });
+});

@@ -3,7 +3,7 @@
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useState, useTransition } from 'react';
 
-import type { TagOption } from '@/components/TagPicker';
+import type { TagOption } from '@/components/TagInput';
 
 const CONTENT_TYPES = [
   { value: 'article', label: '文章' },

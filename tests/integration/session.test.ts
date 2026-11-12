@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 import { createServerClient } from '@supabase/ssr';
 
 /**
@@ -26,6 +26,28 @@ const PASSWORD = process.env.TROVE_TEST_PASSWORD;
 const enabled = Boolean(APP_URL && SUPABASE_URL && ANON_KEY && EMAIL && PASSWORD);
 
 const API = `${APP_URL}/api/trove`;
+
+/** 本文件造的标签名 —— 清理时按名字匹配。 */
+const TEST_TAG_NAMES = ['会话测试', '甲', '乙', '丙', '丁', '戊', '己', '庚'];
+
+/**
+ * 判断 URL 是否属于「保留的示例域名」——
+ * example.com / *.example.com / *.example 按 RFC 2606 都是测试专用，
+ * 真实用户不可能拿它当收藏。清理时只删这一类条目，绝不误删真实数据。
+ */
+function isTestUrl(url: string): boolean {
+  try {
+    const host = new URL(url).hostname.toLowerCase();
+    return (
+      host === 'example.com' ||
+      host.endsWith('.example.com') ||
+      host.endsWith('.example') ||
+      host === 'example'
+    );
+  } catch {
+    return false;
+  }
+}
 
 /** @supabase/ssr 的 Cookie 适配器：把会话 Cookie 存进内存 jar。 */
 const jar = new Map<string, string>();
@@ -57,9 +79,10 @@ async function call(
 describe.skipIf(!enabled)('集成测试（会话通道）', () => {
   let itemId = '';
   let itemUrl = '';
+  let supabase: ReturnType<typeof createServerClient>;
 
   beforeAll(async () => {
-    const supabase = createServerClient(SUPABASE_URL!, ANON_KEY!, {
+    supabase = createServerClient(SUPABASE_URL!, ANON_KEY!, {
       cookies: {
         getAll: () => [...jar].map(([name, value]) => ({ name, value })),
         setAll: (list) => {
@@ -73,7 +96,29 @@ describe.skipIf(!enabled)('集成测试（会话通道）', () => {
       password: PASSWORD!,
     });
     if (error) throw new Error(`登录失败：${error.message}`);
-  });
+  }, 60000);
+
+  afterAll(async () => {
+    // 收尾：集成测试跑在真实库上，不能留残渣。
+    // 只清「保留的示例域名」上的条目 + 本文件造的标签，真实收藏不受影响。
+    const list = await call('/items?status=all&limit=200');
+    const items =
+      (list.json?.data as { items?: Array<{ id: string; url?: string }> })?.items ?? [];
+    for (const item of items) {
+      if (item.id === itemId || (item.url && isTestUrl(item.url))) {
+        await call(`/items/${item.id}`, { method: 'DELETE' });
+      }
+    }
+
+    const res = await call('/tags');
+    const tags =
+      (res.json?.data as { tags?: Array<{ id: string; name: string }> })?.tags ?? [];
+    for (const tag of tags) {
+      if (TEST_TAG_NAMES.includes(tag.name)) {
+        await call(`/tags/${tag.id}`, { method: 'DELETE' });
+      }
+    }
+  }, 180000);
 
   it('会话建立后可以读取自己的收藏列表', async () => {
     const res = await call('/items?limit=5');
@@ -119,7 +164,25 @@ describe.skipIf(!enabled)('集成测试（会话通道）', () => {
     });
     expect(tooMany.status).toBe(422);
     expect((tooMany.json?.error as { code: string }).code).toBe('MAX_TAGS_EXCEEDED');
-  });
+  }, 30000);
+
+  it('会话角色在 DB 层可以打超过 3 个标签（Web 手工通道不限数量）', async () => {
+    // 绕过 REST 的 service 层上限，直接以 authenticated 角色调 RPC，
+    // 验证 DB 层的 auth.role() 分流：authenticated 放行、service_role 限 3。
+    const { error } = await supabase.rpc('trove_replace_item_tags', {
+      p_user_id: '00000000-0000-0000-0000-000000000000',
+      p_item_id: itemId,
+      p_tags: ['丁', '戊', '己', '庚'],
+      p_origin: 'user',
+    });
+    expect(error).toBeNull();
+
+    const res = await call(`/items/${itemId}`);
+    const tags = (res.json?.data as { item: { tags: Array<{ name: string }> } }).item.tags;
+    const names = tags.map((t) => t.name);
+    expect(names).toHaveLength(4);
+    expect([...names].sort()).toEqual(['丁', '戊', '己', '庚'].sort());
+  }, 30000);
 
   it('/r/[id] 302 跳转到原始 URL', async () => {
     const res = await fetch(`${APP_URL}/r/${itemId}`, {

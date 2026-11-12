@@ -170,9 +170,14 @@ create trigger trg_tags_touch_updated_at before update on public.tags
   for each row execute function public.touch_updated_at();
 
 -- ---------------------------------------------------------------------------
--- 触发器：每个收藏最多 3 个标签（DB 层兜底）
+-- 触发器：Agent 通道每个收藏最多 3 个标签（DB 层兜底）
 --   pg_advisory_xact_lock 保证并发插入同一 item 时计数检查是原子的，
 --   否则两个并发 INSERT 都能看到 count < 3 而突破上限。
+--
+--   只对 service_role 生效——REST / MCP / Skill 走的就是 service_role 通道，
+--   需要防止 AI 乱贴标签；Web 手工整理走会话通道（authenticated），不限数量。
+--   auth.role() 读的是 JWT claims（GUC request.jwt.claims），
+--   SECURITY DEFINER 不会改变它，所以 RPC 内部调用时看到的仍是原始调用者的角色。
 -- ---------------------------------------------------------------------------
 create or replace function public.enforce_item_tag_limit()
 returns trigger
@@ -180,6 +185,10 @@ language plpgsql
 as $$
 declare n integer;
 begin
+  if coalesce(auth.role(), '') <> 'service_role' then
+    return new;
+  end if;
+
   perform pg_advisory_xact_lock(hashtext(new.item_id::text));
   select count(*) into n from public.item_tags where item_id = new.item_id;
   if n >= 3 then
@@ -311,7 +320,8 @@ grant execute on function public.trove_record_click(uuid,text,text,text) to auth
 --     但仍要显式分流：会话请求必须忽略 p_user_id，不能靠「uid 为空才用 p_user_id」兜底。
 --
 --   B-1 标签替换：原子完成「建/取标签 → 清旧绑定 → 绑新标签」
---       ≤3 校验与归属校验都在 delete 之前完成，失败不留半成品
+--       数量校验与归属校验都在 delete 之前完成，失败不留半成品
+--       数量上限只对 Agent 通道（service_role）生效，Web 会话通道不限
 -- ---------------------------------------------------------------------------
 create or replace function public.trove_replace_item_tags(
   p_user_id uuid,
@@ -351,7 +361,9 @@ begin
   from unnest(coalesce(p_tags, array[]::text[])) t
   where btrim(t) <> '';
 
-  if v_cnt > 3 then
+  -- 数量上限：只对 Agent 通道（service_role：REST / MCP / Skill）限 3 个，
+  -- 防止 AI 乱贴标签；Web 手工整理走会话通道（authenticated），不限数量。
+  if v_role = 'service_role' and v_cnt > 3 then
     raise exception 'MAX_TAGS_EXCEEDED' using errcode = 'check_violation';
   end if;
 

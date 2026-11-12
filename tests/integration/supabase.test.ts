@@ -1,4 +1,4 @@
-import { describe, expect, it, beforeAll } from 'vitest';
+import { describe, expect, it, beforeAll, afterAll } from 'vitest';
 
 /**
  * 集成测试：需要真实的 Supabase 项目与已部署的应用。
@@ -21,6 +21,12 @@ const KEY_B = process.env.TROVE_TEST_KEY_B;
 const enabled = Boolean(APP_URL && URL && SERVICE_KEY && KEY_A);
 
 const API = `${APP_URL}/api/trove`;
+
+/** 本文件造的条目 URL 前缀 —— 清理时只按前缀匹配，绝不误删用户真实收藏。 */
+const TEST_URL_PREFIX = 'https://example.com/integ-';
+
+/** 本文件造的标签名。 */
+const TEST_TAG_NAMES = ['集成测试', '集成冲突标签', '集成冲突标签2'];
 
 async function api(
   path: string,
@@ -47,16 +53,36 @@ async function api(
 describe.skipIf(!enabled)('集成测试（需要真实 Supabase）', () => {
   let createdId = '';
 
-  beforeAll(async () => {
-    // 清理上一轮残留
+  /** 删除本文件造出来的所有条目与标签。 */
+  async function cleanup() {
     const list = await api('/items?status=all&limit=200');
-    const items = (list.json?.data as { items?: Array<{ id: string }> })?.items ?? [];
+    const items =
+      (list.json?.data as { items?: Array<{ id: string; url?: string }> })?.items ?? [];
     for (const item of items) {
-      if (item.id.startsWith('it') || item.id) {
+      if (item.url?.startsWith(TEST_URL_PREFIX)) {
         await api(`/items/${item.id}`, { method: 'DELETE' });
       }
     }
-  });
+
+    const tagList = await api('/tags');
+    const tags =
+      (tagList.json?.data as { tags?: Array<{ id: string; name: string }> })?.tags ?? [];
+    for (const tag of tags) {
+      if (TEST_TAG_NAMES.includes(tag.name)) {
+        await api(`/tags/${tag.id}`, { method: 'DELETE' });
+      }
+    }
+  }
+
+  beforeAll(async () => {
+    // 清理上一轮残留（只删测试自己造的）
+    await cleanup();
+  }, 180000);
+
+  afterAll(async () => {
+    // 收尾：集成测试跑在真实库上，不能留残渣
+    await cleanup();
+  }, 180000);
 
   it('同一 URL 重复提交只产生一条条目', async () => {
     const payload = {
@@ -76,7 +102,7 @@ describe.skipIf(!enabled)('集成测试（需要真实 Supabase）', () => {
     const secondData = second.json?.data as { created: number; updated: number };
     expect(secondData.created).toBe(0);
     expect(secondData.updated).toBe(1);
-  });
+  }, 30000);
 
   it('缺省 tags 的 upsert 保留原标签', async () => {
     const before = await api(`/items/${createdId}`);
@@ -92,7 +118,7 @@ describe.skipIf(!enabled)('集成测试（需要真实 Supabase）', () => {
     const afterTags = (after.json?.data as { item: { tags: Array<{ name: string }> } }).item
       .tags;
     expect(afterTags.map((t) => t.name)).toContain('集成测试');
-  });
+  }, 30000);
 
   it('超过 3 个标签被拒绝，且不改动原有标签', async () => {
     const res = await api(`/items/${createdId}`, {
@@ -105,7 +131,7 @@ describe.skipIf(!enabled)('集成测试（需要真实 Supabase）', () => {
     const after = await api(`/items/${createdId}`);
     const tags = (after.json?.data as { item: { tags: Array<{ name: string }> } }).item.tags;
     expect(tags.map((t) => t.name)).toContain('集成测试');
-  });
+  }, 30000);
 
   it('标签重名返回 TAG_NAME_CONFLICT', async () => {
     await api('/tags', { method: 'POST', body: { name: '集成冲突标签' } });
@@ -126,39 +152,58 @@ describe.skipIf(!enabled)('集成测试（需要真实 Supabase）', () => {
     expect(res.status).toBe(409);
     expect((res.json?.error as { code: string }).code).toBe('TAG_NAME_CONFLICT');
     expect(target).toBeDefined();
-  });
+  }, 30000);
 
-  it('数据库层触发器拒绝第 4 个标签', async () => {
+  it('数据库层触发器在 Agent 通道拒绝第 4 个标签', async () => {
     const { createClient } = await import('@supabase/supabase-js');
     const admin = createClient(URL!, SERVICE_KEY!, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    const { data: tags } = await admin
-      .from('tags')
-      .select('id,name')
-      .eq('name', '集成测试');
+    const itemRes = await api(`/items/${createdId}`);
+    const userId = (itemRes.json?.data as { item: { user_id: string } }).item.user_id;
 
-    const inserted = [];
-    for (const t of tags ?? []) {
-      const { error } = await admin
-        .from('item_tags')
-        .insert({ item_id: createdId, tag_id: t.id });
-      inserted.push(error);
+    // 自造 4 个新标签逐个绑定，不依赖历史残留：
+    // service_role（Agent 通道）下触发器只允许 3 个，第 4 个必然被拒。
+    const stamp = Date.now();
+    const tagIds: string[] = [];
+    for (let i = 0; i < 4; i += 1) {
+      const { data, error } = await admin
+        .from('tags')
+        .insert({ user_id: userId, name: `触发器测试${stamp}-${i}`, origin: 'agent' })
+        .select('id')
+        .single();
+      if (error) throw new Error(error.message);
+      tagIds.push((data as { id: string }).id);
     }
 
-    // 至少要有一个触发器报错（第三个之后插入的）
-    expect(inserted.some((e) => e?.message.includes('MAX_TAGS_EXCEEDED'))).toBe(true);
-  });
+    const errors: string[] = [];
+    for (const tagId of tagIds) {
+      const { error } = await admin.from('item_tags').insert({ item_id: createdId, tag_id: tagId });
+      if (error) errors.push(error.message);
+    }
+
+    expect(errors.some((m) => m.includes('MAX_TAGS_EXCEEDED'))).toBe(true);
+
+    // 无论插多少次，最终绑定数都不超过 3
+    const { data: bindings } = await admin
+      .from('item_tags')
+      .select('tag_id')
+      .eq('item_id', createdId);
+    expect((bindings ?? []).length).toBeLessThanOrEqual(3);
+
+    // 清理这批测试标签（item_tags 会跟着级联删）
+    await admin.from('tags').delete().in('id', tagIds);
+  }, 60000);
 
   it.skipIf(!KEY_B)('跨用户访问被拒绝（404）', async () => {
     const res = await api(`/items/${createdId}`, { key: KEY_B });
     expect(res.status).toBe(404);
-  });
+  }, 30000);
 
   it.skipIf(!KEY_B)('用户 B 看不到用户 A 的标签', async () => {
     const res = await api('/tags', { key: KEY_B });
     const tags = (res.json?.data as { tags: Array<{ name: string }> }).tags;
     expect(tags.map((t) => t.name)).not.toContain('集成测试');
-  });
+  }, 30000);
 });

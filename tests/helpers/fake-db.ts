@@ -261,9 +261,10 @@ export class FakeTroveDb {
     origin: Tag['origin'] = 'agent',
   ): Promise<Tag[]> {
     const names = [...new Set(tagNames.map((n) => n.trim().toLowerCase()).filter(Boolean))];
-    if (names.length > 3) {
-      throw new Error('MAX_TAGS_EXCEEDED');
-    }
+    // 不在这里限制数量：DB 层的「至多 3 个」现在按 auth.role() 分流
+    // （service_role 的 Agent 通道限 3，会话通道不限），假实现没有角色概念。
+    // Agent 通道的上限由 service 层的 normalizeTags 保证（单测覆盖），
+    // DB 层的角色分流由 tests/integration/ 覆盖。
 
     const tagIds: string[] = [];
     const createdAt = this.currentTime();

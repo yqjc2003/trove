@@ -4,6 +4,16 @@ export const MAX_TAGS_PER_ITEM = 3;
 export const MAX_TAG_NAME_LENGTH = 32;
 
 /**
+ * 标签数量上限的分层约定：
+ *   - Agent 通道（MCP / Skill / REST，service_role）→ 至多 3 个，防止 AI 乱贴标签
+ *   - Web 手工整理（会话通道）→ 不限数量
+ * 上限由调用方通过 `max` 传入；`null` 表示不限。
+ */
+export type TagLimit = number | null;
+
+export const DEFAULT_TAG_LIMIT: TagLimit = MAX_TAGS_PER_ITEM;
+
+/**
  * 标签名归一（plan §5.3）：
  *   trim → 去 # 前缀 → 折叠空白 → 小写 → 长度上限 32
  *
@@ -35,10 +45,12 @@ export function normalizeTagName(raw: string): string | null {
 }
 
 /**
- * 归一 + 去重一个标签数组，并校验「至多 3 个」。
+ * 归一 + 去重一个标签数组，并校验数量上限。
  * 返回值已去重且保持首次出现顺序。
+ *
+ * `max` 传 `null` 表示不限数量（Web 手工整理）；默认走 Agent 通道的 3 个上限。
  */
-export function normalizeTags(input: unknown): string[] {
+export function normalizeTags(input: unknown, max: TagLimit = DEFAULT_TAG_LIMIT): string[] {
   if (input === undefined || input === null) return [];
 
   if (!Array.isArray(input)) {
@@ -59,11 +71,11 @@ export function normalizeTags(input: unknown): string[] {
     result.push(name);
   }
 
-  if (result.length > MAX_TAGS_PER_ITEM) {
+  if (max !== null && result.length > max) {
     throw new AppError(
       'MAX_TAGS_EXCEEDED',
-      `每个收藏最多 ${MAX_TAGS_PER_ITEM} 个标签`,
-      { limit: MAX_TAGS_PER_ITEM, received: result.length },
+      `每个收藏最多 ${max} 个标签`,
+      { limit: max, received: result.length },
     );
   }
 
@@ -71,7 +83,7 @@ export function normalizeTags(input: unknown): string[] {
 }
 
 /** 不抛错的版本，用于「判断是否超限」这类场景。 */
-export function exceedsTagLimit(input: unknown): boolean {
+export function exceedsTagLimit(input: unknown, max: TagLimit = DEFAULT_TAG_LIMIT): boolean {
   if (!Array.isArray(input)) return false;
   const seen = new Set<string>();
   for (const raw of input) {
@@ -80,7 +92,8 @@ export function exceedsTagLimit(input: unknown): boolean {
     if (name === null) continue;
     seen.add(name);
   }
-  return seen.size > MAX_TAGS_PER_ITEM;
+  if (max === null) return false;
+  return seen.size > max;
 }
 
 /**
