@@ -9,35 +9,15 @@
  *   node trove-api.mjs stats                     统计概览
  *   node trove-api.mjs tags                      标签列表
  *   node trove-api.mjs notes --id <id> --body '<md>'
+ *   node trove-api.mjs account
  *
  * 配置：环境变量 TROVE_API_BASE 与 TROVE_API_KEY，
  *      或放在 ~/.config/trove/env（KEY=VALUE 格式）。
  */
 
-import fs from 'node:fs';
-import os from 'node:os';
-import path from 'node:path';
+import { loadTroveEnv } from './trove-env.mjs';
 
-const ENV_FILE = path.join(os.homedir(), '.config', 'trove', 'env');
-
-function loadEnvFile() {
-  if (!fs.existsSync(ENV_FILE)) return;
-  const text = fs.readFileSync(ENV_FILE, 'utf8');
-  for (const line of text.split(/\r?\n/)) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) continue;
-    const idx = trimmed.indexOf('=');
-    if (idx === -1) continue;
-    const key = trimmed.slice(0, idx).trim();
-    const value = trimmed.slice(idx + 1).trim().replace(/^["']|["']$/g, '');
-    if (key && !(key in process.env)) process.env[key] = value;
-  }
-}
-
-loadEnvFile();
-
-const BASE = (process.env.TROVE_API_BASE ?? '').replace(/\/$/, '');
-const KEY = process.env.TROVE_API_KEY ?? '';
+const { base: BASE, key: KEY } = loadTroveEnv() ?? { base: '', key: '' };
 
 if (!BASE || !KEY) {
   console.error(
@@ -92,11 +72,16 @@ async function request(pathname, { method = 'GET', body } = {}) {
   try {
     payload = text ? JSON.parse(text) : null;
   } catch {
-    payload = { raw: text };
+    // 非 JSON（例如 404 时 Next.js 返回的 HTML 页面）—— 别把整页塞进错误消息
+    payload = null;
   }
 
   if (!res.ok) {
-    const error = payload?.error ?? { code: `HTTP_${res.status}`, message: text };
+    const error =
+      payload?.error ?? {
+        code: `HTTP_${res.status}`,
+        message: `请求 ${BASE}${pathname} 失败：HTTP ${res.status} ${res.statusText}`,
+      };
     console.error(JSON.stringify({ error }, null, 2));
     process.exit(1);
   }
@@ -185,13 +170,19 @@ switch (command) {
     break;
   }
 
+  case 'account': {
+    const data = await request('/account');
+    console.log(JSON.stringify(data, null, 2));
+    break;
+  }
+
   default: {
     console.error(
       JSON.stringify(
         {
           error:
-            '未知命令。可用：save / save-many / search / stats / tags / notes',
-          commands: ['save', 'save-many', 'search', 'stats', 'tags', 'notes'],
+            '未知命令。可用：save / save-many / search / stats / tags / notes / account',
+          commands: ['save', 'save-many', 'search', 'stats', 'tags', 'notes', 'account'],
         },
         null,
         2,

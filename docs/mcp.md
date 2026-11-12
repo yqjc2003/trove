@@ -103,6 +103,12 @@
 
 无入参。返回超期未读清单，含 `days_overdue`。
 
+### `trove_account`
+
+无入参。返回当前账号信息：邮箱、昵称、GitHub 用户名与头像。
+
+`github_username` 可直接用于读取该用户的 star 列表（GitHub 公开端点，无需 Token）。
+
 ### `trove_list_tags`
 
 无入参。返回当前用户全部标签（含 `count` 与 `origin`）。

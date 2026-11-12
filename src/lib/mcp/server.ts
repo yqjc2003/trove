@@ -13,6 +13,7 @@ import {
   type SaveItemInput,
 } from '@/lib/services/items';
 import { addNote } from '@/lib/services/notes';
+import { getAccountInfo } from '@/lib/services/account';
 import { createTag, deleteTag, listTags, renameTag } from '@/lib/services/tags';
 import { getStats, listReminders } from '@/lib/services/reminders';
 import type { ItemSource, ContentType } from '@/types';
@@ -422,6 +423,26 @@ export function registerTroveTools(server: {
             days_overdue: r.days_overdue,
           })),
         );
+      } catch (e) {
+        const err = toAppError(e);
+        return toolError(err.code, err.message, err.details);
+      }
+    }) as never,
+  );
+
+  search(
+    'trove_account',
+    {
+      title: '账号信息',
+      description:
+        '返回当前账号信息：邮箱、昵称、GitHub 用户名与头像。GitHub 用户名可用于读取该用户的 star 列表（公开端点，无需 Token）。',
+      inputSchema: z.object({}),
+    },
+    (async (_args: unknown, ctx: unknown) => {
+      const auth = authFromContext(ctx);
+      try {
+        const service = serviceContext(auth);
+        return toolOk(await getAccountInfo(service));
       } catch (e) {
         const err = toAppError(e);
         return toolError(err.code, err.message, err.details);

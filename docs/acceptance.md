@@ -70,7 +70,11 @@ Vercel 生产环境变量已配置。
     `trove_manage_tag` 新建/改名/删除标签均生效；无 Key → 401 + `WWW-Authenticate` 挑战。
 20. **Skill** —— `bookmarks` 模式导入 Chrome 书签 ≥10 条（标题/摘要/≤3 标签齐全）；
     `github-stars` 模式导入 star ≥5 条；`url` 模式单条/多条均可。
-21. **部署** —— Vercel 生产环境走一遍 1–20（API base 与 MCP url 指向生产域名）。
+21. **GitHub star 免 Token** —— `GET /api/trove/account` 返回 `github_username`；
+    **不配 `GITHUB_TOKEN`、不传 `--user`**，只靠 `TROVE_API_KEY` 跑
+    `node github-stars.mjs --limit 5` → 输出 `mode="public-user"`、
+    `username_source="trove-account"`、拿到 ≥1 条 star。
+22. **部署** —— Vercel 生产环境走一遍 1–21（API base 与 MCP url 指向生产域名）。
 
 ---
 

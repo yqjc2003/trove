@@ -15,31 +15,18 @@
  */
 
 import fs from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { resolveTags, findNearDuplicates, baseNormalize, similarityKey } from './tag-matching.mjs';
+import { loadTroveEnv } from './trove-env.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ALIAS_FILE = path.join(HERE, '..', 'data', 'tag-aliases.json');
-const ENV_FILE = path.join(os.homedir(), '.config', 'trove', 'env');
 
 function loadEnv() {
-  if (fs.existsSync(ENV_FILE)) {
-    for (const line of fs.readFileSync(ENV_FILE, 'utf8').split(/\r?\n/)) {
-      const t = line.trim();
-      if (!t || t.startsWith('#')) continue;
-      const i = t.indexOf('=');
-      if (i === -1) continue;
-      const key = t.slice(0, i).trim();
-      const value = t.slice(i + 1).trim().replace(/^["']|["']$/g, '');
-      if (key && !(key in process.env)) process.env[key] = value;
-    }
-  }
-  const base = (process.env.TROVE_API_BASE ?? '').replace(/\/$/, '');
-  const key = process.env.TROVE_API_KEY ?? '';
-  if (!base || !key) {
+  const env = loadTroveEnv();
+  if (!env) {
     console.error(
       JSON.stringify(
         { error: '缺少配置：请设置 TROVE_API_BASE 与 TROVE_API_KEY（可在 trove 的「设置 → API Key」生成）' },
@@ -49,7 +36,7 @@ function loadEnv() {
     );
     process.exit(1);
   }
-  return { base, key };
+  return env;
 }
 
 function loadAliases() {

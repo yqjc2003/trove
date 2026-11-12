@@ -52,6 +52,22 @@ Agent 取 URL 列表  →  Agent 抓正文  →  Agent 自己产出 title/summar
 
 所以 Skill 与 MCP 的职责边界很清楚：它们负责「搬运」和「校验」，理解内容是 Agent 的事。
 
+### GitHub star 免 Token 采集
+
+读 star 列表用 GitHub 的**公开端点** `GET /users/{username}/starred`，**不需要 GITHUB_TOKEN**。
+
+那 username 从哪来？trove 用 GitHub OAuth 登录时，Supabase 已经把 GitHub 资料
+（`user_name` / `preferred_username`）写进了 `auth.users`。服务端在
+`GET /api/trove/account` 里把它交出来，Skill 拿着已有的 API Key 就能自取：
+
+```
+node scripts/github-stars.mjs --limit 50
+→ { mode: "public-user", user: "…", username_source: "trove-account", stars: [...] }
+```
+
+所以采集 star **只需要配 `TROVE_API_BASE` + `TROVE_API_KEY`**，用户什么都不用额外配。
+`GITHUB_TOKEN` 仍然可选：配了配额从 60 次/小时提到 5000 次/小时，也能读私密 profile 的 star。
+
 ### 重复录入 = Upsert
 
 同一 URL 重复录入永远只对应一条条目，写入即 upsert：
@@ -180,7 +196,7 @@ src/lib/domain/               纯逻辑：URL 规范化、内容形态、标签�
 src/lib/db/trove-db.ts        唯一的数据访问入口（强制 user_id 过滤）
 src/lib/services/             业务逻辑（REST / MCP / Server Action 复用同一层）
 src/lib/mcp/server.ts         MCP 工具注册
-skills/trove-capture/         Skill：SKILL.md + 4 个零依赖 Node 脚本
+skills/trove-capture/         Skill：SKILL.md + 6 个零依赖 Node 脚本
 tests/                        Vitest 单测（离线可跑）+ 集成测试（默认 skip）
 docs/                         API / MCP / Skill / 验收文档
 ```

@@ -102,6 +102,30 @@ src/lib/db/trove-db.ts    唯一数据访问入口
 `src/lib/auth/` 是认证专用的一层（凭据解析、API Key、注册编排），
 同样遵守「依赖注入、离线可测」，不直接 `.from()` 业务表。
 
+## GitHub star 采集（免 Token）
+
+读 star 列表走 GitHub 的**公开端点** `GET /users/{username}/starred`，
+**不需要 GITHUB_TOKEN**。username 由服务端提供：
+
+```
+auth.users.raw_user_meta_data（GitHub OAuth 写入）
+        ↓  src/lib/auth/github-identity.ts（纯函数 extractGithubIdentity，可离线单测）
+       fetchGithubIdentity(userId)（service-role，只按当前 user id 查）
+        ↓  src/lib/services/account.ts
+   GET /api/trove/account → { github_username, ... }
+        ↓
+   Skill: github-stars.mjs → GET /users/{username}/starred
+```
+
+- **不要**要求用户配 `GITHUB_TOKEN` —— trove 用 GitHub OAuth 登录时服务端已经知道 username，
+  Skill 手里有 API Key 就能自取（`username_source="trove-account"`）。
+- `GITHUB_TOKEN` 只是**可选加速器**：配额 60/h → 5000/h，且能读私密 profile 的 star。
+- `GITHUB_TOKEN` 只在 GitHub API 调用里用，**绝不写进仓库或 `.env.local`**；
+  真要长期配就放 `~/.config/trove/env`。
+- 公开端点对私密 profile 返回**空列表**（不是 404）—— 遇到 0 条要提示「可能是私密 profile」。
+- 抓仓库详情（`fetch-content.mjs` 遇 GitHub 链接走 API）**每个仓库消耗一次配额**，
+  star 多时建议配 token。
+
 ## 注册流程
 
 ```

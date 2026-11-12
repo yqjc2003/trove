@@ -24,8 +24,8 @@ license: Apache-2.0
 |---|---|
 | `TROVE_API_BASE` | 例如 `https://trove.sxyicheng.tech/api/trove` |
 | `TROVE_API_KEY` | `trv_` 开头的长效 API Key |
-| `GITHUB_TOKEN` | 可选；读取 star 列表时必需（匿名调用会被限流） |
-
+| `GITHUB_USERNAME` | 可选；GitHub 用户名。设了就能**免 Token** 读 star 列表（也可临时用 `--user` 传） |
+| `GITHUB_TOKEN` | 可选；设了配额从 60 次/小时提到 5000 次/小时，也能读私密 profile 的 star |
 放在环境变量里，或写进 `~/.config/trove/env`（`KEY=VALUE` 格式，每行一条）。
 
 如果缺少 `TROVE_API_KEY`，提示用户到 trove 的「设置 → API Key」生成。
@@ -45,14 +45,37 @@ node scripts/fetch-content.mjs "<url>" ["<url2>" ...]
 ### 模式 B — GitHub star 列表
 
 ```bash
-node scripts/github-stars.mjs [--limit 50]
+node scripts/github-stars.mjs [--limit 50] [--user <GitHub用户名>]
 ```
 
-输出 `{ count, stars: [{ full_name, html_url, description, topics, language, ... }] }`。
+输出 `{ mode, count, stars: [{ full_name, html_url, description, topics, language, starred_at, ... }], rateLimit }`。
 每个 star 视为一个待收录链接，其 `html_url` 就是目标 URL。
 
-> `401` → 提示配置 `GITHUB_TOKEN`。
-> `403` → 触发限流，同样提示配置 token；不要无限重试。
+**用户名从哪来（按优先级）**：
+
+| 来源 | 说明 |
+|---|---|
+| `--user <name>` | 命令行显式指定 |
+| `GITHUB_USERNAME` | 环境变量 |
+| **trove 账号** | 调 `GET /account` 拿 `github_username` —— trove 用 GitHub OAuth 登录时服务端已经存下了它，**所以默认什么都不用配** |
+| `GITHUB_TOKEN` | 上面都没有时的兜底：读认证用户自己的 star |
+
+拿到用户名后走**公开端点** `GET /users/{username}/starred` —— **不需要 GITHUB_TOKEN**。
+
+**两种端点**：
+
+| 端点 | 何时用 | 要 Token 吗 | 配额 |
+|---|---|---|---|
+| `GET /users/{username}/starred` | 知道用户名 | **不要** | 匿名 60 次/小时；带了 Token 则 5000 次/小时 |
+| `GET /user/starred` | 不知道用户名但有 Token | 要 | 5000 次/小时 |
+
+公开端点只能读**公开 profile** 的 star；profile 是私密时它返回空列表（此时才需要 Token）。
+
+> `401` → Token 无效或已吊销。
+> `403` → 触发限流；不要无限重试。
+> `404` → 用户名不存在。
+
+> **配额提示**：列 star 列表可以免 Token，但**逐个抓仓库详情**（`fetch-content.mjs` 遇到 GitHub 链接会走 API）每个仓库消耗一次配额。star 数量多时建议配 `GITHUB_TOKEN`。
 
 ### 模式 C — 本地 Chrome / Edge 收藏夹
 

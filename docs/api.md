@@ -219,6 +219,31 @@
 
 ---
 
+## 账号
+
+### `GET /account`
+
+```jsonc
+{
+  "data": {
+    "user_id": "dceb207f-…",
+    "email": "you@example.com",
+    "display_name": "你的昵称",
+    "github_username": "yqjc2003",
+    "github_account_id": "6190566",
+    "github_avatar_url": "https://avatars.githubusercontent.com/u/6190566?v=4"
+  }
+}
+```
+
+只返回**当前用户自己**的资料。
+
+`github_username` 是 trove 用 GitHub OAuth 登录时存下的 GitHub 登录名
+（邮箱注册的账号为 `null`）。客户端拿它就能走 GitHub 的**公开端点**
+`GET /users/{username}/starred` 读 star 列表 —— **不需要 GITHUB_TOKEN**。
+
+---
+
 ## 导入导出
 
 ### `GET /export`
