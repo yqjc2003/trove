@@ -20,7 +20,7 @@ export function Nav() {
   return (
     <nav className="nav">
       <div className="nav-inner">
-        <Link href="/" className="nav-brand">
+        <Link href="/" className="nav-brand" translate="no">
           trove
         </Link>
         <div className="nav-links">

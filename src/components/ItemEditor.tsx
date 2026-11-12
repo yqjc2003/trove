@@ -55,9 +55,12 @@ export function ItemEditor({
         <span className="field-label">标题</span>
         <input
           className="input"
+          name="title"
           value={draftTitle}
           onChange={(e) => setDraftTitle(e.target.value)}
           maxLength={300}
+          autoComplete="off"
+          required
         />
       </label>
 
@@ -65,15 +68,17 @@ export function ItemEditor({
         <span className="field-label">摘要</span>
         <textarea
           className="textarea"
+          name="summary"
           value={draftSummary}
           onChange={(e) => setDraftSummary(e.target.value)}
           maxLength={1000}
+          autoComplete="off"
           style={{ minHeight: 100 }}
         />
       </label>
 
       {error ? (
-        <p className="small" style={{ color: 'var(--danger)' }}>
+        <p className="small danger" role="alert">
           {error}
         </p>
       ) : null}
@@ -85,7 +90,7 @@ export function ItemEditor({
           onClick={save}
           disabled={pending}
         >
-          保存
+          保存标题与摘要
         </button>
         <button
           type="button"

@@ -53,12 +53,19 @@ export function ApiKeyManager({
           create();
         }}
       >
+        <label className="sr-only" htmlFor="api-key-name">
+          Key 的用途名称
+        </label>
         <input
+          id="api-key-name"
           className="input"
+          name="api_key_name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="用途名称，例如「定时采集」"
+          placeholder="例如：定时采集…"
           disabled={pending}
+          autoComplete="off"
+          spellCheck={false}
         />
         <button type="submit" className="btn" disabled={pending || !name.trim()}>
           生成 API Key
@@ -66,7 +73,7 @@ export function ApiKeyManager({
       </form>
 
       {error ? (
-        <p className="small" style={{ color: 'var(--danger)', marginTop: 8 }}>
+        <p className="small danger" style={{ marginTop: 8 }} role="alert">
           {error}
         </p>
       ) : null}
@@ -76,13 +83,19 @@ export function ApiKeyManager({
           <p className="small muted">
             明文只显示这一次，请立刻保存：
           </p>
-          <code className="key-reveal">{plaintext}</code>
+          <code className="key-reveal" translate="no">
+            {plaintext}
+          </code>
           <p className="small faint" style={{ marginTop: 8 }}>
             放到 Skill 的环境变量里：
             <br />
-            <code className="mono">TROVE_API_BASE={siteUrl}/api/trove</code>
+            <code className="mono" translate="no">
+              TROVE_API_BASE={siteUrl}/api/trove
+            </code>
             <br />
-            <code className="mono">TROVE_API_KEY={plaintext}</code>
+            <code className="mono" translate="no">
+              TROVE_API_KEY={plaintext}
+            </code>
           </p>
           <button
             type="button"
@@ -96,6 +109,7 @@ export function ApiKeyManager({
       ) : null}
 
       {keys.length > 0 ? (
+        <div className="table-scroll">
         <table className="table-simple" style={{ marginTop: 20 }}>
           <thead>
             <tr>
@@ -110,7 +124,9 @@ export function ApiKeyManager({
             {keys.map((k) => (
               <tr key={k.id}>
                 <td>{k.name}</td>
-                <td className="mono">{k.prefix}…</td>
+                <td className="mono" translate="no">
+                  {k.prefix}…
+                </td>
                 <td className="small faint">{formatDateTime(k.created_at)}</td>
                 <td className="small faint">
                   {k.last_used_at ? formatDateTime(k.last_used_at) : '—'}
@@ -121,7 +137,7 @@ export function ApiKeyManager({
                   ) : (
                     <button
                       type="button"
-                      className="btn-quiet"
+                      className="btn-quiet btn-danger"
                       disabled={pending}
                       onClick={() => revoke(k.id)}
                     >
@@ -133,6 +149,7 @@ export function ApiKeyManager({
             ))}
           </tbody>
         </table>
+        </div>
       ) : null}
     </div>
   );

@@ -87,8 +87,12 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
                 <div>
                   <textarea
                     className="textarea textarea-mono"
+                    name="note"
                     value={editingBody}
                     onChange={(e) => setEditingBody(e.target.value)}
+                    aria-label="编辑笔记"
+                    autoComplete="off"
+                    spellCheck
                   />
                   <div className="row-actions">
                     <button
@@ -122,7 +126,7 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
 
       <div className="section">
         <div className="section-head">
-          <h2>写一条新笔记</h2>
+          <h2 id="new-note-heading">写一条新笔记</h2>
           <button
             type="button"
             className="btn-quiet"
@@ -138,16 +142,20 @@ export function NoteEditor({ itemId, notes }: { itemId: string; notes: Note[] })
           </div>
         ) : (
           <textarea
+            id="new-note"
             className="textarea textarea-mono"
+            name="note"
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             placeholder="支持 Markdown：代码块、列表、表格…"
+            autoComplete="off"
+            aria-labelledby="new-note-heading"
             style={{ marginTop: 12 }}
           />
         )}
 
         {error ? (
-          <p className="small" style={{ color: 'var(--danger)' }}>
+          <p className="small danger" role="alert">
             {error}
           </p>
         ) : null}

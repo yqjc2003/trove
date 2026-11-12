@@ -16,7 +16,7 @@ export function ItemRow({
         <Link href={`/items/${item.id}`}>{item.title}</Link>
       </p>
       <p className="row-meta">
-        <span>{item.domain}</span>
+        <span translate="no">{item.domain}</span>
         <span>收藏于 {formatDate(item.collected_at)}</span>
         {item.click_count > 0 ? <span>打开 {item.click_count} 次</span> : null}
         {!item.read_at ? <span>未读</span> : null}

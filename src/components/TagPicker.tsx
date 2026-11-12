@@ -38,11 +38,13 @@ export function TagPicker({
     <div>
       <TagInput tags={tags} onChange={commit} options={options} disabled={pending} />
       {error ? (
-        <p className="small" style={{ color: 'var(--danger)' }}>
+        <p className="small danger" role="alert">
           {error}
         </p>
       ) : null}
-      {pending ? <p className="faint small">保存中…</p> : null}
+      <p className="faint small" aria-live="polite">
+        {pending ? '保存中…' : ''}
+      </p>
     </div>
   );
 }

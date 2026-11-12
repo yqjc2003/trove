@@ -1,4 +1,4 @@
-import type { Metadata } from 'next';
+import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
 import { Nav } from '@/components/Nav';
@@ -8,6 +8,41 @@ export const metadata: Metadata = {
   title: 'trove — 个人收藏管理',
   description: '把散落的链接统一收敛到一处：标签、笔记、归档与阅读追踪。',
 };
+
+export const viewport: Viewport = {
+  themeColor: '#f3f4f1',
+  colorScheme: 'light',
+};
+
+function Shell({
+  nav,
+  children,
+}: {
+  nav?: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <html lang="zh-CN">
+      <head>
+        <link rel="preconnect" href="https://fontsapi.zeoseven.com" crossOrigin="anonymous" />
+        <link
+          rel="stylesheet"
+          href="https://fontsapi.zeoseven.com/159/main/result.css"
+          precedence="default"
+        />
+      </head>
+      <body>
+        <a className="skip-link" href="#content">
+          跳到正文
+        </a>
+        {nav}
+        <div id="content" tabIndex={-1}>
+          {children}
+        </div>
+      </body>
+    </html>
+  );
+}
 
 /**
  * 环境变量没配好时，给出可执行的提示，而不是让每个页面 500。
@@ -54,11 +89,9 @@ export default async function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   if (!isSupabaseConfigured()) {
     return (
-      <html lang="zh-CN">
-        <body>
-          <SetupNotice />
-        </body>
-      </html>
+      <Shell>
+        <SetupNotice />
+      </Shell>
     );
   }
 
@@ -73,12 +106,5 @@ export default async function RootLayout({
     signedIn = false;
   }
 
-  return (
-    <html lang="zh-CN">
-      <body>
-        {signedIn ? <Nav /> : null}
-        {children}
-      </body>
-    </html>
-  );
+  return <Shell nav={signedIn ? <Nav /> : null}>{children}</Shell>;
 }

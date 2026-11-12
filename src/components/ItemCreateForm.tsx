@@ -45,9 +45,13 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
         <input
           className="input"
           type="url"
+          name="url"
+          inputMode="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
           placeholder="https://example.com/article"
+          autoComplete="off"
+          spellCheck={false}
           required
         />
       </label>
@@ -56,9 +60,11 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
         <span className="field-label">标题</span>
         <input
           className="input"
+          name="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="这条收藏叫什么"
+          placeholder="例如：一篇想稍后再读的文章…"
+          autoComplete="off"
           required
           maxLength={300}
         />
@@ -68,9 +74,11 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
         <span className="field-label">摘要</span>
         <textarea
           className="textarea"
+          name="summary"
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="一句话说明（可留空）"
+          placeholder="一句话说明，可留空…"
+          autoComplete="off"
           maxLength={1000}
           style={{ minHeight: 90 }}
         />
@@ -85,7 +93,9 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
       </div>
 
       {error ? (
-        <p className="callout callout-error small">{error}</p>
+        <p className="callout callout-error small" role="alert">
+          {error}
+        </p>
       ) : null}
 
       <div className="row-actions" style={{ marginTop: 20 }}>

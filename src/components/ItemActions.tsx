@@ -67,13 +67,13 @@ export function ItemActions({
       </button>
 
       {showDelete ? (
-        <button type="button" className="btn-quiet" disabled={pending} onClick={remove}>
+        <button type="button" className="btn-quiet btn-danger" disabled={pending} onClick={remove}>
           删除
         </button>
       ) : null}
 
       {error ? (
-        <span className="small" style={{ color: 'var(--danger)' }}>
+        <span className="small danger" role="alert">
           {error}
         </span>
       ) : null}

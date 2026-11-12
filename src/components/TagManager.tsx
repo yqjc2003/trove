@@ -72,12 +72,19 @@ export function TagManager({ tags }: { tags: Tag[] }) {
           create();
         }}
       >
+        <label className="sr-only" htmlFor="new-tag">
+          新标签名称
+        </label>
         <input
+          id="new-tag"
           className="input"
+          name="tag"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="新建标签（支持中文）"
+          placeholder="新建标签，支持中文…"
           disabled={pending}
+          autoComplete="off"
+          spellCheck={false}
         />
         <button type="submit" className="btn" disabled={pending || !name.trim()}>
           新建
@@ -85,7 +92,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
       </form>
 
       {error ? (
-        <p className="small" style={{ color: 'var(--danger)' }}>
+        <p className="small danger" role="alert">
           {error}
         </p>
       ) : null}
@@ -96,6 +103,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
           还没有任何标签。AI 解读链接时会自动创建标签，你也可以在这里手动新建。
         </p>
       ) : (
+        <div className="table-scroll">
         <table className="table-simple">
           <thead>
             <tr>
@@ -112,8 +120,12 @@ export function TagManager({ tags }: { tags: Tag[] }) {
                   {editingId === t.id ? (
                     <input
                       className="input"
+                      name="tag_name"
                       value={editingName}
                       onChange={(e) => setEditingName(e.target.value)}
+                      aria-label={`标签 ${t.name} 的新名称`}
+                      autoComplete="off"
+                      spellCheck={false}
                       autoFocus
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') {
@@ -166,7 +178,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
                       </button>
                       <button
                         type="button"
-                        className="btn-quiet"
+                        className="btn-quiet btn-danger"
                         disabled={pending}
                         onClick={() => remove(t)}
                       >
@@ -179,6 +191,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
             ))}
           </tbody>
         </table>
+        </div>
       )}
     </div>
   );

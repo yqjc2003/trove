@@ -156,7 +156,7 @@ function LoginForm() {
   return (
     <main className="page">
       <div className="wrap-narrow">
-        <h1>trove</h1>
+        <h1 translate="no">trove</h1>
         <p className="page-sub">
           把散落在各处收藏的链接，统一收敛到一处：标签、笔记、归档与阅读追踪。
         </p>
@@ -186,10 +186,13 @@ function LoginForm() {
               <input
                 className="input"
                 type="email"
+                name="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="you@example.com"
                 autoComplete="email"
+                spellCheck={false}
+                inputMode="email"
                 required
               />
             </label>
@@ -200,20 +203,40 @@ function LoginForm() {
                 <input
                   className="input"
                   type="password"
+                  name="password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   autoComplete={mode === 'signup' ? 'new-password' : 'current-password'}
                   required
+                  minLength={6}
                 />
               </label>
             ) : null}
 
-            {error ? <p className="callout callout-error small">{error}</p> : null}
-            {notice ? <p className="callout small">{notice}</p> : null}
+            {error ? (
+              <p className="callout callout-error small" role="alert">
+                {error}
+              </p>
+            ) : null}
+            {notice ? (
+              <p className="callout small" aria-live="polite">
+                {notice}
+              </p>
+            ) : null}
 
             <div className="form-row" style={{ marginTop: 20 }}>
               <button type="submit" className="btn btn-primary" disabled={busy}>
-                {mode === 'password' ? '登录' : mode === 'signup' ? '创建账号' : '发送登录链接'}
+                {busy
+                  ? mode === 'signup'
+                    ? '创建中…'
+                    : mode === 'magic'
+                      ? '发送中…'
+                      : '登录中…'
+                  : mode === 'password'
+                    ? '登录'
+                    : mode === 'signup'
+                      ? '创建账号'
+                      : '发送登录链接'}
               </button>
               <button
                 type="button"

@@ -22,31 +22,37 @@ export function ReminderDaysForm({ days }: { days: number }) {
   }
 
   return (
-    <div className="form-row">
-      <input
-        className="input"
-        type="number"
-        min={1}
-        max={365}
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        style={{ maxWidth: 120 }}
-        disabled={pending}
-      />
-      <button
-        type="button"
-        className="btn"
-        onClick={save}
-        disabled={pending}
-      >
-        保存
+    <form
+      className="form-row"
+      onSubmit={(e) => {
+        e.preventDefault();
+        save();
+      }}
+    >
+      <label className="field" style={{ marginBottom: 0, width: 120 }}>
+        <span className="field-label">提醒天数</span>
+        <input
+          className="input"
+          type="number"
+          name="reminder_days"
+          inputMode="numeric"
+          min={1}
+          max={365}
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          disabled={pending}
+          autoComplete="off"
+        />
+      </label>
+      <button type="submit" className="btn" disabled={pending}>
+        {pending ? '保存中…' : '保存'}
       </button>
       <span className="small faint">天（1–365）</span>
       {error ? (
-        <span className="small" style={{ color: 'var(--danger)' }}>
+        <span className="small danger" role="alert">
           {error}
         </span>
       ) : null}
-    </div>
+    </form>
   );
 }

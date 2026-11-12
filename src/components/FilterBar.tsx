@@ -75,12 +75,20 @@ export function FilterBar({
 
   return (
     <div className="filters">
-      <form onSubmit={submitSearch} className="form-row">
+      <form onSubmit={submitSearch} className="form-row" role="search">
+        <label className="sr-only" htmlFor="item-search">
+          搜索收藏
+        </label>
         <input
+          id="item-search"
           className="input"
+          name="q"
           value={q}
           onChange={(e) => setQ(e.target.value)}
-          placeholder="搜索标题、摘要或链接"
+          placeholder="标题、摘要或链接…"
+          autoComplete="off"
+          spellCheck={false}
+          enterKeyHint="search"
         />
         <button type="submit" className="btn btn-sm">
           搜索
@@ -186,7 +194,9 @@ export function FilterBar({
         ) : null}
       </div>
 
-      {pending ? <p className="faint small" style={{ marginTop: 8 }}>筛选中…</p> : null}
+      <p className="faint small" style={{ marginTop: pending ? 8 : 0 }} aria-live="polite">
+        {pending ? '筛选中…' : ''}
+      </p>
     </div>
   );
 }

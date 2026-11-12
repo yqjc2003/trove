@@ -17,7 +17,7 @@ export function TagInput({
   tags,
   onChange,
   options,
-  placeholder = '添加标签',
+  placeholder = '添加标签…',
   disabled,
 }: {
   tags: string[];
@@ -73,11 +73,15 @@ export function TagInput({
       >
         <input
           className="input"
+          name="tag"
           value={input}
           onChange={(e) => setInput(e.target.value)}
-          placeholder={placeholder}
+          placeholder={placeholder.endsWith('…') ? placeholder : `${placeholder}…`}
           disabled={disabled}
           list={listId}
+          aria-label="标签名"
+          autoComplete="off"
+          spellCheck={false}
         />
         <datalist id={listId}>
           {options
@@ -92,7 +96,7 @@ export function TagInput({
       </form>
 
       {error ? (
-        <p className="small" style={{ color: 'var(--danger)' }}>
+        <p className="small danger" role="alert">
           {error}
         </p>
       ) : null}
