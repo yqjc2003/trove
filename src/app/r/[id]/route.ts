@@ -1,20 +1,31 @@
-import { NextResponse } from 'next/server';
+import { after, NextResponse } from 'next/server';
 
 import { recordClick } from '@/lib/services/click';
 import { isAllowedScheme } from '@/lib/domain/url';
 import { toAppError } from '@/lib/domain/errors';
 import { isSupabaseConfigured } from '@/lib/supabase/server';
+import { getServerContext } from '@/lib/server-context';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /r/{id} —— 302 重定向 + 点击追踪。
  *
- * 点击链接不直接跳转，而是先经这里记录点击行为与点击时间（首次点击同时标记已读），
- * 再 302 到目标地址。
+ * 先读取当前用户的收藏并校验目标地址，返回 302。
+ * 点击追踪在响应后尽力执行，失败不能阻断打开原文。
  */
-export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }) {
+export async function GET(
+  req: Request,
+  ctx: { params: Promise<{ id: string }> },
+) {
   const { id } = await ctx.params;
+  function redirect(target: string | URL) {
+    const response = NextResponse.redirect(target, { status: 302 });
+    response.headers.set('Cache-Control', 'private, no-store');
+    return response;
+  }
+  const fallback = new URL('/items', req.url);
+  fallback.searchParams.set('missing', id);
 
   // 部署未配置完成时给出明确提示，而不是 500
   if (!isSupabaseConfigured()) {
@@ -24,32 +35,38 @@ export async function GET(req: Request, ctx: { params: Promise<{ id: string }> }
   }
 
   try {
-    const target = await recordClick(id, {
+    const context = await getServerContext();
+    if (!context) return redirect(fallback);
+    // 经 TroveDb 的 user_id 过滤与会话 RLS 读取，不通过 service-role 兜底。
+    const item = await context.db.getItem(id);
+    if (!item || !isAllowedScheme(item.url)) return redirect(fallback);
+    const response = redirect(item.url);
+    const options = {
       source: 'web',
       referrer: req.headers.get('referer'),
       userAgent: req.headers.get('user-agent'),
-    });
-
-    // 兜底：即使库里存了奇怪的 scheme，也不允许跳过去（开放重定向防护）
-    if (!isAllowedScheme(target)) {
-      return NextResponse.redirect(new URL(`/items?missing=${id}`, req.url), {
-        status: 302,
+    };
+    try {
+      after(async () => {
+        try {
+          await recordClick(id, options);
+        } catch (error) {
+          // 不记录原始错误/请求头，避免凭据或私人 URL 进入日志。
+          console.warn('TROVE_CLICK_TRACKING_FAILED', {
+            id,
+            code: toAppError(error).code,
+          });
+        }
       });
+    } catch {
+      console.warn('TROVE_CLICK_TRACKING_NOT_SCHEDULED', { id });
     }
-
-    return NextResponse.redirect(target, { status: 302 });
+    return response;
   } catch (e) {
     const err = toAppError(e);
 
-    // 未登录 / 收藏不存在：都退回列表页，由列表页提示，
-    // 绝不在这里把用户卡在一张错误页上。
-    if (err.code === 'NOT_FOUND' || err.code === 'UNAUTHORIZED') {
-      return NextResponse.redirect(new URL(`/items?missing=${id}`, req.url), {
-        status: 302,
-      });
-    }
-
-    // 其他错误不跳转，避免吞掉问题
-    return new Response('记录点击失败', { status: err.status });
+    // 无法安全确定归属或目标地址时退回站内；不泄露或猜测其他用户的链接。
+    console.warn('TROVE_REDIRECT_TARGET_UNAVAILABLE', { id, code: err.code });
+    return redirect(fallback);
   }
 }

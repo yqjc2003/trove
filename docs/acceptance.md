@@ -44,7 +44,8 @@ Vercel 生产环境变量已配置。
 ## 点击追踪与提醒
 
 12. **点击追踪** —— Web 点「打开链接」→ 302 跳到目标站点；`click_events` 新增一行、
-    `click_count=1`、`read_at` 非空；再点 → `click_count=2`、`read_at` 不变。
+    后台任务完成后 `click_count=1`、`read_at` 非空；再点 → `click_count=2`、`read_at` 不变。
+    模拟 RPC 不可用、写入报错或统计超时，仍应立即 302 打开原文；非法 scheme、其他用户条目不跳往原文。
 13. **超期提醒** —— 手工把某条 `collected_at` 改成 20 天前且 `read_at=null` →
     出现在 `/reminders` 与仪表盘提醒区；点击它后消失。
 14. **归档** —— 归档 → 默认列表与提醒不再出现 → `/archive` 可见 → 取消归档后恢复，
