@@ -409,7 +409,7 @@ h3,
   gap: 14px;
   margin-top: 12px;
   flex-wrap: wrap;
-  align-items: baseline;
+  align-items: center;
 }
 
 /* ------------------------------------------------------------------ 标签 -- */
@@ -460,9 +460,15 @@ button.tag:focus-visible {
 /* ------------------------------------------------------------------ 按钮 -- */
 
 .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 44px;
+  vertical-align: middle;
   font: inherit;
   font-size: 14px;
-  line-height: 1.4;
+  line-height: 20px;
   padding: 8px 14px;
   border: 1px solid var(--rule-2);
   border-radius: 2px;
@@ -499,11 +505,19 @@ button.tag:focus-visible {
 }
 
 .btn-quiet {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  vertical-align: middle;
+  font: inherit;
   border: 0;
   background: none;
   color: var(--ink-2);
   padding: 0;
   font-size: 13px;
+  line-height: 20px;
+  cursor: pointer;
   text-decoration: underline;
   text-underline-offset: 3px;
 }
@@ -898,8 +912,13 @@ button.tag:focus-visible {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 20px;
+  gap: 12px;
   margin-top: 32px;
+}
+.desk-actions > .btn-quiet {
+  padding: 8px 14px;
+  border: 1px solid transparent;
+  font-size: 14px;
 }
 .desk-footer {
   display: flex;
@@ -1099,13 +1118,7 @@ summary {
   flex-wrap: wrap;
   margin-top: 16px;
 }
-.btn,
 .chip {
-  min-height: 44px;
-}
-.btn-quiet {
-  display: inline-flex;
-  align-items: center;
   min-height: 44px;
 }
 .tag {

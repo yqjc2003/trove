@@ -204,7 +204,7 @@ fix(redirect): 点击追踪失败时不再吞掉错误
 chore(deps): 升级 mcp-handler 到 2.x
 ```
 
-**推送前先问用户** —— 本仓库没有「改完直接 push」的授权。
+**完成修改后自动 commit 并 push** —— 用户已授权本仓库在质量门禁通过后自动提交和推送，无需重复确认。只提交本次任务的改动，保留无关的未提交修改；提交信息使用中文 conventional commits。
 
 <!-- BEGIN:nextjs-agent-rules -->
 
