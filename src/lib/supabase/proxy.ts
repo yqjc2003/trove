@@ -1,11 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
-const PUBLIC_PATHS = ['/login', '/api/mcp', '/.well-known'];
+const PUBLIC_PATHS = ['/login', '/auth/callback', '/api/mcp', '/.well-known'];
 
 /**
  * 刷新 Supabase 会话并对受保护页面做守卫。
- * `/api/mcp` 与 `/.well-known` 必须放行——MCP 走 Bearer 头，不依赖 Cookie。
+ * `/auth/callback`（OAuth 落地页）、`/api/mcp` 与 `/.well-known` 必须放行——
+ * 前两个分别是 OAuth 回调（靠 code 换 session，不依赖已有会话）和 MCP
+ * （走 Bearer 头）。
  */
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });

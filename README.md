@@ -79,6 +79,39 @@ pnpm dev
 > 本机没有 Docker，无法 `supabase start` 起本地实例，schema 需要推到托管项目。
 > 直连 `db.<ref>.supabase.co` 是 IPv6-only 主机，迁移走 pooler 连接串（用户名要带项目 ref）。
 
+## 注册与登录
+
+登录页有四种入口：
+
+| 入口 | 什么时候用 | 说明 |
+|---|---|---|
+| **创建账号** | 第一次用 | 填邮箱 + 密码 → Supabase 发确认邮件 → 点链接完成注册 → 之后用「密码登录」 |
+| **密码登录** | 已有账号 | 直接登录；密码错时会提示去「创建账号」 |
+| **邮件验证码** | 不想记密码 | 发一次性登录链接；第一次用这个邮箱会自动建号 |
+| **使用 GitHub 登录** | 可选 | 默认关闭，未在后台启用时按钮会置灰并说明原因 |
+
+注册成功即自动创建 `profiles` 行与**空白**的个人标签空间 —— 由数据库触发器
+`trve_handle_new_user` 完成，不预置任何标签。
+
+### 启用 GitHub 登录（三步）
+
+GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把按钮置灰并指出原因，
+不会给用户一个必然报错的死按钮。要启用：
+
+1. **GitHub 建 OAuth App** —— Settings → Developer settings → OAuth Apps → New OAuth App
+   - Homepage URL：你的站点地址
+   - Authorization callback URL：`https://sqpmotynmrpglsqvkmht.supabase.co/auth/v1/callback`
+   - 记下 Client ID 与 Client Secret
+2. **Supabase 开 provider** —— Dashboard → Authentication → Providers → GitHub
+   - 填入 Client ID / Client Secret 并启用
+3. **Supabase 加回调白名单** —— Dashboard → Authentication → URL Configuration → Redirect URLs
+   - 加 `http://localhost:3000/auth/callback`（本地开发）
+   - 加 `https://<你的域名>/auth/callback`（生产）
+   - Site URL 设为生产域名
+
+应用侧的回调落地页是 `GET /auth/callback`：浏览器走 PKCE，OAuth 回来时只带一个 `?code=`，
+必须由服务端拿它换 session 再写 Cookie —— 少这个路由 OAuth 登录就必然失败。
+
 ## 部署到 Vercel
 
 导入 GitHub 仓库后，在 Vercel 项目设置里配好环境变量再部署：
