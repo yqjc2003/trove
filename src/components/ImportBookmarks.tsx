@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState } from 'react';
+import { useTranslation } from '@/components/LocaleProvider';
 
 type ImportItem = {
   url: string;
@@ -55,7 +56,7 @@ function parseBookmarkHtml(markup: string): ImportItem[] {
 function parseCatchLingerExport(raw: string): ImportItem[] {
   const data: unknown = JSON.parse(raw);
   if (!data || typeof data !== 'object' || !Array.isArray((data as { items?: unknown }).items)) {
-    throw new Error('请选择 CatchLinger 导出的 JSON 文件。');
+    throw new Error('INVALID_EXPORT');
   }
   return (data as { items: Array<{ url?: unknown; title?: unknown; source_ref?: unknown }> }).items
     .flatMap((item) => {
@@ -71,6 +72,7 @@ function parseCatchLingerExport(raw: string): ImportItem[] {
 }
 
 export function ImportBookmarks() {
+  const { t } = useTranslation();
   const inputRef = useRef<HTMLInputElement>(null);
   const [selected, setSelected] = useState<ImportItem[] | null>(null);
   const [fileName, setFileName] = useState('');
@@ -90,12 +92,12 @@ export function ImportBookmarks() {
         ? parseCatchLingerExport(raw)
         : parseBookmarkHtml(raw);
       if (items.length === 0) {
-        throw new Error('没有找到可导入的 http(s) 链接。');
+        throw new Error('NO_LINKS');
       }
       setSelected(items);
       setFileName(file.name);
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '无法读取该文件。');
+      setError(cause instanceof Error && cause.message === 'INVALID_EXPORT' ? t('import.invalidExport') : cause instanceof Error && cause.message === 'NO_LINKS' ? t('import.noLinks') : t('import.readFailed'));
     }
   }
 
@@ -113,11 +115,11 @@ export function ImportBookmarks() {
       });
       const body = (await response.json()) as { data?: ImportOutcome; error?: { message?: string } };
       if (!response.ok || !body.data) {
-        throw new Error(body.error?.message ?? '导入失败。');
+        throw new Error(body.error?.message ?? 'IMPORT_FAILED');
       }
       setOutcome(body.data);
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : '导入失败。');
+    } catch {
+      setError(t('import.failed'));
     } finally {
       setBusy(false);
     }
@@ -126,7 +128,7 @@ export function ImportBookmarks() {
   return (
     <div className="import-bookmarks">
       <p className="small muted">
-        支持 Chrome/Edge 导出的书签 HTML，或 CatchLinger 的 JSON 导出。重复链接会合并，不会新增副本；每次最多导入 {MAX_IMPORT_ITEMS} 条。
+        {t('import.help', { count: MAX_IMPORT_ITEMS })}
       </p>
       <input
         ref={inputRef}
@@ -137,19 +139,19 @@ export function ImportBookmarks() {
       />
       <div className="row-actions" style={{ marginTop: 16 }}>
         <button type="button" className="btn" onClick={() => inputRef.current?.click()} disabled={busy}>
-          选择导出文件
+          {t('import.chooseFile')}
         </button>
         {selected ? (
           <button type="button" className="btn btn-primary" onClick={() => void startImport()} disabled={busy}>
-            {busy ? '导入中…' : `导入 ${selected.length} 条`}
+            {busy ? t('import.importing') : t('import.start', { count: selected.length })}
           </button>
         ) : null}
       </div>
-      {selected ? <p className="small faint" style={{ marginTop: 10 }}>已读取 {fileName}，待导入 {selected.length} 条链接。</p> : null}
+      {selected ? <p className="small faint" style={{ marginTop: 10 }}>{t('import.selected', { file: fileName, count: selected.length })}</p> : null}
       {error ? <p className="callout callout-error small" role="alert" style={{ marginTop: 12 }}>{error}</p> : null}
       {outcome ? (
         <p className="callout small" role="status" style={{ marginTop: 12 }}>
-          导入完成：新增 {outcome.created} 条，更新 {outcome.updated} 条，失败 {outcome.errors.length} 条。
+          {t('import.complete', { created: outcome.created, updated: outcome.updated, failed: outcome.errors.length })}
         </p>
       ) : null}
     </div>
