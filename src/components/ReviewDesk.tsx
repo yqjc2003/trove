@@ -4,8 +4,9 @@ import { useState, useTransition } from 'react';
 import { setItemStatusAction } from '@/app/actions/items';
 import { OpenOriginal } from '@/components/OpenOriginal';
 import { formatDate } from '@/lib/format';
-import { SOURCE_LABELS, TYPE_LABELS } from '@/lib/ui-labels';
+import { getSourceLabels, getTypeLabels } from '@/lib/ui-labels';
 import type { Item } from '@/types';
+import { useTranslation } from '@/components/LocaleProvider';
 
 export function ReviewDesk({
   items,
@@ -14,6 +15,9 @@ export function ReviewDesk({
   items: Item[];
   overdue: boolean;
 }) {
+  const { locale, t } = useTranslation();
+  const typeLabels = getTypeLabels(locale);
+  const sourceLabels = getSourceLabels(locale);
   const [skipped, setSkipped] = useState<string[]>([]);
   const [archived, setArchived] = useState<string[]>([]);
   const [tag, setTag] = useState('');
@@ -57,30 +61,30 @@ export function ReviewDesk({
     });
   }
   return (
-    <section className="review-desk" aria-label="单条回看">
+    <section className="review-desk" aria-label={t('review.label')}>
       <div className="desk-tools">
         <label>
-          主题
+          {t('review.topic')}
           <select
             className="input"
             value={tag}
             onChange={(e) => setTag(e.target.value)}
           >
-            <option value="">所有标签</option>
+            <option value="">{t('review.allTags')}</option>
             {tags.map((t) => (
               <option key={t}>{t}</option>
             ))}
           </select>
         </label>
         <label>
-          形态
+          {t('review.type')}
           <select
             className="input"
             value={type}
             onChange={(e) => setType(e.target.value)}
           >
-            <option value="">所有形态</option>
-            {Object.entries(TYPE_LABELS).map(([value, label]) => (
+            <option value="">{t('review.allTypes')}</option>
+            {Object.entries(typeLabels).map(([value, label]) => (
               <option key={value} value={value}>
                 {label}
               </option>
@@ -97,14 +101,14 @@ export function ReviewDesk({
             );
           }}
         >
-          随机一条
+          {t('review.random')}
         </button>
       </div>
       {item ? (
         <article key={item.id} className="desk-content">
           <p className="desk-context">
-            {overdue ? '搁置了一阵，重新看看' : '从最早收下的链接开始'}
-            <span>{TYPE_LABELS[item.content_type]}</span>
+            {overdue ? t('review.overdue') : t('review.oldest')}
+            <span>{typeLabels[item.content_type]}</span>
           </p>
           <h2 className="desk-title">
             <a
@@ -114,15 +118,14 @@ export function ReviewDesk({
               onClick={() => setOpened(item.id)}
             >
               {item.title}
-              <span className="sr-only">（在新标签页打开原文）</span>
+              <span className="sr-only">{t('item.openNewTab')}</span>
             </a>
           </h2>
           <p className="row-meta">
-            {item.domain} · {formatDate(item.collected_at)} 收集 ·{' '}
-            {SOURCE_LABELS[item.source]}
+            {item.domain} · {t('review.collected', { date: formatDate(item.collected_at) })} · {sourceLabels[item.source]}
           </p>
           <p className="desk-summary">
-            {item.summary || '还没有摘要。打开原文，看看当初是什么吸引了你。'}
+            {item.summary || t('review.noSummary')}
           </p>
           <div className="tags">
             {item.tags?.map((t) => (
@@ -138,7 +141,7 @@ export function ReviewDesk({
           <div className="desk-actions">
             <OpenOriginal id={item.id} onOpen={() => setOpened(item.id)} />
             <Link className="btn" href={`/items/${item.id}`}>
-              详情与笔记
+              {t('review.details')}
             </Link>
             <button
               className="btn"
@@ -148,14 +151,14 @@ export function ReviewDesk({
                 setNotice('本轮已跳过，未改变阅读状态。');
               }}
             >
-              稍后再看
+              {t('review.later')}
             </button>
             <button
               className="btn-quiet"
               disabled={pending}
               onClick={() => archive(item.id)}
             >
-              {pending ? '处理中…' : '归档'}
+              {pending ? t('review.processing') : t('review.archive')}
             </button>
           </div>
         </article>
@@ -163,10 +166,10 @@ export function ReviewDesk({
         <div className="desk-content empty">
           <h2>
             {matching.length
-              ? '这一轮先到这里。'
+              ? t('review.emptyRound')
               : items.length
-                ? '这个镜头下没有待回看的链接。'
-                : '暂时没有待回看的链接。'}
+                ? t('review.emptyFiltered')
+                : t('review.empty')}
           </h2>
           <p className="page-sub">
             {matching.length
@@ -182,27 +185,27 @@ export function ReviewDesk({
                 setType('');
               }}
             >
-              重新开始
+              {t('review.restart')}
             </button>
-            <Link href="/items">去藏库看看</Link>
+            <Link href="/items">{t('review.library')}</Link>
           </div>
         </div>
       )}
       {opened ? (
         <p className="reading-return">
-          打开之后，
-          <Link href={`/items/${opened}#notes`}>留下一句自己的理解</Link>
-          。打开记录不代表你已经读完。
+          {t('review.return')}
+          <Link href={`/items/${opened}#notes`}>{t('review.leaveNote')}</Link>
+          {t('review.returnEnd')}
         </p>
       ) : null}
       <div className="desk-footer">
         <span>
-          当前候选 {pool.length} 条 · 本轮剩余 {candidates.length} 条
+          {t('review.candidates', { pool: pool.length, remaining: candidates.length })}
         </span>
-        <Link href="/items?overdue=true">完整待回看清单</Link>
+        <Link href="/items?overdue=true">{t('review.fullList')}</Link>
       </div>
       <p className="small faint desk-help">
-        稍后再看仅在本轮跳过；重新进入回看台会再次出现。
+        {t('review.help')}
       </p>
       <p className="small muted" role="status">
         {notice}
@@ -213,7 +216,7 @@ export function ReviewDesk({
           disabled={pending}
           onClick={() => archive(archived[archived.length - 1], true)}
         >
-          撤销上次归档
+          {t('review.undoArchive')}
         </button>
       ) : null}
       {error ? (

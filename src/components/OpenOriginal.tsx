@@ -1,5 +1,7 @@
 'use client';
 
+import { useTranslation } from '@/components/LocaleProvider';
+
 export function OpenOriginal({
   id,
   read = false,
@@ -9,6 +11,7 @@ export function OpenOriginal({
   read?: boolean;
   onOpen?: () => void;
 }) {
+  const { t } = useTranslation();
   return (
     <a
       className="btn btn-primary"
@@ -19,8 +22,8 @@ export function OpenOriginal({
         onOpen?.();
       }}
     >
-      {read ? '再次打开' : '打开并阅读'}
-      <span className="sr-only">（在新标签页打开）</span>
+      {read ? t('open.again') : t('open.read')}
+      <span className="sr-only">{t('open.newTab')}</span>
     </a>
   );
 }

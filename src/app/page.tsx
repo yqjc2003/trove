@@ -51,7 +51,7 @@ export default async function DashboardPage() {
           )}
           <aside className="context-rail">
             <h2>{translate(locale, 'dashboard.library')}</h2>
-            <p className="small faint">最近至多 200 条收藏的概况</p>
+            <p className="small faint">{translate(locale, 'dashboard.snapshot')}</p>
             <dl className="quiet-stats">
               <div>
                 <dt>{translate(locale, 'dashboard.total')}</dt>
@@ -72,12 +72,12 @@ export default async function DashboardPage() {
             </dl>
             <p className="small muted">
               {reminders.length
-                ? '先回看超过提醒阈值的链接。'
-                : '从最早收下、还未打开的链接开始。'}
-              每轮最多呈现 100 条候选。
+                ? translate(locale, 'dashboard.overdueHelp')
+                : translate(locale, 'dashboard.oldestHelp')}
+              {translate(locale, 'dashboard.candidatesHelp')}
             </p>
             <div className="rail-section">
-              <h2>顺着主题走</h2>
+              <h2>{translate(locale, 'dashboard.byTopic')}</h2>
               <div className="rail-links">
                 {stats.by_tag.slice(0, 6).map((t) => (
                   <Link
@@ -91,9 +91,9 @@ export default async function DashboardPage() {
               </div>
             </div>
             <div className="rail-section">
-              <Link href="/stream">看看最近收下了什么</Link>
+              <Link href="/stream">{translate(locale, 'dashboard.recent')}</Link>
               <p className="small faint">
-                链接由 Agent 整理，你决定它们的价值。
+                {translate(locale, 'dashboard.recentHelp')}
               </p>
             </div>
             {stats.total === 0 ? (
