@@ -20,7 +20,30 @@ export function ApiKeyManager({
   const [name, setName] = useState('');
   const [plaintext, setPlaintext] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
+
+  function installationPrompt(key: string): string {
+    return `请帮我安装并连接 CatchLinger 收藏 Skill。
+
+1. 如果当前环境没有 CatchLinger 项目仓库，先获取 https://github.com/yqjc2003/trove.git；然后在仓库根目录运行：pnpm skill:install
+   它会把新版 Skill 安装到 ~/.agents/skills/catchlinger-capture/，并移除已弃用的 trove-capture。
+2. 创建或更新 ~/.config/catchlinger/env，写入：
+   CATCHLINGER_API_BASE=${siteUrl}/api/trove
+   CATCHLINGER_API_KEY=${key}
+3. 重开一个 Codex 会话后，确认 catchlinger-capture 已可用；再用它收下一个链接。
+
+这把 Key 只属于我的 CatchLinger 藏库。请不要提交、记录到仓库，或分享给其他人。`;
+  }
+
+  async function copyInstallationPrompt(key: string) {
+    try {
+      await navigator.clipboard.writeText(installationPrompt(key));
+      setNotice('安装提示语已复制。现在把它发给你信任的 Agent。');
+    } catch {
+      setNotice('自动复制失败；请从下方显示的 Key 和配置手动复制。');
+    }
+  }
 
   function create() {
     startTransition(async () => {
@@ -33,6 +56,20 @@ export function ApiKeyManager({
       setPlaintext(res.plaintext);
       setName('');
       setError(null);
+      setNotice(null);
+    });
+  }
+
+  function createAndCopyInstallationPrompt() {
+    startTransition(async () => {
+      const res = await createApiKeyAction('Agent 安装连接');
+      if (!res.ok || !res.plaintext) {
+        setError(res.error ?? '生成安装连接 Key 失败');
+        return;
+      }
+      setPlaintext(res.plaintext);
+      setError(null);
+      await copyInstallationPrompt(res.plaintext);
     });
   }
 
@@ -78,6 +115,12 @@ export function ApiKeyManager({
         </p>
       ) : null}
 
+      {notice ? (
+        <p className="small muted" style={{ marginTop: 8 }} role="status">
+          {notice}
+        </p>
+      ) : null}
+
       {plaintext ? (
         <div style={{ marginTop: 16 }}>
           <p className="small muted">
@@ -106,10 +149,32 @@ export function ApiKeyManager({
             type="button"
             className="btn btn-sm"
             style={{ marginTop: 8 }}
+            onClick={() => copyInstallationPrompt(plaintext)}
+          >
+            复制安装提示语
+          </button>
+          <button
+            type="button"
+            className="btn btn-sm"
+            style={{ marginTop: 8 }}
             onClick={() => setPlaintext(null)}
           >
             我已保存
           </button>
+        </div>
+      ) : null}
+
+      {keys.length > 0 && !plaintext ? (
+        <div className="form-row" style={{ marginTop: 16 }}>
+          <button
+            type="button"
+            className="btn"
+            disabled={pending}
+            onClick={createAndCopyInstallationPrompt}
+          >
+            {pending ? '生成中…' : '一键复制 Agent 安装提示'}
+          </button>
+          <p className="small faint">会新建一枚专用于安装连接的 API Key；已有 Key 的明文无法再次读取。</p>
         </div>
       ) : null}
 

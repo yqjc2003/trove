@@ -6,6 +6,7 @@ import { ItemRow } from '@/components/ItemRow';
 import { ReviewDesk } from '@/components/ReviewDesk';
 import { TagInput } from '@/components/TagInput';
 import { AgentSetupGuide } from '@/components/AgentSetupGuide';
+import { ApiKeyManager } from '@/components/ApiKeyManager';
 import { FakeTroveDb, fakeContext } from '../helpers/fake-db';
 import { getItem, saveItem } from '@/lib/services/items';
 import ItemDetailPage from '@/app/items/[id]/page';
@@ -97,5 +98,25 @@ describe('收集流 / 回看台渲染约束', () => {
     expect(html).toContain('让 Agent 替你收下第一条。');
     expect(html).toContain('生成连接 Key');
     expect(html).not.toContain('CATCHLINGER_API_KEY=');
+  });
+
+  it('已有 API Key 时提供一键复制 Agent 安装提示入口', () => {
+    const html = renderToStaticMarkup(
+      createElement(ApiKeyManager, {
+        siteUrl: 'https://catchlinger.example',
+        keys: [{
+          id: 'key-1',
+          user_id: 'user-1',
+          name: '已有连接',
+          prefix: 'trv_12345678',
+          scopes: [],
+          created_at: '2026-11-13T00:00:00.000Z',
+          last_used_at: null,
+          revoked_at: null,
+        }],
+      }),
+    );
+    expect(html).toContain('一键复制 Agent 安装提示');
+    expect(html).toContain('已有 Key 的明文无法再次读取。');
   });
 });
