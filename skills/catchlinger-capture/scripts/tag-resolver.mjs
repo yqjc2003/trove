@@ -8,8 +8,8 @@
  *   node tag-resolver.mjs audit                     找出既有标签里的近重复分组
  *   node tag-resolver.mjs merge <from> <to> [--dry-run]   把 from 合并进 to
  *
- * 配置沿用 trove-api.mjs：环境变量 TROVE_API_BASE / TROVE_API_KEY，
- * 或写在 ~/.config/trove/env。
+ * 配置沿用 catchlinger-api.mjs：环境变量 CATCHLINGER_API_BASE / CATCHLINGER_API_KEY，
+ * 或写在 ~/.config/catchlinger/env。
  *
  * 零依赖，只用 Node 内置 fetch。
  */
@@ -19,17 +19,17 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { resolveTags, findNearDuplicates, baseNormalize, similarityKey } from './tag-matching.mjs';
-import { loadTroveEnv } from './trove-env.mjs';
+import { loadCatchLingerEnv } from './catchlinger-env.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ALIAS_FILE = path.join(HERE, '..', 'data', 'tag-aliases.json');
 
 function loadEnv() {
-  const env = loadTroveEnv();
+  const env = loadCatchLingerEnv();
   if (!env) {
     console.error(
       JSON.stringify(
-        { error: '缺少配置：请设置 TROVE_API_BASE 与 TROVE_API_KEY（可在 trove 的「设置 → API Key」生成）' },
+        { error: '缺少配置：请设置 CATCHLINGER_API_BASE 与 CATCHLINGER_API_KEY（可在 CatchLinger 的「设置 → API Key」生成）' },
         null,
         2,
       ),

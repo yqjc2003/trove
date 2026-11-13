@@ -1,9 +1,9 @@
-# Skill：`trove-capture`
+# Skill：`catchlinger-capture`
 
-把链接收进 trove 收藏系统：**解析正文 → AI 解读 → 写入统一存储**。
+把链接收进 CatchLinger 收藏系统：**解析正文 → AI 解读 → 写入统一存储**。
 
-**源码**：`skills/trove-capture/`（仓库内）
-**安装位置**：`~/.agents/skills/trove-capture/`（Codex 用户级全局 Skills 目录）
+**源码**：`skills/catchlinger-capture/`（仓库内）
+**安装位置**：`~/.agents/skills/catchlinger-capture/`（Codex 用户级全局 Skills 目录）
 
 ```bash
 pnpm skill:install     # 幂等：已存在则覆盖，并清掉目标端多余的旧文件
@@ -15,12 +15,12 @@ pnpm skill:install     # 幂等：已存在则覆盖，并清掉目标端多余�
 
 | 变量 | 说明 |
 |---|---|
-| `TROVE_API_BASE` | 例如 `https://trove.example.com/api/trove` |
-| `TROVE_API_KEY` | `trv_` 开头的长效 API Key（在 trove「设置 → API Key」生成） |
+| `CATCHLINGER_API_BASE` | 例如 `https://<你的站点>/api/trove` |
+| `CATCHLINGER_API_KEY` | `trv_` 开头的长效 API Key（在 CatchLinger「设置 → API Key」生成） |
 | `GITHUB_USERNAME` | 可选；GitHub 用户名。设了就能**免 Token** 读 star 列表 |
 | `GITHUB_TOKEN` | 可选；设了配额从 60 次/小时提到 5000 次/小时，也能读私密 profile 的 star |
 
-放在环境变量里，或写进 `~/.config/trove/env`（`KEY=VALUE` 格式，每行一条）。
+放在环境变量里，或写进 `~/.config/catchlinger/env`（`KEY=VALUE` 格式，每行一条）。
 
 ## 脚本
 
@@ -71,26 +71,26 @@ node github-stars.mjs [--limit 50] [--user <GitHub用户名>]
 **用户名从哪来（按优先级）**：`--user` > `GITHUB_USERNAME` > **trove 账号**
 （调 `GET /account` 拿 `github_username`）> `GITHUB_TOKEN`（此时读自己的 star）。
 
-trove 用 GitHub OAuth 登录时服务端已经存下了 GitHub 用户名，所以
-**只要配了 TROVE_API_KEY，star 列表就能读，不需要 GITHUB_TOKEN，也不用手填用户名**。
+CatchLinger 用 GitHub OAuth 登录时服务端已经存下了 GitHub 用户名，所以
+**只要配了 CATCHLINGER_API_KEY，star 列表就能读，不需要 GITHUB_TOKEN，也不用手填用户名**。
 
 拿到用户名后走公开端点 `GET /users/{username}/starred`（不需要 Token）；
 公开端点读不到私密 profile 的 star，这种情况才需要 `GITHUB_TOKEN`。
 
 `401`（Token 无效）、`403`（限流）、`404`（用户名不存在）会给出明确提示并以非 0 退出码结束。
 
-### `scripts/trove-api.mjs`
+### `scripts/catchlinger-api.mjs`
 
 REST 客户端。
 
 ```bash
-node trove-api.mjs save '<json>'
-node trove-api.mjs save-many '<json[]>'
-node trove-api.mjs search --q 关键词 --tag a --tag b --limit 20
-node trove-api.mjs stats
-node trove-api.mjs tags
-node trove-api.mjs notes --id <id> --body '<md>'
-node trove-api.mjs account
+node catchlinger-api.mjs save '<json>'
+node catchlinger-api.mjs save-many '<json[]>'
+node catchlinger-api.mjs search --q 关键词 --tag a --tag b --limit 20
+node catchlinger-api.mjs stats
+node catchlinger-api.mjs tags
+node catchlinger-api.mjs notes --id <id> --body '<md>'
+node catchlinger-api.mjs account
 ```
 
 错误时打印 `{ "error": { code, message } }` 并以非 0 退出码结束。
@@ -104,14 +104,14 @@ node trove-api.mjs account
         ↓
 ③ AI 解读：产出 title / summary / ≤3 tags（标签语义由 Agent 自己决定）
         ↓
-④ 写入：trove-api.mjs save-many
+④ 写入：catchlinger-api.mjs save-many
         ↓
 ⑤ 汇报：新增 N 条 / 更新 M 条 / 失败 K 条
 ```
 
 ## 硬约束
 
-采集标签通常取 1–2 个较宽、可复用的主题，最多 3 个。先浏览既有标签，再用 resolver 归一；HashMap 源码文章使用 `java`、`源码阅读`，具体类名等细节写入标题和摘要。完整的粒度示例与批量选词规则见 `skills/trove-capture/SKILL.md` 的「标签粒度：先归组，再归一」。
+采集标签通常取 1–2 个较宽、可复用的主题，最多 3 个。先浏览既有标签，再用 resolver 归一；HashMap 源码文章使用 `java`、`源码阅读`，具体类名等细节写入标题和摘要。完整的粒度示例与批量选词规则见 `skills/catchlinger-capture/SKILL.md` 的「标签粒度：先归组，再归一」。
 
 | 约束 | 值 | 越界表现 |
 |---|---|---|

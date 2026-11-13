@@ -117,11 +117,11 @@ auth.users.raw_user_meta_data（GitHub OAuth 写入）
    Skill: github-stars.mjs → GET /users/{username}/starred
 ```
 
-- **不要**要求用户配 `GITHUB_TOKEN` —— trove 用 GitHub OAuth 登录时服务端已经知道 username，
-  Skill 手里有 API Key 就能自取（`username_source="trove-account"`）。
+- **不要**要求用户配 `GITHUB_TOKEN` —— CatchLinger 用 GitHub OAuth 登录时服务端已经知道 username，
+  Skill 手里有 API Key 就能自取（`username_source="catchlinger-account"`）。
 - `GITHUB_TOKEN` 只是**可选加速器**：配额 60/h → 5000/h，且能读私密 profile 的 star。
 - `GITHUB_TOKEN` 只在 GitHub API 调用里用，**绝不写进仓库或 `.env.local`**；
-  真要长期配就放 `~/.config/trove/env`。
+  真要长期配就放 `~/.config/catchlinger/env`。
 - 公开端点对私密 profile 返回**空列表**（不是 404）—— 遇到 0 条要提示「可能是私密 profile」。
 - 抓仓库详情（`fetch-content.mjs` 遇 GitHub 链接走 API）**每个仓库消耗一次配额**，
   star 多时建议配 token。
@@ -191,7 +191,7 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 
 - Windows PowerShell 5.1：`.ps1` 脚本必须存成 **UTF-8 with BOM**，
   否则中文会被按 ANSI 读取导致解析错误。
-- Skill 脚本（`skills/trove-capture/scripts/*.mjs`）是零依赖 Node ESM，
+- Skill 脚本（`skills/catchlinger-capture/scripts/*.mjs`）是零依赖 Node ESM，
   只用内置 API，不参与 Next 构建（已在 eslint 与 tsconfig 中排除）。
 
 ## 提交信息

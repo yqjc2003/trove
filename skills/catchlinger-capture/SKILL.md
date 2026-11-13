@@ -1,12 +1,12 @@
 ---
-name: trove-capture
-description: Capture URLs into the user's Trove bookmark collection. Resolves URLs, GitHub stars, or local Chrome/Edge bookmarks; extracts content; generates a title, summary and a few broad, reusable tags; then saves via REST or MCP. Use when the user asks to 收藏 / 加入 trove / 保存这些链接 / 导入书签 / 同步 GitHub star / 整理收藏.
+name: catchlinger-capture
+description: Capture URLs into the user's CatchLinger bookmark collection. Resolves URLs, GitHub stars, or local Chrome/Edge bookmarks; extracts content; generates a title, summary and a few broad, reusable tags; then saves via REST or MCP. Use when the user asks to 收藏 / 加入 CatchLinger / 保存这些链接 / 导入书签 / 同步 GitHub star / 整理收藏.
 license: Apache-2.0
 ---
 
-# trove-capture
+# catchlinger-capture
 
-把链接收进用户的 Trove 收藏系统：**解析正文 → AI 解读 → 写入统一存储**。
+把链接收进用户的 CatchLinger 收藏系统：**解析正文 → AI 解读 → 写入统一存储**。
 
 ## 核心原则
 
@@ -22,13 +22,13 @@ license: Apache-2.0
 
 | 变量 | 说明 |
 |---|---|
-| `TROVE_API_BASE` | 例如 `https://trove.sxyicheng.tech/api/trove` |
-| `TROVE_API_KEY` | `trv_` 开头的长效 API Key |
+| `CATCHLINGER_API_BASE` | 例如 `https://<你的站点>/api/trove` |
+| `CATCHLINGER_API_KEY` | `trv_` 开头的长效 API Key |
 | `GITHUB_USERNAME` | 可选；GitHub 用户名。设了就能**免 Token** 读 star 列表（也可临时用 `--user` 传） |
 | `GITHUB_TOKEN` | 可选；设了配额从 60 次/小时提到 5000 次/小时，也能读私密 profile 的 star |
-放在环境变量里，或写进 `~/.config/trove/env`（`KEY=VALUE` 格式，每行一条）。
+放在环境变量里，或写进 `~/.config/catchlinger/env`（`KEY=VALUE` 格式，每行一条）。
 
-如果缺少 `TROVE_API_KEY`，提示用户到 trove 的「设置 → API Key」生成。
+如果缺少 `CATCHLINGER_API_KEY`，提示用户到 CatchLinger 的「设置 → API Key」生成。
 
 ## 三种模式
 
@@ -57,7 +57,7 @@ node scripts/github-stars.mjs [--limit 50] [--user <GitHub用户名>]
 |---|---|
 | `--user <name>` | 命令行显式指定 |
 | `GITHUB_USERNAME` | 环境变量 |
-| **trove 账号** | 调 `GET /account` 拿 `github_username` —— trove 用 GitHub OAuth 登录时服务端已经存下了它，**所以默认什么都不用配** |
+| **CatchLinger 账号** | 调 `GET /account` 拿 `github_username` —— CatchLinger 用 GitHub OAuth 登录时服务端已经存下了它，**所以默认什么都不用配** |
 | `GITHUB_TOKEN` | 上面都没有时的兜底：读认证用户自己的 star |
 
 拿到用户名后走**公开端点** `GET /users/{username}/starred` —— **不需要 GITHUB_TOKEN**。
@@ -97,7 +97,7 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
         ↓
 ③.5 标签归一：node scripts/tag-resolver.mjs resolve "<所有候选标签>" ...
         ↓
-④ 写入：node scripts/trove-api.mjs save-many '[{...}]'（标签用归一后的）
+④ 写入：node scripts/catchlinger-api.mjs save-many '[{...}]'（标签用归一后的）
         ↓
 ⑤ 汇报：新增 N 条 / 更新 M 条 / 失败 K 条
 ```
@@ -186,13 +186,13 @@ node scripts/tag-resolver.mjs resolve "标签1" "标签2" "标签3"
 单个：
 
 ```bash
-node scripts/trove-api.mjs save '{"url":"https://...","title":"...","summary":"...","tags":["a","b"],"source":"skill"}'
+node scripts/catchlinger-api.mjs save '{"url":"https://...","title":"...","summary":"...","tags":["a","b"],"source":"skill"}'
 ```
 
 批量（推荐，单次 ≤50 条）：
 
 ```bash
-node scripts/trove-api.mjs save-many '[{"url":"...","title":"...","summary":"...","tags":["..."]}, ...]'
+node scripts/catchlinger-api.mjs save-many '[{"url":"...","title":"...","summary":"...","tags":["..."]}, ...]'
 ```
 
 `source` 可选：`manual` / `skill` / `mcp` / `github` / `bookmark` —— 记录「这条是从哪来的」。模式 B 用 `github`，模式 C 用 `bookmark`，其他用 `skill`。
@@ -240,9 +240,9 @@ node scripts/trove-api.mjs save-many '[{"url":"...","title":"...","summary":"...
 ## 排查
 
 ```bash
-node scripts/trove-api.mjs search --q 关键词 --limit 10   # 确认是否已收录
-node scripts/trove-api.mjs stats                          # 总数 / 未读 / 超期
-node scripts/trove-api.mjs tags                           # 既有标签（完整 JSON）
+node scripts/catchlinger-api.mjs search --q 关键词 --limit 10   # 确认是否已收录
+node scripts/catchlinger-api.mjs stats                          # 总数 / 未读 / 超期
+node scripts/catchlinger-api.mjs tags                           # 既有标签（完整 JSON）
 ```
 
 标签命名空间工具：

@@ -1,12 +1,12 @@
 #!/usr/bin/env node
 /**
- * trove-env.mjs —— 读取 trove 的配置。
+ * catchlinger-env.mjs —— 读取 CatchLinger 的配置。
  *
  * 配置来源（环境变量优先，文件只补缺失项）：
- *   · 环境变量 TROVE_API_BASE / TROVE_API_KEY
- *   · ~/.config/trove/env（KEY=VALUE 格式，每行一条）
+ *   · 环境变量 CATCHLINGER_API_BASE / CATCHLINGER_API_KEY
+ *   · ~/.config/catchlinger/env（KEY=VALUE 格式，每行一条）
  *
- * 三个脚本共用：trove-api.mjs / tag-resolver.mjs / github-stars.mjs。
+ * 三个脚本共用：catchlinger-api.mjs / tag-resolver.mjs / github-stars.mjs。
  * 零依赖，只用 Node 内置 API。
  */
 
@@ -14,9 +14,9 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 
-const ENV_FILE = path.join(os.homedir(), '.config', 'trove', 'env');
+const ENV_FILE = path.join(os.homedir(), '.config', 'catchlinger', 'env');
 
-/** 读取 ~/.config/trove/env；已存在的环境变量不会被文件覆盖。 */
+/** 读取 ~/.config/catchlinger/env；已存在的环境变量不会被文件覆盖。 */
 export function loadEnvFile(file = ENV_FILE) {
   if (!fs.existsSync(file)) return;
   for (const line of fs.readFileSync(file, 'utf8').split(/\r?\n/)) {
@@ -31,13 +31,13 @@ export function loadEnvFile(file = ENV_FILE) {
 }
 
 /**
- * 读取 trove API 的配置。
+ * 读取 CatchLinger API 的配置。
  * @returns {{ base: string, key: string } | null} 没配全时返回 null
  */
-export function loadTroveEnv() {
+export function loadCatchLingerEnv() {
   loadEnvFile();
-  const base = (process.env.TROVE_API_BASE ?? '').replace(/\/$/, '');
-  const key = process.env.TROVE_API_KEY ?? '';
+  const base = (process.env.CATCHLINGER_API_BASE ?? '').replace(/\/$/, '');
+  const key = process.env.CATCHLINGER_API_KEY ?? '';
   if (!base || !key) return null;
   return { base, key };
 }

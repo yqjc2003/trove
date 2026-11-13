@@ -6,7 +6,7 @@ import {
   selectEndpoint,
   normalizeStarEntry,
   buildHeaders,
-} from '../../skills/trove-capture/scripts/github-stars.mjs';
+} from '../../skills/catchlinger-capture/scripts/github-stars.mjs';
 
 /**
  * 「只要知道 GitHub 用户名就能读 star 列表」这条链路的两端：

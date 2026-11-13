@@ -5,7 +5,7 @@
 
 - **后端**：Supabase（Postgres + Auth + RLS）——唯一的数据与认证后端
 - **前端 / API / MCP**：Next.js 16（App Router），部署在 Vercel
-- **采集**：`trove-capture` Skill + MCP 服务端 + REST API
+- **采集**：`catchlinger-capture` Skill + MCP 服务端 + REST API
 
 ## 核心设计
 
@@ -60,16 +60,16 @@ Agent 取 URL 列表  →  Agent 抓正文  →  Agent 自己产出 title/summar
 
 读 star 列表用 GitHub 的**公开端点** `GET /users/{username}/starred`，**不需要 GITHUB_TOKEN**。
 
-那 username 从哪来？trove 用 GitHub OAuth 登录时，Supabase 已经把 GitHub 资料
+那 username 从哪来？CatchLinger 用 GitHub OAuth 登录时，Supabase 已经把 GitHub 资料
 （`user_name` / `preferred_username`）写进了 `auth.users`。服务端在
 `GET /api/trove/account` 里把它交出来，Skill 拿着已有的 API Key 就能自取：
 
 ```
 node scripts/github-stars.mjs --limit 50
-→ { mode: "public-user", user: "…", username_source: "trove-account", stars: [...] }
+→ { mode: "public-user", user: "…", username_source: "catchlinger-account", stars: [...] }
 ```
 
-所以采集 star **只需要配 `TROVE_API_BASE` + `TROVE_API_KEY`**，用户什么都不用额外配。
+所以采集 star **只需要配 `CATCHLINGER_API_BASE` + `CATCHLINGER_API_KEY`**，用户什么都不用额外配。
 `GITHUB_TOKEN` 仍然可选：配了配额从 60 次/小时提到 5000 次/小时，也能读私密 profile 的 star。
 
 ### 重复录入 = Upsert
@@ -167,7 +167,7 @@ GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把
    - 填入 Client ID / Client Secret 并启用
 3. **Supabase 加回调白名单** —— Dashboard → Authentication → URL Configuration → Redirect URLs
    - 加 `http://localhost:3000/auth/callback`（本地开发）
-   - 加 `https://trove.sxyicheng.tech/auth/callback`（生产）
+   - 加 `https://<你的生产域名>/auth/callback`
    - Site URL 设为生产域名
 
 应用侧的回调落地页是 `GET /auth/callback`：浏览器走 PKCE，OAuth 回来时只带一个 `?code=`，
@@ -182,7 +182,7 @@ GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把
 | `NEXT_PUBLIC_SUPABASE_URL` | `https://<项目ref>.supabase.co` | Supabase 项目地址 |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_...` | publishable key（可暴露给浏览器） |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | **服务端专用**，Dashboard → Project Settings → API Keys；注册流程也要用它建号 |
-| `NEXT_PUBLIC_SITE_URL` | `https://trove.sxyicheng.tech` | 生产站点地址，用于 MCP / Skill 回调与绝对链接 |
+| `NEXT_PUBLIC_SITE_URL` | `https://<你的生产域名>` | 生产站点地址，用于 MCP / Skill 回调与绝对链接 |
 
 > 仓库里不写任何 key 字面量（见 AGENTS.md 约定 10）。实际取值见本地 `.env.local`
 > 或 Dashboard → Project Settings → API Keys。
@@ -202,7 +202,7 @@ src/lib/domain/               纯逻辑：URL 规范化、内容形态、标签�
 src/lib/db/trove-db.ts        唯一的数据访问入口（强制 user_id 过滤）
 src/lib/services/             业务逻辑（REST / MCP / Server Action 复用同一层）
 src/lib/mcp/server.ts         MCP 工具注册
-skills/trove-capture/         Skill：SKILL.md + 6 个零依赖 Node 脚本
+skills/catchlinger-capture/   Skill：SKILL.md + 6 个零依赖 Node 脚本
 tests/                        Vitest 单测（离线可跑）+ 集成测试（默认 skip）
 docs/                         API / MCP / Skill / 验收文档
 ```
@@ -211,7 +211,7 @@ docs/                         API / MCP / Skill / 验收文档
 
 - 两种凭据统一解析为 `user_id + scopes`：
   - **Supabase 会话**（Web UI）—— Cookie + RLS
-  - **Trove API Key**（Skill / MCP / CLI）—— `trv_` 前缀，服务端只存 SHA-256 哈希
+  - **CatchLinger API Key**（Skill / MCP / CLI）—— `trv_` 前缀，服务端只存 SHA-256 哈希
 - 为什么不用 Supabase JWT 做 MCP：access_token 约 1 小时过期，而 MCP 的请求头是静态的，
   必须用长效密钥。
 - 所有 service-role 数据访问收口在 `TroveDb` 一个类里，构造函数强制要求 `userId`，
@@ -233,9 +233,9 @@ pnpm skill:install  # 把 Skill 装到 ~/.agents/skills/（Codex 用户级全局
 
 | 方式 | 端点 | 认证 |
 |---|---|---|
-| Web | `https://trove.sxyicheng.tech/` `/items` `/items/new` `/items/[id]` `/archive` `/reminders` `/settings` | Supabase 会话 |
-| REST | `https://trove.sxyicheng.tech/api/trove/*` | `Authorization: Bearer <trv_key>` |
-| MCP | `https://trove.sxyicheng.tech/api/mcp` | `Authorization: Bearer <trv_key>` |
+| Web | `https://<你的生产域名>/` `/items` `/items/new` `/items/[id]` `/archive` `/reminders` `/settings` | Supabase 会话 |
+| REST | `https://<你的生产域名>/api/trove/*` | `Authorization: Bearer <trv_key>` |
+| MCP | `https://<你的生产域名>/api/mcp` | `Authorization: Bearer <trv_key>` |
 
 详见 [docs/api.md](docs/api.md)、[docs/mcp.md](docs/mcp.md)、[docs/skill.md](docs/skill.md)。
 

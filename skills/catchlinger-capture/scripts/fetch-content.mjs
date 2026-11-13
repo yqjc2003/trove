@@ -9,7 +9,7 @@
  */
 
 const UA =
-  'Mozilla/5.0 (compatible; TroveCapture/1.0; +https://github.com/yqjc2003/trove)';
+  'Mozilla/5.0 (compatible; CatchLingerCapture/1.0)';
 const TIMEOUT_MS = 15_000;
 const MAX_TEXT = 8_000;
 

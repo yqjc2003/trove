@@ -1,30 +1,30 @@
 #!/usr/bin/env node
 /**
- * trove-api.mjs — Trove REST API 客户端。
+ * catchlinger-api.mjs — CatchLinger REST API 客户端。
  *
  * 用法：
- *   node trove-api.mjs save '<json>'            保存一条收藏（upsert）
- *   node trove-api.mjs save-many '<json[]>'      批量保存（≤50）
- *   node trove-api.mjs search --q 关键词 [--tag a] [--tag b] [--limit 20]
- *   node trove-api.mjs stats                     统计概览
- *   node trove-api.mjs tags                      标签列表
- *   node trove-api.mjs notes --id <id> --body '<md>'
- *   node trove-api.mjs account
+ *   node catchlinger-api.mjs save '<json>'            保存一条收藏（upsert）
+ *   node catchlinger-api.mjs save-many '<json[]>'      批量保存（≤50）
+ *   node catchlinger-api.mjs search --q 关键词 [--tag a] [--tag b] [--limit 20]
+ *   node catchlinger-api.mjs stats                     统计概览
+ *   node catchlinger-api.mjs tags                      标签列表
+ *   node catchlinger-api.mjs notes --id <id> --body '<md>'
+ *   node catchlinger-api.mjs account
  *
- * 配置：环境变量 TROVE_API_BASE 与 TROVE_API_KEY，
- *      或放在 ~/.config/trove/env（KEY=VALUE 格式）。
+ * 配置：环境变量 CATCHLINGER_API_BASE 与 CATCHLINGER_API_KEY，
+ *      或放在 ~/.config/catchlinger/env（KEY=VALUE 格式）。
  */
 
-import { loadTroveEnv } from './trove-env.mjs';
+import { loadCatchLingerEnv } from './catchlinger-env.mjs';
 
-const { base: BASE, key: KEY } = loadTroveEnv() ?? { base: '', key: '' };
+const { base: BASE, key: KEY } = loadCatchLingerEnv() ?? { base: '', key: '' };
 
 if (!BASE || !KEY) {
   console.error(
     JSON.stringify(
       {
         error:
-          '缺少配置：请设置 TROVE_API_BASE 与 TROVE_API_KEY（可在 trove 的「设置 → API Key」生成）。',
+          '缺少配置：请设置 CATCHLINGER_API_BASE 与 CATCHLINGER_API_KEY（可在 CatchLinger 的「设置 → API Key」生成）。',
       },
       null,
       2,

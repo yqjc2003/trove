@@ -50,7 +50,7 @@ export default async function OnboardingPage() {
               <h2>安装到你的全局 Skills</h2>
               <p>
                 在这个项目根目录运行下面命令。它会安装到{' '}
-                <code>~/.agents/skills/trove-capture/</code>，所有项目中的 Codex 都能使用。
+                <code>~/.agents/skills/catchlinger-capture/</code>，所有项目中的 Codex 都能使用。
               </p>
               <code className="onboarding-code" translate="no">pnpm skill:install</code>
             </div>
@@ -60,13 +60,13 @@ export default async function OnboardingPage() {
             <div>
               <h2>配置一次，开始收集</h2>
               <p>
-                把刚才显示的 Key 连同下面两行写入 <code>~/.config/trove/env</code>，然后重开一个 Codex
+                把刚才显示的 Key 连同下面两行写入 <code>~/.config/catchlinger/env</code>，然后重开一个 Codex
                 会话。
               </p>
               <code className="onboarding-code" translate="no">
-                TROVE_API_BASE={siteUrl}/api/trove{`\n`}TROVE_API_KEY=trv_…
+                CATCHLINGER_API_BASE={siteUrl}/api/trove{`\n`}CATCHLINGER_API_KEY=trv_…
               </code>
-              <p>现在可以说：<code>用 $trove-capture 收下 https://example.com</code>。</p>
+              <p>现在可以说：<code>用 $catchlinger-capture 收下 https://example.com</code>。</p>
             </div>
           </li>
         </ol>

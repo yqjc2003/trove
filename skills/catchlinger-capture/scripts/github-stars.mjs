@@ -8,8 +8,8 @@
  *
  *   ① --user <name>        命令行显式指定
  *   ② GITHUB_USERNAME      环境变量
- *   ③ trove 账号信息        调 `GET {TROVE_API_BASE}/account` 拿 `github_username`
- *                           —— trove 用 GitHub OAuth 登录时服务端已经存下了它，
+ *   ③ CatchLinger 账号信息  调 `GET {CATCHLINGER_API_BASE}/account` 拿 `github_username`
+ *                           —— CatchLinger 用 GitHub OAuth 登录时服务端已经存下了它，
  *                           所以**用户什么都不用配**
  *
  * 拿到用户名后走**公开端点** `GET /users/{username}/starred`：不需要 GITHUB_TOKEN。
@@ -23,7 +23,7 @@
 
 import { pathToFileURL } from 'node:url';
 
-import { loadGithubEnv, loadTroveEnv } from './trove-env.mjs';
+import { loadGithubEnv, loadCatchLingerEnv } from './catchlinger-env.mjs';
 
 const API = 'https://api.github.com';
 const PER_PAGE = 100;
@@ -100,24 +100,24 @@ export function normalizeStarEntry(raw) {
 export function buildHeaders(token) {
   const headers = {
     accept: 'application/vnd.github.star+json',
-    'user-agent': 'TroveCapture/1.0',
+    'user-agent': 'CatchLingerCapture/1.0',
   };
   if (token) headers.authorization = `Bearer ${token}`;
   return headers;
 }
 
 /**
- * 问 trove 要当前账号的 GitHub 用户名。
+ * 问 CatchLinger 要当前账号的 GitHub 用户名。
  *
- * trove 用 GitHub OAuth 登录时，Supabase 会把 GitHub 资料写进 auth.users，
+ * CatchLinger 用 GitHub OAuth 登录时，Supabase 会把 GitHub 资料写进 auth.users，
  * 服务端在 `GET /account` 里把它交出来 —— 所以 Skill 手里有 API Key 就能自取，
  * 用户不必手填用户名，也不必配 GITHUB_TOKEN。
  */
-export async function fetchGithubUsernameFromTrove(trove) {
-  if (!trove) return null;
+export async function fetchGithubUsernameFromCatchLinger(catchLinger) {
+  if (!catchLinger) return null;
   try {
-    const res = await fetch(`${trove.base}/account`, {
-      headers: { authorization: `Bearer ${trove.key}`, accept: 'application/json' },
+    const res = await fetch(`${catchLinger.base}/account`, {
+      headers: { authorization: `Bearer ${catchLinger.key}`, accept: 'application/json' },
     });
     if (!res.ok) return null;
     const payload = await res.json();
@@ -135,14 +135,14 @@ const RATE_LIMIT_HINT =
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const gh = loadGithubEnv();
-  const trove = loadTroveEnv();
+  const catchLinger = loadCatchLingerEnv();
 
-  // 用户名：命令行 > 环境变量 > 向 trove 自取
+  // 用户名：命令行 > 环境变量 > 向 CatchLinger 自取
   let user = (args.user ?? '').trim() || gh.username || null;
   let usernameSource = user ? 'argument-or-env' : null;
   if (!user) {
-    user = await fetchGithubUsernameFromTrove(trove);
-    if (user) usernameSource = 'trove-account';
+    user = await fetchGithubUsernameFromCatchLinger(catchLinger);
+    if (user) usernameSource = 'catchlinger-account';
   }
 
   const endpoint = selectEndpoint({ user, hasToken: Boolean(gh.token) });
@@ -153,8 +153,8 @@ async function main() {
         {
           error:
             '不知道要读谁的 star 列表。三选一：① 传 --user <GitHub用户名>；' +
-            '② 设置 GITHUB_USERNAME 环境变量；③ 配置 TROVE_API_BASE 与 TROVE_API_KEY —— ' +
-            'trove 会自动告诉你你的 GitHub 用户名。' +
+            '② 设置 GITHUB_USERNAME 环境变量；③ 配置 CATCHLINGER_API_BASE 与 CATCHLINGER_API_KEY —— ' +
+            'CatchLinger 会自动告诉你你的 GitHub 用户名。' +
             '（也可以设 GITHUB_TOKEN 读自己的 star。）',
           stars: [],
         },
