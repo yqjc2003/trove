@@ -1165,6 +1165,51 @@ button.tag:focus-visible {
 .review-desk {
   border-top: 1px solid var(--ink);
 }
+
+.agent-setup {
+  border-top: 1px solid var(--ink);
+  padding: 28px 0 36px;
+  max-width: 760px;
+}
+.agent-setup-kicker {
+  color: var(--ink-3);
+  font-size: 13px;
+}
+.agent-setup h2 {
+  margin-top: 14px;
+  font-size: clamp(24px, 2.7vw, 34px);
+  line-height: 1.45;
+}
+.agent-setup-intro {
+  max-width: 38em;
+  margin-top: 16px;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.9;
+}
+.agent-setup-action,
+.agent-setup-ready {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--rule);
+}
+.agent-setup-action .small {
+  margin-top: 12px;
+}
+.agent-setup-instruction {
+  display: block;
+  width: 100%;
+  margin-top: 12px;
+  padding: 12px;
+  resize: vertical;
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  background: var(--wash);
+  color: var(--ink);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+}
 .desk-tools {
   display: flex;
   gap: 16px;

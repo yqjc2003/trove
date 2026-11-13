@@ -5,6 +5,7 @@ import { ItemEditor } from '@/components/ItemEditor';
 import { ItemRow } from '@/components/ItemRow';
 import { ReviewDesk } from '@/components/ReviewDesk';
 import { TagInput } from '@/components/TagInput';
+import { AgentSetupGuide } from '@/components/AgentSetupGuide';
 import { FakeTroveDb, fakeContext } from '../helpers/fake-db';
 import { getItem, saveItem } from '@/lib/services/items';
 import ItemDetailPage from '@/app/items/[id]/page';
@@ -87,5 +88,14 @@ describe('收集流 / 回看台渲染约束', () => {
     );
     expect(form.match(/<form/g)).toHaveLength(1);
     expect(form).toContain('type="button"');
+  });
+
+  it('首次空藏库提供 Agent 连接 Key 的生成入口', () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentSetupGuide, { apiBase: 'https://catchlinger.example/api/trove' }),
+    );
+    expect(html).toContain('让 Agent 替你收下第一条。');
+    expect(html).toContain('生成连接 Key');
+    expect(html).not.toContain('CATCHLINGER_API_KEY=');
   });
 });
