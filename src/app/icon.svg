@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <title>CatchLinger</title>
+  <rect width="64" height="64" rx="15" fill="#20231f"/>
+  <path d="M23 14h18v36l-9-6-9 6V14Z" fill="#f3f1e9"/>
+  <path d="M29 23.5h7" stroke="#20231f" stroke-width="3.5" stroke-linecap="round"/>
+  <circle cx="45.5" cy="18.5" r="6.5" fill="#df6547"/>
+</svg>
