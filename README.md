@@ -1,4 +1,4 @@
-# 拾藏（Cachet）
+# 拾藏（CatchLinger）
 
 个人收藏统一管理系统。把散落在各个 App、GitHub star、Chrome/Edge 收藏夹里的链接，
 通过 AI Agent 解读后收敛到一个带标签、笔记、归档与阅读追踪的统一存储里。
@@ -226,7 +226,7 @@ pnpm lint         # ESLint
 pnpm typecheck    # tsc --noEmit
 pnpm test         # Vitest 单测
 pnpm db:push      # 推送数据库迁移
-pnpm skill:install  # 把 Skill 装到 ~/.minimax/skills/
+pnpm skill:install  # 把 Skill 装到 ~/.agents/skills/（Codex 用户级全局目录）
 ```
 
 ## 接入方式

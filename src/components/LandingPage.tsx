@@ -22,7 +22,7 @@ export function LandingPage() {
     <main className="landing">
       <header className="landing-nav" aria-label="主导航">
         <Link href="/" className="landing-brand" translate="no">
-          Cachet <span>拾藏</span>
+          CatchLinger <span>拾藏</span>
         </Link>
         <Link className="landing-login" href="/login">
           已有账号，登录
@@ -31,11 +31,11 @@ export function LandingPage() {
 
       <section className="landing-hero" aria-labelledby="landing-title">
         <div className="landing-copy">
-          <p className="landing-kicker">给总在收藏的人</p>
-          <h1 id="landing-title">收下此刻，找回价值。</h1>
+          <p className="landing-kicker" translate="no">拾藏 · CatchLinger</p>
+          <h1 id="landing-title">Catch what matters. Let it linger.</h1>
           <p className="landing-lead">
             拾藏把浏览器、视频站和 GitHub 里散落的好东西收在一起；由 Agent
-            帮你读懂，再把它们带回真正值得重看的时刻。
+            帮你整理来路，再把它们带回真正值得回味的时刻。
           </p>
           <div className="landing-actions">
             <Link className="btn btn-primary" href="/login?mode=signup&next=/onboarding">
@@ -45,7 +45,7 @@ export function LandingPage() {
               看看怎么用
             </a>
           </div>
-          <p className="landing-note">创建账号后，三步完成你的第一轮收集。</p>
+          <p className="landing-note">CatchLinger：创建账号后，三步完成你的第一轮收集。</p>
         </div>
 
         <div className="capture-route" aria-label="收藏进入拾藏的路径">
@@ -63,7 +63,7 @@ export function LandingPage() {
           </div>
           <div className="route-line route-line-short" aria-hidden="true" />
           <p className="route-label">在恰当的时候回到</p>
-          <p className="route-return">今天，先回收一条。</p>
+          <p className="route-return">今天，回味一条。</p>
         </div>
       </section>
 
@@ -127,7 +127,7 @@ export function LandingPage() {
       </section>
 
       <footer className="landing-footer">
-        <span>Cachet · 拾藏</span>
+        <span translate="no">CatchLinger · Catch what matters. Let it linger.</span>
         <Link href="/login">登录</Link>
       </footer>
     </main>

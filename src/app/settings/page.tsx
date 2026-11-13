@@ -77,7 +77,7 @@ export default async function SettingsPage() {
             导出为 JSON（含收藏、标签、笔记与点击记录）。
           </p>
           <div className="row-actions" style={{ marginTop: 12 }}>
-            <a className="btn" href="/api/trove/export" download="cachet-export.json">
+            <a className="btn" href="/api/trove/export" download="catchlinger-export.json">
               导出 JSON
             </a>
           </div>

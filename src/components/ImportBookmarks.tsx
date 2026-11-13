@@ -52,10 +52,10 @@ function parseBookmarkHtml(markup: string): ImportItem[] {
   return items;
 }
 
-function parseCachetExport(raw: string): ImportItem[] {
+function parseCatchLingerExport(raw: string): ImportItem[] {
   const data: unknown = JSON.parse(raw);
   if (!data || typeof data !== 'object' || !Array.isArray((data as { items?: unknown }).items)) {
-    throw new Error('请选择 Cachet 导出的 JSON 文件。');
+    throw new Error('请选择 CatchLinger 导出的 JSON 文件。');
   }
   return (data as { items: Array<{ url?: unknown; title?: unknown; source_ref?: unknown }> }).items
     .flatMap((item) => {
@@ -87,7 +87,7 @@ export function ImportBookmarks() {
     try {
       const raw = await file.text();
       const items = file.name.toLowerCase().endsWith('.json')
-        ? parseCachetExport(raw)
+        ? parseCatchLingerExport(raw)
         : parseBookmarkHtml(raw);
       if (items.length === 0) {
         throw new Error('没有找到可导入的 http(s) 链接。');
@@ -126,7 +126,7 @@ export function ImportBookmarks() {
   return (
     <div className="import-bookmarks">
       <p className="small muted">
-        支持 Chrome/Edge 导出的书签 HTML，或 Cachet 的 JSON 导出。重复链接会合并，不会新增副本；每次最多导入 {MAX_IMPORT_ITEMS} 条。
+        支持 Chrome/Edge 导出的书签 HTML，或 CatchLinger 的 JSON 导出。重复链接会合并，不会新增副本；每次最多导入 {MAX_IMPORT_ITEMS} 条。
       </p>
       <input
         ref={inputRef}

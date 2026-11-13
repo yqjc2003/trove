@@ -8,7 +8,7 @@ import {
 } from '@/lib/supabase/server';
 
 export const metadata: Metadata = {
-  title: 'Cachet · 拾藏 — 收下此刻，找回价值',
+  title: 'CatchLinger · 拾藏 — 收下值得的，留下余味',
   description: '把浏览器收藏、视频与 GitHub Star 收进一个可回看的个人藏库。',
 };
 
