@@ -87,7 +87,9 @@ export function ApiKeyManager({
             {plaintext}
           </code>
           <p className="small faint" style={{ marginTop: 8 }}>
-            放到 Skill 的环境变量里：
+            先在项目根目录运行 <code className="mono" translate="no">pnpm skill:install</code>，它会安装到{' '}
+            <code className="mono" translate="no">~/.agents/skills/trove-capture/</code>。然后把下面两行写入{' '}
+            <code className="mono" translate="no">~/.config/trove/env</code>：
             <br />
             <code className="mono" translate="no">
               TROVE_API_BASE={siteUrl}/api/trove
@@ -96,6 +98,9 @@ export function ApiKeyManager({
             <code className="mono" translate="no">
               TROVE_API_KEY={plaintext}
             </code>
+          </p>
+          <p className="small faint" style={{ marginTop: 8 }}>
+            重开一个 Codex 会话后，即可说：<code className="mono">用 $trove-capture 收下一个链接</code>。
           </p>
           <button
             type="button"

@@ -28,6 +28,8 @@ function LoginForm() {
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get('next'));
+  // 落地页会显式带上 /onboarding；直接打开注册页时也不要让新用户错过接入指引。
+  const signUpNext = params.get('next') === null ? '/onboarding' : next;
 
   const [mode, setMode] = useState<Mode>(() => requestedMode(params.get('mode')));
   const [email, setEmail] = useState('');
@@ -99,7 +101,7 @@ function LoginForm() {
     setNotice(null);
 
     // 注册走 Server Action：自动确认邮箱需要 service-role，不能在前端做
-    const result = await signUpAction(email.trim(), password, next);
+    const result = await signUpAction(email.trim(), password, signUpNext);
 
     setBusy(false);
     if (result.error) {
@@ -107,7 +109,8 @@ function LoginForm() {
       return;
     }
     if (result.signedIn) {
-      redirect();
+      router.replace(signUpNext);
+      router.refresh();
       return;
     }
     // 只有在服务端没配 service-role 时才会走到这里

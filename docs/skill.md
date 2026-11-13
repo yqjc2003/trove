@@ -3,11 +3,13 @@
 把链接收进 trove 收藏系统：**解析正文 → AI 解读 → 写入统一存储**。
 
 **源码**：`skills/trove-capture/`（仓库内）
-**安装位置**：`~/.minimax/skills/trove-capture/`
+**安装位置**：`~/.agents/skills/trove-capture/`（Codex 用户级全局 Skills 目录）
 
 ```bash
 pnpm skill:install     # 幂等：已存在则覆盖，并清掉目标端多余的旧文件
 ```
+
+安装后请重新开启一个 Codex 会话，Skill 才会被发现。
 
 ## 配置
 

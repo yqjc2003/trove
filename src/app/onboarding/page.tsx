@@ -9,6 +9,9 @@ export default async function OnboardingPage() {
   const context = await getServerContext();
   if (!context) redirect('/login?mode=signup&next=/onboarding');
 
+  const siteUrl =
+    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+
   return (
     <main className="page onboarding-page">
       <div className="wrap-narrow">
@@ -32,8 +35,10 @@ export default async function OnboardingPage() {
           <li>
             <span>2</span>
             <div>
-              <h2>连接你的 Agent</h2>
-              <p>生成 API Key 后，可用 Codex Skill 收录网页、视频、收藏夹或 GitHub Star。</p>
+              <h2>生成连接 Key</h2>
+              <p>
+                API Key 只在创建时显示一次；它把本机 Agent 的每一次写入限定在你的藏库里。
+              </p>
               <Link className="btn" href="/settings#connections">
                 生成 API Key
               </Link>
@@ -42,11 +47,26 @@ export default async function OnboardingPage() {
           <li>
             <span>3</span>
             <div>
-              <h2>回到你的回看台</h2>
-              <p>从最早、最值得重新打开的一条开始；读完后留下自己的理解。</p>
-              <Link className="btn" href="/">
-                前往回看台
-              </Link>
+              <h2>安装到你的全局 Skills</h2>
+              <p>
+                在这个项目根目录运行下面命令。它会安装到{' '}
+                <code>~/.agents/skills/trove-capture/</code>，所有项目中的 Codex 都能使用。
+              </p>
+              <code className="onboarding-code" translate="no">pnpm skill:install</code>
+            </div>
+          </li>
+          <li>
+            <span>4</span>
+            <div>
+              <h2>配置一次，开始收集</h2>
+              <p>
+                把刚才显示的 Key 连同下面两行写入 <code>~/.config/trove/env</code>，然后重开一个 Codex
+                会话。
+              </p>
+              <code className="onboarding-code" translate="no">
+                TROVE_API_BASE={siteUrl}/api/trove{`\n`}TROVE_API_KEY=trv_…
+              </code>
+              <p>现在可以说：<code>用 $trove-capture 收下 https://example.com</code>。</p>
             </div>
           </li>
         </ol>

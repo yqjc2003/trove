@@ -416,6 +416,20 @@ p {
   margin-top: 18px;
 }
 
+.onboarding-code {
+  display: block;
+  width: fit-content;
+  max-width: 100%;
+  margin-top: 14px;
+  padding: 10px 12px;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+  border: 1px solid var(--rule);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  line-height: 1.6;
+}
+
 .import-divider {
   border-top: 1px solid var(--rule);
   margin: 28px 0 20px;

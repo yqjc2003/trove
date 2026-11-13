@@ -1,9 +1,9 @@
 ﻿<#
 .SYNOPSIS
-  把仓库里的 skills/trove-capture 同步到本机 MiniMax Code 的 skills 目录。
+  把仓库里的 skills/trove-capture 同步到本机 Codex 的用户级全局 Skills 目录。
 
 .DESCRIPTION
-  幂等：已存在则整体覆盖。默认目标目录为 $env:USERPROFILE\.minimax\skills\trove-capture，
+  幂等：已存在则整体覆盖。默认目标目录为 $env:USERPROFILE\.agents\skills\trove-capture，
   可用 -Target 覆盖。
 
 .EXAMPLE
@@ -11,7 +11,7 @@
 #>
 [CmdletBinding()]
 param(
-  [string]$Target = (Join-Path $env:USERPROFILE '.minimax\skills\trove-capture')
+  [string]$Target = (Join-Path $env:USERPROFILE '.agents\skills\trove-capture')
 )
 
 $ErrorActionPreference = 'Stop'
@@ -54,4 +54,4 @@ Write-Host ''
 Write-Host '下一步：'
 Write-Host '  1) 在 trove 的「设置 → API Key」生成密钥'
 Write-Host '  2) 配置环境变量 TROVE_API_BASE / TROVE_API_KEY（可写入 ~/.config/trove/env）'
-Write-Host '  3) 在 Agent 中调用本 Skill：把链接收进 trove'
+Write-Host '  3) 重开 Codex 会话，再调用 $trove-capture：把链接收进 trove'
