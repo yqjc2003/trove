@@ -97,6 +97,31 @@ export default async function SettingsPage() {
             <ImportBookmarks />
           </div>
         </section>
+
+        <section className="section" aria-labelledby="feedback-heading">
+          <div className="section-head">
+            <h2 id="feedback-heading">反馈</h2>
+          </div>
+          <p className="small muted" style={{ marginTop: 12 }}>
+            遇到问题、想分享建议或提出新想法，都可以直接联系我。
+          </p>
+          <div className="row-actions" style={{ marginTop: 16 }}>
+            <a
+              className="btn"
+              href="https://github.com/yqjc2003/trove/issues/new"
+              target="_blank"
+              rel="noreferrer"
+            >
+              在 GitHub 提交 Issue
+            </a>
+            <a
+              className="btn"
+              href="mailto:yqjc2003@gmail.com?subject=%5BTrove%5D%20%E5%8F%8D%E9%A6%88&body=%E8%AF%B7%E5%91%8A%E8%AF%89%E6%88%91%E4%BD%A0%E9%81%87%E5%88%B0%E7%9A%84%E9%97%AE%E9%A2%98%E6%88%96%E6%83%B3%E6%B3%95%E3%80%82%0A%0A%E5%A4%8D%E7%8E%B0%E6%AD%A5%E9%AA%A4%EF%BC%88%E5%A6%82%E9%80%82%E7%94%A8%EF%BC%89%EF%BC%9A%0A%E6%9C%9F%E6%9C%9B%E7%BB%93%E6%9E%9C%EF%BC%9A%0A%E5%AE%9E%E9%99%85%E7%BB%93%E6%9E%9C%EF%BC%9A"
+            >
+              发送邮件
+            </a>
+          </div>
+        </section>
       </div>
     </main>
   );
