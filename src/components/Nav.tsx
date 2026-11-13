@@ -3,18 +3,20 @@
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef } from 'react';
-
-const LINKS = [
-  { href: '/', label: '回看台' },
-  { href: '/stream', label: '收集流' },
-  { href: '/items', label: '藏库' },
-  { href: '/settings', label: '我的语言' },
-];
+import { LocaleSwitcher } from '@/components/LocaleSwitcher';
+import { useTranslation } from '@/components/LocaleProvider';
 
 export function Nav() {
   const pathname = usePathname();
   const router = useRouter();
   const opened = useRef(false);
+  const { t } = useTranslation();
+  const links = [
+    { href: '/', label: t('nav.dashboard') },
+    { href: '/stream', label: t('nav.stream') },
+    { href: '/items', label: t('nav.library') },
+    { href: '/settings', label: t('nav.settings') },
+  ];
 
   useEffect(() => {
     function track(event: MouseEvent) {
@@ -59,7 +61,7 @@ export function Nav() {
           拾藏
         </Link>
         <div className="nav-links">
-          {LINKS.map((l) => (
+          {links.map((l) => (
             <Link
               key={l.href}
               href={l.href}
@@ -70,12 +72,13 @@ export function Nav() {
           ))}
         </div>
         <div className="nav-spacer" />
+        <LocaleSwitcher />
         <Link href="/items/new" className="nav-capture">
-          收一条链接
+          {t('nav.capture')}
         </Link>
         <form action="/api/auth/signout" method="post">
           <button type="submit" className="btn-quiet">
-            退出
+            {t('nav.signOut')}
           </button>
         </form>
       </div>

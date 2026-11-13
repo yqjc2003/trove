@@ -1,4 +1,6 @@
 import Link from 'next/link';
+import { LocaleSwitcher } from '@/components/LocaleSwitcher';
+import { translate, type Locale } from '@/lib/i18n';
 
 const sources = ['浏览器收藏夹', 'GitHub Star', 'Bilibili / YouTube', '任何链接'];
 
@@ -17,16 +19,15 @@ const advantages = [
   },
 ];
 
-export function LandingPage() {
+export function LandingPage({ locale }: { locale: Locale }) {
   return (
     <main className="landing">
       <header className="landing-nav" aria-label="主导航">
         <Link href="/" className="landing-brand" translate="no">
           CatchLinger <span>拾藏</span>
         </Link>
-        <Link className="landing-login" href="/login">
-          已有账号，登录
-        </Link>
+        <LocaleSwitcher />
+        <Link className="landing-login" href="/login">{translate(locale, 'landing.login')}</Link>
       </header>
 
       <section className="landing-hero" aria-labelledby="landing-title">
@@ -39,10 +40,10 @@ export function LandingPage() {
           </p>
           <div className="landing-actions">
             <Link className="btn btn-primary" href="/login?mode=signup&next=/onboarding">
-              从第一条开始
+              {translate(locale, 'landing.start')}
             </Link>
             <a className="btn" href="#how-it-works">
-              看看怎么用
+              {translate(locale, 'landing.how')}
             </a>
           </div>
           <p className="landing-note">CatchLinger：创建账号后，三步完成你的第一轮收集。</p>

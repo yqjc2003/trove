@@ -5,10 +5,14 @@ import { ApiKeyManager } from '@/components/ApiKeyManager';
 import { ReminderDaysForm } from '@/components/ReminderDaysForm';
 import { ImportBookmarks } from '@/components/ImportBookmarks';
 import { resolveAgentApiBase } from '@/lib/agent-connection';
+import { LocaleSwitcher } from '@/components/LocaleSwitcher';
+import { translate } from '@/lib/i18n';
+import { getLocale } from '@/lib/i18n-server';
 
 export const dynamic = 'force-dynamic';
 
 export default async function SettingsPage() {
+  const locale = await getLocale();
   const ctx = await getServerContext();
   if (!ctx) return null;
 
@@ -25,12 +29,18 @@ export default async function SettingsPage() {
       <div className="wrap">
         <div className="page-head">
           <div>
-            <h1>我的语言</h1>
-            <p className="page-sub">收藏慢慢积累，描述它们的词汇也由你定义。</p>
+            <h1>{translate(locale, 'settings.title')}</h1>
+            <p className="page-sub">{translate(locale, 'settings.subtitle')}</p>
           </div>
         </div>
 
         <section className="section" style={{ marginTop: 0 }}>
+          <div className="section-head"><h2>{translate(locale, 'settings.language')}</h2></div>
+          <p className="small muted" style={{ marginTop: 12 }}>{translate(locale, 'settings.languageHelp')}</p>
+          <div style={{ marginTop: 16 }}><LocaleSwitcher /></div>
+        </section>
+
+        <section className="section">
           <div className="section-head">
             <h2>个人词汇表</h2>
             <span className="section-count">{tags.length} 个</span>

@@ -6,11 +6,14 @@ import { ReviewDesk } from '@/components/ReviewDesk';
 import { LandingPage } from '@/components/LandingPage';
 import { AgentSetupGuide } from '@/components/AgentSetupGuide';
 import { resolveAgentApiBase } from '@/lib/agent-connection';
+import { translate } from '@/lib/i18n';
+import { getLocale } from '@/lib/i18n-server';
 
 export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
+  const locale = await getLocale();
   const ctx = await getServerContext();
-  if (!ctx) return <LandingPage />;
+  if (!ctx) return <LandingPage locale={locale} />;
   const [stats, reminders, unread, keys] = await Promise.all([
     getStats(ctx),
     listReminders(ctx),
@@ -33,11 +36,11 @@ export default async function DashboardPage() {
       <div className="wrap wrap-wide">
         <header className="page-head">
           <div>
-            <h1>今天，先回收一条。</h1>
-            <p className="page-sub">曾经收下的好东西，值得再打开一次。</p>
+            <h1>{translate(locale, 'dashboard.title')}</h1>
+            <p className="page-sub">{translate(locale, 'dashboard.subtitle')}</p>
           </div>
           <Link className="small muted" href="/items?read=unread">
-            查看未读收藏
+            {translate(locale, 'dashboard.unread')}
           </Link>
         </header>
         <div className="workspace">
@@ -47,23 +50,23 @@ export default async function DashboardPage() {
             <ReviewDesk items={items} overdue={reminders.length > 0} />
           )}
           <aside className="context-rail">
-            <h2>你的藏库</h2>
+            <h2>{translate(locale, 'dashboard.library')}</h2>
             <p className="small faint">最近至多 200 条收藏的概况</p>
             <dl className="quiet-stats">
               <div>
-                <dt>收藏</dt>
+                <dt>{translate(locale, 'dashboard.total')}</dt>
                 <dd>{stats.total}</dd>
               </div>
               <div>
-                <dt>未读</dt>
+                <dt>{translate(locale, 'dashboard.unreadCount')}</dt>
                 <dd>{stats.unread}</dd>
               </div>
               <div>
-                <dt>待回看</dt>
+                <dt>{translate(locale, 'dashboard.overdue')}</dt>
                 <dd>{stats.overdue}</dd>
               </div>
               <div>
-                <dt>本周收集</dt>
+                <dt>{translate(locale, 'dashboard.week')}</dt>
                 <dd>{stats.added_7d}</dd>
               </div>
             </dl>

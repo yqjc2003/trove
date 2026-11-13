@@ -6,9 +6,11 @@ import Link from 'next/link';
 
 import { createItemAction } from '@/app/actions/items';
 import { TagInput, type TagOption } from '@/components/TagInput';
+import { useTranslation } from '@/components/LocaleProvider';
 
 /** 手工添加收藏的表单（Web 通道，标签不限数量）。 */
 export function ItemCreateForm({ options }: { options: TagOption[] }) {
+  const { t } = useTranslation();
   const router = useRouter();
 
   const [url, setUrl] = useState('');
@@ -41,7 +43,7 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
   return (
     <form onSubmit={submit} style={{ marginTop: 28 }}>
       <label className="field">
-        <span className="field-label">链接</span>
+        <span className="field-label">{t('form.url')}</span>
         <input
           className="input"
           type="url"
@@ -49,7 +51,7 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
           inputMode="url"
           value={url}
           onChange={(e) => setUrl(e.target.value)}
-          placeholder="https://example.com/article"
+          placeholder={t('form.urlPlaceholder')}
           autoComplete="off"
           spellCheck={false}
           required
@@ -57,13 +59,13 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
       </label>
 
       <label className="field">
-        <span className="field-label">标题</span>
+        <span className="field-label">{t('form.title')}</span>
         <input
           className="input"
           name="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="例如：一篇想稍后再读的文章…"
+          placeholder={t('form.titlePlaceholder')}
           autoComplete="off"
           required
           maxLength={300}
@@ -71,13 +73,13 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
       </label>
 
       <label className="field">
-        <span className="field-label">摘要</span>
+        <span className="field-label">{t('form.summary')}</span>
         <textarea
           className="textarea"
           name="summary"
           value={summary}
           onChange={(e) => setSummary(e.target.value)}
-          placeholder="一句话说明，可留空…"
+          placeholder={t('form.summaryPlaceholder')}
           autoComplete="off"
           maxLength={1000}
           style={{ minHeight: 90 }}
@@ -85,10 +87,10 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
       </label>
 
       <div className="field">
-        <span className="field-label">标签</span>
+        <span className="field-label">{t('form.tags')}</span>
         <TagInput tags={tags} onChange={setTags} options={options} disabled={pending} />
         <p className="small faint" style={{ marginTop: 6 }}>
-          手工整理，标签数量不限。
+          {t('form.tagsUnlimited')}
         </p>
       </div>
 
@@ -100,10 +102,10 @@ export function ItemCreateForm({ options }: { options: TagOption[] }) {
 
       <div className="row-actions" style={{ marginTop: 20 }}>
         <button type="submit" className="btn btn-primary" disabled={pending}>
-          {pending ? '保存中…' : '保存'}
+          {pending ? t('form.saving') : t('common.save')}
         </button>
         <Link className="btn" href="/items">
-          取消
+          {t('common.cancel')}
         </Link>
       </div>
     </form>

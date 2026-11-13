@@ -2,6 +2,9 @@ import type { Metadata, Viewport } from 'next';
 
 import './globals.css';
 import { Nav } from '@/components/Nav';
+import { LocaleProvider } from '@/components/LocaleProvider';
+import type { Locale } from '@/lib/i18n';
+import { getLocale } from '@/lib/i18n-server';
 import {
   createServerSupabaseClient,
   isSupabaseConfigured,
@@ -20,20 +23,24 @@ export const viewport: Viewport = {
 function Shell({
   nav,
   children,
+  locale,
 }: {
   nav?: React.ReactNode;
   children: React.ReactNode;
+  locale: Locale;
 }) {
   return (
-    <html lang="zh-CN">
+    <html lang={locale}>
       <body>
         <a className="skip-link" href="#content">
           跳到正文
         </a>
-        {nav}
-        <div id="content" tabIndex={-1}>
-          {children}
-        </div>
+        <LocaleProvider locale={locale}>
+          {nav}
+          <div id="content" tabIndex={-1}>
+            {children}
+          </div>
+        </LocaleProvider>
       </body>
     </html>
   );
@@ -83,9 +90,10 @@ function SetupNotice() {
 export default async function RootLayout({
   children,
 }: Readonly<{ children: React.ReactNode }>) {
+  const locale = await getLocale();
   if (!isSupabaseConfigured()) {
     return (
-      <Shell>
+      <Shell locale={locale}>
         <SetupNotice />
       </Shell>
     );
@@ -102,5 +110,5 @@ export default async function RootLayout({
     signedIn = false;
   }
 
-  return <Shell nav={signedIn ? <Nav /> : null}>{children}</Shell>;
+  return <Shell locale={locale} nav={signedIn ? <Nav /> : null}>{children}</Shell>;
 }

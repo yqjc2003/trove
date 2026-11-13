@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 
 import { signUpAction } from '@/app/actions/auth';
 import { createBrowserSupabaseClient } from '@/lib/supabase/client';
+import { LocaleSwitcher } from '@/components/LocaleSwitcher';
+import { useTranslation } from '@/components/LocaleProvider';
 
 type Mode = 'password' | 'signup' | 'magic';
 
@@ -25,6 +27,7 @@ function requestedMode(raw: string | null): Mode {
 }
 
 function LoginForm() {
+  const { t } = useTranslation();
   const router = useRouter();
   const params = useSearchParams();
   const next = safeNext(params.get('next'));
@@ -163,9 +166,9 @@ function LoginForm() {
   return (
     <main className="page">
       <div className="wrap-narrow">
-        <h1>拾藏</h1>
+        <div className="row-actions" style={{ justifyContent: 'space-between' }}><h1>{t('login.title')}</h1><LocaleSwitcher /></div>
         <p className="page-sub">
-          把散落的链接收进来，再把真正重要的打开。
+          {t('login.lead')}
         </p>
 
         <div className="section">

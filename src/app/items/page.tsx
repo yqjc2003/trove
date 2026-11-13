@@ -9,6 +9,8 @@ import { ItemRow } from '@/components/ItemRow';
 import { FilterBar } from '@/components/FilterBar';
 import { isContentType, type ContentType } from '@/lib/domain/content-type';
 import type { ItemSource } from '@/types';
+import { translate } from '@/lib/i18n';
+import { getLocale } from '@/lib/i18n-server';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,6 +35,7 @@ function list(v: string | string[] | undefined): string[] {
 }
 
 async function ItemsList({ searchParams }: PageProps) {
+  const locale = await getLocale();
   const ctx = await getServerContext();
   if (!ctx) return null;
 
@@ -84,20 +87,20 @@ async function ItemsList({ searchParams }: PageProps) {
     <>
       <FilterBar tags={tags.map((t) => ({ id: t.id, name: t.name }))} />
       <p className="results-count small faint" role="status">
-        找到 {total} 条收藏
+        {translate(locale, 'items.results', { count: total })}
       </p>
 
       {result.items.length === 0 ? (
         <EmptyState
-          title="没有匹配的收藏"
-          text="换个关键词，或清空筛选条件试试。"
+          title={translate(locale, 'items.empty')}
+          text={translate(locale, 'items.emptyText')}
           action={
             <div className="row-actions">
               <Link href="/items" className="btn">
-                清空镜头
+                {translate(locale, 'items.clear')}
               </Link>
               <Link href="/items/new" className="btn btn-sm">
-                手工收一条链接
+                {translate(locale, 'items.manual')}
               </Link>
             </div>
           }
@@ -123,7 +126,7 @@ async function ItemsList({ searchParams }: PageProps) {
                   className="btn btn-sm"
                   href={`/items?${buildQuery(sp, Math.max(0, offset - PAGE_SIZE))}`}
                 >
-                  上一页
+                  {translate(locale, 'items.previous')}
                 </a>
               ) : null}
               {hasMore ? (
@@ -131,7 +134,7 @@ async function ItemsList({ searchParams }: PageProps) {
                   className="btn btn-sm"
                   href={`/items?${buildQuery(sp, offset + PAGE_SIZE)}`}
                 >
-                  下一页
+                  {translate(locale, 'items.next')}
                 </a>
               ) : null}
             </span>
@@ -160,21 +163,22 @@ function buildQuery(
   return params.toString();
 }
 
-export default function ItemsPage({ searchParams }: PageProps) {
+export default async function ItemsPage({ searchParams }: PageProps) {
+  const locale = await getLocale();
   return (
     <main className="page">
       <div className="wrap wrap-library">
         <div className="page-head">
           <div>
-            <h1>藏库</h1>
-            <p className="page-sub">你曾经觉得有价值的，都在这里。</p>
+            <h1>{translate(locale, 'items.title')}</h1>
+            <p className="page-sub">{translate(locale, 'items.subtitle')}</p>
           </div>
           <Link href="/items/new" className="btn btn-primary">
-            收一条链接
+            {translate(locale, 'items.capture')}
           </Link>
         </div>
 
-        <Suspense fallback={<p className="faint small">加载中…</p>}>
+        <Suspense fallback={<p className="faint small">{translate(locale, 'common.loading')}</p>}>
           <ItemsList searchParams={searchParams} />
         </Suspense>
       </div>

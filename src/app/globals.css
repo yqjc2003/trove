@@ -527,6 +527,16 @@ p {
   margin-left: auto;
 }
 
+.locale-switcher select {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-size: 13px;
+  padding: 4px;
+}
+
 .nav-meta {
   font-size: 13px;
   color: var(--ink-3);
