@@ -19,6 +19,7 @@ export function ApiKeyManager({
   keys: ApiKey[];
   apiBase: string;
 }) {
+  const activeKeys = keys.filter((key) => !key.revoked_at);
   const [name, setName] = useState('');
   const [instruction, setInstruction] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -79,7 +80,7 @@ export function ApiKeyManager({
         </p>
       ) : null}
 
-      {keys.length > 0 ? (
+      {activeKeys.length > 0 ? (
         <div className="table-scroll">
         <table className="table-simple" style={{ marginTop: 20 }}>
           <thead>
@@ -92,7 +93,7 @@ export function ApiKeyManager({
             </tr>
           </thead>
           <tbody>
-            {keys.map((k) => (
+            {activeKeys.map((k) => (
               <tr key={k.id}>
                 <td>{k.name}</td>
                 <td className="mono" translate="no">
@@ -103,18 +104,14 @@ export function ApiKeyManager({
                   {k.last_used_at ? formatDateTime(k.last_used_at) : '—'}
                 </td>
                 <td>
-                  {k.revoked_at ? (
-                    <span className="faint small">已吊销</span>
-                  ) : (
-                    <button
-                      type="button"
-                      className="btn-quiet btn-danger"
-                      disabled={pending}
-                      onClick={() => revoke(k.id)}
-                    >
-                      吊销
-                    </button>
-                  )}
+                  <button
+                    type="button"
+                    className="btn-quiet btn-danger"
+                    disabled={pending}
+                    onClick={() => revoke(k.id)}
+                  >
+                    吊销
+                  </button>
                 </td>
               </tr>
             ))}

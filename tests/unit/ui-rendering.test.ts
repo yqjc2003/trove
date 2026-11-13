@@ -123,6 +123,27 @@ describe('收集流 / 回看台渲染约束', () => {
     expect(html).not.toContain('Agent 安装连接');
   });
 
+  it('已吊销的 API Key 不显示在连接列表中', () => {
+    const html = renderToStaticMarkup(
+      createElement(ApiKeyManager, {
+        apiBase: 'https://catchlinger.example/api/trove',
+        keys: [
+          {
+            id: 'active-key', user_id: 'user-1', name: '仍在使用', prefix: 'trv_active', scopes: [],
+            created_at: '2026-11-13T00:00:00.000Z', last_used_at: null, revoked_at: null,
+          },
+          {
+            id: 'revoked-key', user_id: 'user-1', name: '不应显示', prefix: 'trv_revoked', scopes: [],
+            created_at: '2026-11-12T00:00:00.000Z', last_used_at: null, revoked_at: '2026-11-13T00:00:00.000Z',
+          },
+        ],
+      }),
+    );
+    expect(html).toContain('仍在使用');
+    expect(html).not.toContain('不应显示');
+    expect(html).not.toContain('已吊销');
+  });
+
   it('新建连接 Key 的安装指令只在独立对话框中展示', () => {
     const html = renderToStaticMarkup(
       createElement(AgentInstallDialog, {
