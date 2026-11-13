@@ -4,6 +4,7 @@ import { useState, useTransition } from 'react';
 
 import { createApiKeyAction } from '@/app/actions/settings';
 import { buildAgentInstallPrompt } from '@/lib/agent-install-prompt';
+import { AgentInstallDialog } from './AgentInstallDialog';
 
 type SetupState =
   | { kind: 'idle' }
@@ -16,7 +17,6 @@ type SetupState =
  */
 export function AgentSetupGuide({ apiBase }: { apiBase: string }) {
   const [state, setState] = useState<SetupState>({ kind: 'idle' });
-  const [copyNotice, setCopyNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
   function createConnectionKey() {
@@ -31,18 +31,7 @@ export function AgentSetupGuide({ apiBase }: { apiBase: string }) {
         kind: 'ready',
         instruction: buildAgentInstallPrompt({ apiBase, apiKey: result.plaintext }),
       });
-      setCopyNotice(null);
     });
-  }
-
-  async function copyInstruction() {
-    if (state.kind !== 'ready') return;
-    try {
-      await navigator.clipboard.writeText(state.instruction);
-      setCopyNotice('已复制。现在把这段话发给你的 Agent。');
-    } catch {
-      setCopyNotice('复制失败，请手动选中下方文字复制。');
-    }
   }
 
   return (
@@ -67,23 +56,10 @@ export function AgentSetupGuide({ apiBase }: { apiBase: string }) {
       ) : null}
 
       {state.kind === 'ready' ? (
-        <div className="agent-setup-ready">
-          <p className="small muted">这段文字含有你的连接 Key，只发送给你信任的 Agent。</p>
-          <textarea
-            className="agent-setup-instruction"
-            aria-label="发给 Agent 的 CatchLinger 安装与连接指令"
-            readOnly
-            value={state.instruction}
-            rows={13}
-            onFocus={(event) => event.currentTarget.select()}
-          />
-          <div className="desk-actions">
-            <button type="button" className="btn btn-primary" onClick={copyInstruction}>
-              复制给 Agent
-            </button>
-            {copyNotice ? <p className="small muted" role="status">{copyNotice}</p> : null}
-          </div>
-        </div>
+        <AgentInstallDialog
+          instruction={state.instruction}
+          onClose={() => setState({ kind: 'idle' })}
+        />
       ) : null}
     </section>
   );

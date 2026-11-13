@@ -1187,8 +1187,7 @@ button.tag:focus-visible {
   font-size: 15px;
   line-height: 1.9;
 }
-.agent-setup-action,
-.agent-setup-ready {
+.agent-setup-action {
   margin-top: 32px;
   padding-top: 20px;
   border-top: 1px solid var(--rule);
@@ -1209,6 +1208,38 @@ button.tag:focus-visible {
   font-family: var(--font-mono);
   font-size: 12px;
   line-height: 1.7;
+}
+
+.agent-install-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgb(18 20 18 / 38%);
+}
+
+.agent-install-dialog {
+  width: min(720px, 100%);
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  border: 1px solid var(--ink);
+  background: var(--paper);
+  padding: 28px;
+}
+
+.agent-install-dialog h2 {
+  margin-top: 12px;
+  font-size: clamp(22px, 2.5vw, 30px);
+  line-height: 1.4;
+}
+
+.agent-install-dialog-intro {
+  margin-top: 14px;
+  color: var(--ink-2);
+  font-size: 15px;
+  line-height: 1.8;
 }
 .desk-tools {
   display: flex;

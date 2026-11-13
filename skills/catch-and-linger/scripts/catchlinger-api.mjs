@@ -24,7 +24,7 @@ if (!BASE || !KEY) {
     JSON.stringify(
       {
         error:
-          '缺少配置：请设置 CATCHLINGER_API_BASE 与 CATCHLINGER_API_KEY（可在 CatchLinger 的「设置 → API Key」生成）。',
+          '缺少配置：请设置 CATCHLINGER_API_BASE 与 CATCHLINGER_API_KEY。请登录 https://catchlinger.sxyicheng.tech，在「我的语言 → 连接 Agent」手动生成新的 API Key，再更新 ~/.config/catchlinger/env。',
       },
       null,
       2,
@@ -82,6 +82,11 @@ async function request(pathname, { method = 'GET', body } = {}) {
         code: `HTTP_${res.status}`,
         message: `请求 ${BASE}${pathname} 失败：HTTP ${res.status} ${res.statusText}`,
       };
+    if (res.status === 401 || error.code === 'UNAUTHORIZED') {
+      error.code = 'UNAUTHORIZED';
+      error.message =
+        'API Key 无效或已吊销。请登录 https://catchlinger.sxyicheng.tech，在「我的语言 → 连接 Agent」手动生成新的 API Key，再更新 ~/.config/catchlinger/env。';
+    }
     console.error(JSON.stringify({ error }, null, 2));
     process.exit(1);
   }

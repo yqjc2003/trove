@@ -28,7 +28,7 @@ license: Apache-2.0
 | `GITHUB_TOKEN` | 可选；设了配额从 60 次/小时提到 5000 次/小时，也能读私密 profile 的 star |
 放在环境变量里，或写进 `~/.config/catchlinger/env`（`KEY=VALUE` 格式，每行一条）。
 
-如果缺少 `CATCHLINGER_API_KEY`，提示用户到 CatchLinger 的「设置 → API Key」生成。
+如果缺少 `CATCHLINGER_API_KEY`，明确提示用户登录 [CatchLinger](https://catchlinger.sxyicheng.tech)，前往「我的语言 → 连接 Agent」手动生成新的 API Key；不要替用户生成或猜测 Key。
 
 ## 三种模式
 
@@ -262,7 +262,7 @@ node scripts/tag-resolver.mjs merge <from> <to> [--dry-run]   # 把 from 合并�
 
 | 码 | 含义 | 处理 |
 |---|---|---|
-| `UNAUTHORIZED` | API Key 无效或已吊销 | 让用户去设置页重新生成 |
+| `UNAUTHORIZED` | API Key 无效或已吊销 | 明确要求用户登录 [CatchLinger](https://catchlinger.sxyicheng.tech)，前往「我的语言 → 连接 Agent」手动生成新的 API Key，再更新 `~/.config/catchlinger/env`；不要替用户生成或猜测 Key。 |
 | `MAX_TAGS_EXCEEDED` | 标签超过 3 个 | 砍到 3 个再提交 |
 | `VALIDATION_ERROR` | 字段不合法 | 按 message 修正 |
 | `INVALID_SCHEME` | 不是 http/https 链接 | 跳过该 URL |

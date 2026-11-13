@@ -7,6 +7,7 @@ import { ReviewDesk } from '@/components/ReviewDesk';
 import { TagInput } from '@/components/TagInput';
 import { AgentSetupGuide } from '@/components/AgentSetupGuide';
 import { ApiKeyManager } from '@/components/ApiKeyManager';
+import { AgentInstallDialog } from '@/components/AgentInstallDialog';
 import { FakeTroveDb, fakeContext } from '../helpers/fake-db';
 import { getItem, saveItem } from '@/lib/services/items';
 import ItemDetailPage from '@/app/items/[id]/page';
@@ -100,7 +101,7 @@ describe('收集流 / 回看台渲染约束', () => {
     expect(html).not.toContain('CATCHLINGER_API_KEY=');
   });
 
-  it('已有 API Key 时提供一键复制 Agent 安装提示入口', () => {
+  it('已有 API Key 时只允许用户手动命名并生成新的连接 Key', () => {
     const html = renderToStaticMarkup(
       createElement(ApiKeyManager, {
         apiBase: 'https://catchlinger.example/api/trove',
@@ -116,7 +117,22 @@ describe('收集流 / 回看台渲染约束', () => {
         }],
       }),
     );
-    expect(html).toContain('一键复制 Agent 安装提示');
-    expect(html).toContain('已有 Key 的明文无法再次读取。');
+    expect(html).toContain('生成 API Key');
+    expect(html).toContain('例如：定时采集…');
+    expect(html).not.toContain('一键复制 Agent 安装提示');
+    expect(html).not.toContain('Agent 安装连接');
+  });
+
+  it('新建连接 Key 的安装指令只在独立对话框中展示', () => {
+    const html = renderToStaticMarkup(
+      createElement(AgentInstallDialog, {
+        instruction: 'CATCHLINGER_API_KEY=trv_once_only',
+        onClose: () => undefined,
+      }),
+    );
+    expect(html).toContain('role="dialog"');
+    expect(html).toContain('连接 Key 已生成');
+    expect(html).toContain('CATCHLINGER_API_KEY=trv_once_only');
+    expect(html).toContain('我已保存');
   });
 });
