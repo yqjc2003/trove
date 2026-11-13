@@ -56,6 +56,11 @@ Agent 取 URL 列表  →  Agent 抓正文  →  Agent 自己产出 title/summar
 
 所以 Skill 与 MCP 的职责边界很清楚：它们负责「搬运」和「校验」，理解内容是 Agent 的事。
 
+Skill 对单条链接、GitHub star 和 Chrome/Edge 批量书签使用同一规则：先逐条读取网页内容，
+由 Agent 生成说明主题、主要内容与用途的 `summary`，再从梗概中提炼至多 3 个标签并归一后保存。
+`summary` 不能写成「从 Edge 收藏夹『xx』导入」等采集日志；来源记录在 `source`，
+原文件夹名不直接作为内容标签。网页无法读取时如实说明原因和信息限制，不虚构梗概或标签。
+
 ### GitHub star 免 Token 采集
 
 读 star 列表用 GitHub 的**公开端点** `GET /users/{username}/starred`，**不需要 GITHUB_TOKEN**。
