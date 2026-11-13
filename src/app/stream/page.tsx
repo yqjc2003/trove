@@ -5,6 +5,8 @@ import { formatDate } from '@/lib/format';
 import { ItemRow } from '@/components/ItemRow';
 import { EmptyState } from '@/components/StatBlock';
 import type { Item } from '@/types';
+import { getLocale } from '@/lib/i18n-server';
+import { translate } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 export default async function StreamPage({
@@ -12,6 +14,7 @@ export default async function StreamPage({
 }: {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }) {
+  const locale = await getLocale();
   const ctx = await getServerContext();
   if (!ctx) return null;
   const sp = await searchParams;
@@ -34,22 +37,22 @@ export default async function StreamPage({
       <div className="wrap wrap-wide">
         <header className="page-head">
           <div>
-            <h1>收集流</h1>
-            <p className="page-sub">从各处收下的链接，在这里汇合。</p>
+            <h1>{translate(locale, 'stream.title')}</h1>
+            <p className="page-sub">{translate(locale, 'stream.subtitle')}</p>
           </div>
           <Link className="btn" href="/items/new">
-            收一条链接
+            {translate(locale, 'nav.capture')}
           </Link>
         </header>
         <div className="workspace">
           <div>
             {result.total === 0 ? (
               <EmptyState
-                title="第一条链接，从这里开始"
-                text="手工收下一个链接，或连接 Agent 导入浏览器书签与 GitHub Star。"
+                title={translate(locale, 'stream.emptyTitle')}
+                text={translate(locale, 'stream.emptyText')}
                 action={
                   <Link href="/settings#connections" className="btn">
-                    连接 Agent
+                    {translate(locale, 'stream.connectAgent')}
                   </Link>
                 }
               />
@@ -58,17 +61,18 @@ export default async function StreamPage({
               <section className="stream-day" key={date}>
                 <div className="section-head">
                   <h2>{date}</h2>
-                  <span className="section-count">本页 {items.length} 条</span>
+                  <span className="section-count">{translate(locale, 'stream.pageItems', { count: items.length })}</span>
                 </div>
                 <ul className="rows">
                   {items.map((item) => (
                     <ItemRow
                       key={item.id}
                       item={item}
+                      locale={locale}
                       actions={
                         item.source_ref ? (
                           <span className="small faint source-ref">
-                            来源记录：{item.source_ref}
+                            {translate(locale, 'stream.sourceRecord', { source: item.source_ref })}
                           </span>
                         ) : undefined
                       }
@@ -78,37 +82,36 @@ export default async function StreamPage({
               </section>
             ))}
             <div className="pagination">
-              <span className="small faint">共 {result.total} 条收藏</span>
+              <span className="small faint">{translate(locale, 'stream.totalItems', { count: result.total })}</span>
               <div>
                 {offset > 0 ? (
                   <Link
                     className="btn"
                     href={`/stream?offset=${Math.max(0, offset - 50)}`}
                   >
-                    较新的收集
+                    {translate(locale, 'stream.newer')}
                   </Link>
                 ) : null}
                 {offset + result.items.length < result.total ? (
                   <Link className="btn" href={`/stream?offset=${offset + 50}`}>
-                    更早的收集
+                    {translate(locale, 'stream.older')}
                   </Link>
                 ) : null}
               </div>
             </div>
           </div>
           <aside className="context-rail">
-            <h2>收集的来路</h2>
+            <h2>{translate(locale, 'stream.origins')}</h2>
             <p className="page-sub">
-              这里按首次收藏日期排列，重复采集会补全已有收藏，保留它原来的位置。
+              {translate(locale, 'stream.originsText')}
             </p>
             <div className="rail-section">
               <p className="small muted">
-                日期分组呈现收藏记录。每次导入的新增、更新与失败结果，请查看
-                Agent 的采集报告。
+                {translate(locale, 'stream.reportText')}
               </p>
             </div>
             <div className="rail-section">
-              <Link href="/settings#connections">管理采集连接</Link>
+              <Link href="/settings#connections">{translate(locale, 'stream.manageConnections')}</Link>
             </div>
           </aside>
         </div>

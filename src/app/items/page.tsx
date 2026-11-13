@@ -109,7 +109,7 @@ async function ItemsList({ searchParams }: PageProps) {
         <>
           <ul className="rows">
             {result.items.map((item) => (
-              <ItemRow key={item.id} item={item} />
+              <ItemRow key={item.id} item={item} locale={locale} />
             ))}
           </ul>
 
