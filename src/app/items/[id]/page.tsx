@@ -5,7 +5,9 @@ import { getItem } from '@/lib/services/items';
 import { listTags } from '@/lib/services/tags';
 import { AppError } from '@/lib/domain/errors';
 import { formatDate } from '@/lib/format';
-import { SOURCE_LABELS } from '@/lib/ui-labels';
+import { getSourceLabels } from '@/lib/ui-labels';
+import { getLocale } from '@/lib/i18n-server';
+import { translate } from '@/lib/i18n';
 import { ItemActions } from '@/components/ItemActions';
 import { ItemEditor } from '@/components/ItemEditor';
 import { NoteEditor } from '@/components/NoteEditor';
@@ -19,6 +21,7 @@ export default async function ItemDetailPage({
 }: {
   params: Promise<{ id: string }>;
 }) {
+  const locale = await getLocale();
   const ctx = await getServerContext();
   if (!ctx) return null;
   const { id } = await params;
@@ -32,18 +35,18 @@ export default async function ItemDetailPage({
     <main className="page">
       <div className="wrap detail-page">
         <p className="breadcrumb">
-          <Link href="/items">返回藏库</Link>
+          <Link href="/items">{translate(locale, 'detail.back')}</Link>
         </p>
         <header className="detail-main">
           <p className="row-meta detail-meta">
             <span>{item.domain}</span>
-            <span>{formatDate(item.collected_at)} 收集</span>
+            <span>{translate(locale, 'detail.collected', { date: formatDate(item.collected_at) })}</span>
             <span>
               {item.status === 'archived'
-                ? '已归档'
+                ? translate(locale, 'item.archived')
                 : item.read_at
-                  ? '已读'
-                  : '未读'}
+                  ? translate(locale, 'item.read')
+                  : translate(locale, 'item.unread')}
             </span>
           </p>
           <ItemEditor
@@ -56,19 +59,19 @@ export default async function ItemDetailPage({
           </div>
         </header>
         <details className="item-organize">
-          <summary>整理收藏</summary>
+          <summary>{translate(locale, 'detail.organize')}</summary>
           <div className="organize-content">
             <p className="small faint">
-              {SOURCE_LABELS[item.source]} · 打开 {item.click_count} 次
-              {item.read_at ? ` · ${formatDate(item.read_at)} 已读` : ''}
+              {getSourceLabels(locale)[item.source]} · {translate(locale, 'item.opened', { count: item.click_count })}
+              {item.read_at ? ` · ${translate(locale, 'detail.collected', { date: formatDate(item.read_at) })} ${translate(locale, 'item.read')}` : ''}
             </p>
             {item.source_ref ? (
               <p className="small faint source-ref">
-                来源记录：{item.source_ref}
+                {translate(locale, 'detail.sourceRecord', { source: item.source_ref })}
               </p>
             ) : null}
             <h2 className="field-label" id="item-tags-heading">
-              标签
+              {translate(locale, 'detail.tags')}
             </h2>
             <TagPicker
               itemId={item.id}
@@ -82,7 +85,7 @@ export default async function ItemDetailPage({
             />
           </div>
         </details>
-        <section className="detail-notes" id="notes" aria-label="收藏笔记">
+        <section className="detail-notes" id="notes" aria-label={translate(locale, 'detail.notes')}>
           <NoteEditor itemId={item.id} notes={notes} />
         </section>
       </div>

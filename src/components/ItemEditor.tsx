@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 
 import { updateItemFieldsAction } from '@/app/actions/items';
+import { useTranslation } from '@/components/LocaleProvider';
 
 /** 详情页的标题与摘要编辑。 */
 export function ItemEditor({
@@ -14,6 +15,7 @@ export function ItemEditor({
   title: string;
   summary: string | null;
 }) {
+  const { t } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [draftTitle, setDraftTitle] = useState(title);
   const [draftSummary, setDraftSummary] = useState(summary ?? '');
@@ -42,7 +44,7 @@ export function ItemEditor({
         {summary ? <p className="detail-summary">{summary}</p> : null}
         <div className="row-actions">
           <button type="button" className="btn-quiet" onClick={() => setEditing(true)}>
-            编辑标题与摘要
+            {t('detail.editTitleSummary')}
           </button>
         </div>
       </div>
@@ -52,7 +54,7 @@ export function ItemEditor({
   return (
     <div>
       <label className="field">
-        <span className="field-label">标题</span>
+        <span className="field-label">{t('form.title')}</span>
         <input
           className="input"
           name="title"
@@ -65,7 +67,7 @@ export function ItemEditor({
       </label>
 
       <label className="field">
-        <span className="field-label">摘要</span>
+        <span className="field-label">{t('form.summary')}</span>
         <textarea
           className="textarea"
           name="summary"
@@ -90,7 +92,7 @@ export function ItemEditor({
           onClick={save}
           disabled={pending}
         >
-          保存标题与摘要
+          {t('detail.saveTitleSummary')}
         </button>
         <button
           type="button"
@@ -103,7 +105,7 @@ export function ItemEditor({
           }}
           disabled={pending}
         >
-          取消
+          {t('common.cancel')}
         </button>
       </div>
     </div>

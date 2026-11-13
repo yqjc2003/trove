@@ -10,6 +10,7 @@ import {
 import { MarkdownView } from '@/components/MarkdownView';
 import { formatDateTime } from '@/lib/format';
 import type { Note } from '@/types';
+import { useTranslation } from '@/components/LocaleProvider';
 
 /** Markdown 笔记编辑器：多条笔记，可增删改，带预览切换。 */
 export function NoteEditor({
@@ -19,6 +20,7 @@ export function NoteEditor({
   itemId: string;
   notes: Note[];
 }) {
+  const { t } = useTranslation();
   const [draft, setDraft] = useState('');
   const [preview, setPreview] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -93,7 +95,7 @@ export function NoteEditor({
                       setEditingBody(note.body_md);
                     }}
                   >
-                    编辑
+                    {t('common.edit')}
                   </button>
                   <button
                     type="button"
@@ -101,7 +103,7 @@ export function NoteEditor({
                     disabled={pending}
                     onClick={() => remove(note.id)}
                   >
-                    删除
+                    {t('common.delete')}
                   </button>
                 </span>
               </div>
@@ -114,7 +116,7 @@ export function NoteEditor({
                     value={editingBody}
                     disabled={pending}
                     onChange={(e) => setEditingBody(e.target.value)}
-                    aria-label="编辑笔记"
+                    aria-label={t('detail.editNote')}
                     autoComplete="off"
                     spellCheck
                   />
@@ -125,7 +127,7 @@ export function NoteEditor({
                       disabled={pending}
                       onClick={() => submitEdit(note.id)}
                     >
-                      保存
+                      {t('common.save')}
                     </button>
                     <button
                       type="button"
@@ -136,7 +138,7 @@ export function NoteEditor({
                         setEditingBody('');
                       }}
                     >
-                      取消
+                      {t('common.cancel')}
                     </button>
                   </div>
                 </div>
@@ -150,13 +152,13 @@ export function NoteEditor({
 
       <div className="note-compose">
         <div className="section-head">
-          <h2 id="new-note-heading">写下你的理解</h2>
+          <h2 id="new-note-heading">{t('detail.noteTitle')}</h2>
           <button
             type="button"
             className="btn-quiet"
             onClick={() => setPreview((v) => !v)}
           >
-            {preview ? '编辑' : '预览'}
+            {preview ? t('common.edit') : t('detail.preview')}
           </button>
         </div>
 
@@ -172,7 +174,7 @@ export function NoteEditor({
             value={draft}
             disabled={pending}
             onChange={(e) => setDraft(e.target.value)}
-            placeholder="为什么收下它？什么值得下次再用？支持 Markdown。"
+            placeholder={t('detail.notePlaceholder')}
             autoComplete="off"
             aria-labelledby="new-note-heading"
             style={{ marginTop: 12 }}
@@ -192,7 +194,7 @@ export function NoteEditor({
             onClick={submitNew}
             disabled={pending || !draft.trim()}
           >
-            {pending ? '保存中…' : '保存笔记'}
+            {pending ? t('form.saving') : t('detail.saveNote')}
           </button>
         </div>
         <p className="small muted" role="status">
