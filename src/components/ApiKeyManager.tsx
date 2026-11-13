@@ -12,10 +12,10 @@ import type { ApiKey } from '@/types';
  */
 export function ApiKeyManager({
   keys,
-  siteUrl,
+  apiBase,
 }: {
   keys: ApiKey[];
-  siteUrl: string;
+  apiBase: string;
 }) {
   const [name, setName] = useState('');
   const [plaintext, setPlaintext] = useState<string | null>(null);
@@ -29,7 +29,7 @@ export function ApiKeyManager({
 1. 如果当前环境没有 CatchLinger 项目仓库，先获取 https://github.com/yqjc2003/trove.git；然后在仓库根目录运行：pnpm skill:install
    它会把新版 Skill 安装到 ~/.agents/skills/catchlinger-capture/，并移除已弃用的 trove-capture。
 2. 创建或更新 ~/.config/catchlinger/env，写入：
-   CATCHLINGER_API_BASE=${siteUrl}/api/trove
+   CATCHLINGER_API_BASE=${apiBase}
    CATCHLINGER_API_KEY=${key}
 3. 重开一个 Codex 会话后，确认 catchlinger-capture 已可用；再用它收下一个链接。
 
@@ -135,7 +135,7 @@ export function ApiKeyManager({
             <code className="mono" translate="no">~/.config/catchlinger/env</code>：
             <br />
             <code className="mono" translate="no">
-              CATCHLINGER_API_BASE={siteUrl}/api/trove
+              CATCHLINGER_API_BASE={apiBase}
             </code>
             <br />
             <code className="mono" translate="no">

@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 
 import { getServerContext } from '@/lib/server-context';
+import { resolveAgentApiBase } from '@/lib/agent-connection';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,8 +10,7 @@ export default async function OnboardingPage() {
   const context = await getServerContext();
   if (!context) redirect('/login?mode=signup&next=/onboarding');
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+  const apiBase = resolveAgentApiBase();
 
   return (
     <main className="page onboarding-page">
@@ -64,7 +64,7 @@ export default async function OnboardingPage() {
                 会话。
               </p>
               <code className="onboarding-code" translate="no">
-                CATCHLINGER_API_BASE={siteUrl}/api/trove{`\n`}CATCHLINGER_API_KEY=trv_…
+                CATCHLINGER_API_BASE={apiBase}{`\n`}CATCHLINGER_API_KEY=trv_…
               </code>
               <p>现在可以说：<code>用 $catchlinger-capture 收下 https://example.com</code>。</p>
             </div>

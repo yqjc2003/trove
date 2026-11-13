@@ -4,6 +4,7 @@ import { TagManager } from '@/components/TagManager';
 import { ApiKeyManager } from '@/components/ApiKeyManager';
 import { ReminderDaysForm } from '@/components/ReminderDaysForm';
 import { ImportBookmarks } from '@/components/ImportBookmarks';
+import { resolveAgentApiBase } from '@/lib/agent-connection';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,8 +18,7 @@ export default async function SettingsPage() {
     ctx.db.getProfile(),
   ]);
 
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, '') ?? 'http://localhost:3000';
+  const apiBase = resolveAgentApiBase();
 
   return (
     <main className="page">
@@ -53,7 +53,7 @@ export default async function SettingsPage() {
             供 Skill 与 MCP 使用。服务端只保存哈希，明文仅在生成时显示一次。
           </p>
           <div style={{ marginTop: 16 }}>
-            <ApiKeyManager keys={keys} siteUrl={siteUrl} />
+            <ApiKeyManager keys={keys} apiBase={apiBase} />
           </div>
         </section>
 

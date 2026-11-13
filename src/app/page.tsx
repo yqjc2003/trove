@@ -5,6 +5,7 @@ import { listItems } from '@/lib/services/items';
 import { ReviewDesk } from '@/components/ReviewDesk';
 import { LandingPage } from '@/components/LandingPage';
 import { AgentSetupGuide } from '@/components/AgentSetupGuide';
+import { resolveAgentApiBase } from '@/lib/agent-connection';
 
 export const dynamic = 'force-dynamic';
 export default async function DashboardPage() {
@@ -22,7 +23,7 @@ export default async function DashboardPage() {
     }),
     ctx.db.listApiKeys(),
   ]);
-  const apiBase = `${(process.env.NEXT_PUBLIC_SITE_URL ?? 'http://localhost:3000').replace(/\/$/, '')}/api/trove`;
+  const apiBase = resolveAgentApiBase();
   const needsAgentSetup = stats.total === 0 && !keys.some((key) => !key.revoked_at);
   const items = reminders.length
     ? reminders.slice(0, 100).map((r) => r.item)

@@ -183,6 +183,7 @@ GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_...` | publishable key（可暴露给浏览器） |
 | `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | **服务端专用**，Dashboard → Project Settings → API Keys；注册流程也要用它建号 |
 | `NEXT_PUBLIC_SITE_URL` | `https://<你的生产域名>` | 生产站点地址，用于 MCP / Skill 回调与绝对链接 |
+| `CATCHLINGER_AGENT_API_BASE` | `https://catchlinger.sxyicheng.tech/api/trove` | 写入 Agent 安装提示的公开 REST API 地址；不要填 localhost |
 
 > 仓库里不写任何 key 字面量（见 AGENTS.md 约定 10）。实际取值见本地 `.env.local`
 > 或 Dashboard → Project Settings → API Keys。

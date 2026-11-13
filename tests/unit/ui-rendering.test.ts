@@ -103,7 +103,7 @@ describe('收集流 / 回看台渲染约束', () => {
   it('已有 API Key 时提供一键复制 Agent 安装提示入口', () => {
     const html = renderToStaticMarkup(
       createElement(ApiKeyManager, {
-        siteUrl: 'https://catchlinger.example',
+        apiBase: 'https://catchlinger.example/api/trove',
         keys: [{
           id: 'key-1',
           user_id: 'user-1',
