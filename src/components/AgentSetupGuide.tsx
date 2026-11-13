@@ -3,6 +3,7 @@
 import { useState, useTransition } from 'react';
 
 import { createApiKeyAction } from '@/app/actions/settings';
+import { buildAgentInstallPrompt } from '@/lib/agent-install-prompt';
 
 type SetupState =
   | { kind: 'idle' }
@@ -28,16 +29,7 @@ export function AgentSetupGuide({ apiBase }: { apiBase: string }) {
 
       setState({
         kind: 'ready',
-        instruction: `请帮我安装并连接 CatchLinger 收藏 Skill。
-
-1. 如果当前环境没有 CatchLinger 项目仓库，先获取 https://github.com/yqjc2003/trove.git；然后在仓库根目录运行：pnpm skill:install
-   它会把新版 Skill 安装到 ~/.agents/skills/catchlinger-capture/，并移除已弃用的 trove-capture。
-2. 创建或更新 ~/.config/catchlinger/env，写入：
-   CATCHLINGER_API_BASE=${apiBase}
-   CATCHLINGER_API_KEY=${result.plaintext}
-3. 重开一个 Codex 会话后，确认 catchlinger-capture 已可用；再用它收下一个链接。
-
-这把 Key 只属于我的 CatchLinger 藏库。请不要提交、记录到仓库，或分享给其他人。`,
+        instruction: buildAgentInstallPrompt({ apiBase, apiKey: result.plaintext }),
       });
       setCopyNotice(null);
     });

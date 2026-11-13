@@ -5,9 +5,18 @@
 **源码**：`skills/catchlinger-capture/`（仓库内）
 **安装位置**：`~/.agents/skills/catchlinger-capture/`（Codex 用户级全局 Skills 目录）
 
-```bash
-pnpm skill:install     # 幂等：已存在则覆盖，并清掉目标端多余的旧文件
+推荐从 GitHub Release 下载，不需要 clone 整个仓库：
+
+```powershell
+$work = Join-Path $env:TEMP "catchlinger-skill-$([guid]::NewGuid())"
+New-Item -ItemType Directory -Path $work | Out-Null
+$zip = Join-Path $work 'catchlinger-capture.zip'
+Invoke-WebRequest 'https://github.com/yqjc2003/trove/releases/latest/download/catchlinger-capture.zip' -OutFile $zip
+Expand-Archive -LiteralPath $zip -DestinationPath $work
+& (Join-Path $work 'install-catchlinger-skill.ps1')
 ```
+
+开发仓库内仍可运行 `pnpm skill:install`；两种方式都幂等，并会清理目标端多余的旧文件。
 
 安装后请重新开启一个 Codex 会话，Skill 才会被发现。
 

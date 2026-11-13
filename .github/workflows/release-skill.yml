@@ -1,0 +1,32 @@
+name: Release CatchLinger Skill
+
+on:
+  push:
+    tags:
+      - 'skill-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package skill
+        shell: pwsh
+        run: |
+          $dist = Join-Path $env:RUNNER_TEMP 'catchlinger-skill-release'
+          New-Item -ItemType Directory -Path $dist -Force | Out-Null
+          Copy-Item 'skills/catchlinger-capture' (Join-Path $dist 'catchlinger-capture') -Recurse -Force
+          Copy-Item 'scripts/install-release-skill.ps1' (Join-Path $dist 'install-catchlinger-skill.ps1') -Force
+          $archive = Join-Path $env:GITHUB_WORKSPACE 'catchlinger-capture.zip'
+          Compress-Archive -Path (Join-Path $dist '*') -DestinationPath $archive -Force
+
+      - name: Publish release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME 'catchlinger-capture.zip' --title "CatchLinger Skill $env:GITHUB_REF_NAME" --generate-notes
