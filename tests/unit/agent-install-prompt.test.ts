@@ -8,8 +8,8 @@ describe('Agent 安装提示', () => {
       apiBase: 'https://catchlinger.example/api/trove',
       apiKey: 'trv_example',
     });
-    expect(prompt).toContain('releases/latest/download/catchlinger-capture.zip');
-    expect(prompt).toContain('install-catchlinger-skill.ps1');
+    expect(prompt).toContain('releases/latest/download/catch-and-linger.zip');
+    expect(prompt).toContain('install-catch-and-linger.ps1');
     expect(prompt).not.toContain('git clone');
     expect(prompt).toContain('CATCHLINGER_API_BASE=https://catchlinger.example/api/trove');
     expect(prompt).toContain('CATCHLINGER_API_KEY=trv_example');

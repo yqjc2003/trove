@@ -50,7 +50,7 @@ export default async function OnboardingPage() {
               <h2>安装到你的全局 Skills</h2>
               <p>
                 在这个项目根目录运行下面命令。它会安装到{' '}
-                <code>~/.agents/skills/catchlinger-capture/</code>，所有项目中的 Codex 都能使用。
+                <code>~/.agents/skills/catch-and-linger/</code>，所有项目中的 Codex 都能使用。
               </p>
               <code className="onboarding-code" translate="no">pnpm skill:install</code>
             </div>
@@ -66,7 +66,7 @@ export default async function OnboardingPage() {
               <code className="onboarding-code" translate="no">
                 CATCHLINGER_API_BASE={apiBase}{`\n`}CATCHLINGER_API_KEY=trv_…
               </code>
-              <p>现在可以说：<code>用 $catchlinger-capture 收下 https://example.com</code>。</p>
+              <p>现在可以说：<code>用 $catch-and-linger 收下 https://example.com</code>。</p>
             </div>
           </li>
         </ol>

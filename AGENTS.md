@@ -191,7 +191,7 @@ pnpm lint && pnpm typecheck && pnpm test && pnpm build
 
 - Windows PowerShell 5.1：`.ps1` 脚本必须存成 **UTF-8 with BOM**，
   否则中文会被按 ANSI 读取导致解析错误。
-- Skill 脚本（`skills/catchlinger-capture/scripts/*.mjs`）是零依赖 Node ESM，
+- Skill 脚本（`skills/catch-and-linger/scripts/*.mjs`）是零依赖 Node ESM，
   只用内置 API，不参与 Next 构建（已在 eslint 与 tsconfig 中排除）。
 
 ## 提交信息

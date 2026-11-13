@@ -5,7 +5,7 @@
 
 - **后端**：Supabase（Postgres + Auth + RLS）——唯一的数据与认证后端
 - **前端 / API / MCP**：Next.js 16（App Router），部署在 Vercel
-- **采集**：`catchlinger-capture` Skill + MCP 服务端 + REST API
+- **采集**：`catch-and-linger` Skill + MCP 服务端 + REST API
 
 ## 核心设计
 
@@ -203,7 +203,7 @@ src/lib/domain/               纯逻辑：URL 规范化、内容形态、标签�
 src/lib/db/trove-db.ts        唯一的数据访问入口（强制 user_id 过滤）
 src/lib/services/             业务逻辑（REST / MCP / Server Action 复用同一层）
 src/lib/mcp/server.ts         MCP 工具注册
-skills/catchlinger-capture/   Skill：SKILL.md + 6 个零依赖 Node 脚本
+skills/catch-and-linger/      Skill：SKILL.md + 6 个零依赖 Node 脚本
 tests/                        Vitest 单测（离线可跑）+ 集成测试（默认 skip）
 docs/                         API / MCP / Skill / 验收文档
 ```

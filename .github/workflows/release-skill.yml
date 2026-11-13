@@ -17,11 +17,11 @@ jobs:
       - name: Package skill
         shell: pwsh
         run: |
-          $dist = Join-Path $env:RUNNER_TEMP 'catchlinger-skill-release'
+          $dist = Join-Path $env:RUNNER_TEMP 'catch-and-linger-release'
           New-Item -ItemType Directory -Path $dist -Force | Out-Null
-          Copy-Item 'skills/catchlinger-capture' (Join-Path $dist 'catchlinger-capture') -Recurse -Force
-          Copy-Item 'scripts/install-release-skill.ps1' (Join-Path $dist 'install-catchlinger-skill.ps1') -Force
-          $archive = Join-Path $env:GITHUB_WORKSPACE 'catchlinger-capture.zip'
+          Copy-Item 'skills/catch-and-linger' (Join-Path $dist 'catch-and-linger') -Recurse -Force
+          Copy-Item 'scripts/install-catch-and-linger.ps1' (Join-Path $dist 'install-catch-and-linger.ps1') -Force
+          $archive = Join-Path $env:GITHUB_WORKSPACE 'catch-and-linger.zip'
           Compress-Archive -Path (Join-Path $dist '*') -DestinationPath $archive -Force
 
       - name: Publish release asset
@@ -29,4 +29,4 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          gh release create $env:GITHUB_REF_NAME 'catchlinger-capture.zip' --title "CatchLinger Skill $env:GITHUB_REF_NAME" --generate-notes
+          gh release create $env:GITHUB_REF_NAME 'catch-and-linger.zip' --title "Catch-and-Linger Skill $env:GITHUB_REF_NAME" --generate-notes

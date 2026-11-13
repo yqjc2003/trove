@@ -5,10 +5,10 @@ import {
   similarityKey,
   resolveTags,
   findNearDuplicates,
-} from '../../skills/catchlinger-capture/scripts/tag-matching.mjs';
+} from '../../skills/catch-and-linger/scripts/tag-matching.mjs';
 
 /**
- * Skill 里的标签归一逻辑（skills/catchlinger-capture/scripts/tag-matching.mjs）。
+ * Skill 里的标签归一逻辑（skills/catch-and-linger/scripts/tag-matching.mjs）。
  *
  * 这是「新增标签前先查既有标签」那道闸门的核心，必须离线可测。
  * 真实标签空间长这样：学习×137 / java×13 / gis×3 / java并发×11 / springboot×2 …

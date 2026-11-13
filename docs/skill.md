@@ -1,19 +1,19 @@
-# Skill：`catchlinger-capture`
+# Skill：`catch-and-linger`
 
 把链接收进 CatchLinger 收藏系统：**解析正文 → AI 解读 → 写入统一存储**。
 
-**源码**：`skills/catchlinger-capture/`（仓库内）
-**安装位置**：`~/.agents/skills/catchlinger-capture/`（Codex 用户级全局 Skills 目录）
+**源码**：`skills/catch-and-linger/`（仓库内）
+**安装位置**：`~/.agents/skills/catch-and-linger/`（Codex 用户级全局 Skills 目录）
 
 推荐从 GitHub Release 下载，不需要 clone 整个仓库：
 
 ```powershell
-$work = Join-Path $env:TEMP "catchlinger-skill-$([guid]::NewGuid())"
+$work = Join-Path $env:TEMP "catch-and-linger-$([guid]::NewGuid())"
 New-Item -ItemType Directory -Path $work | Out-Null
-$zip = Join-Path $work 'catchlinger-capture.zip'
-Invoke-WebRequest 'https://github.com/yqjc2003/trove/releases/latest/download/catchlinger-capture.zip' -OutFile $zip
+$zip = Join-Path $work 'catch-and-linger.zip'
+Invoke-WebRequest 'https://github.com/yqjc2003/trove/releases/latest/download/catch-and-linger.zip' -OutFile $zip
 Expand-Archive -LiteralPath $zip -DestinationPath $work
-& (Join-Path $work 'install-catchlinger-skill.ps1')
+& (Join-Path $work 'install-catch-and-linger.ps1')
 ```
 
 开发仓库内仍可运行 `pnpm skill:install`；两种方式都幂等，并会清理目标端多余的旧文件。
@@ -120,7 +120,7 @@ node catchlinger-api.mjs account
 
 ## 硬约束
 
-采集标签通常取 1–2 个较宽、可复用的主题，最多 3 个。先浏览既有标签，再用 resolver 归一；HashMap 源码文章使用 `java`、`源码阅读`，具体类名等细节写入标题和摘要。完整的粒度示例与批量选词规则见 `skills/catchlinger-capture/SKILL.md` 的「标签粒度：先归组，再归一」。
+采集标签通常取 1–2 个较宽、可复用的主题，最多 3 个。先浏览既有标签，再用 resolver 归一；HashMap 源码文章使用 `java`、`源码阅读`，具体类名等细节写入标题和摘要。完整的粒度示例与批量选词规则见 `skills/catch-and-linger/SKILL.md` 的「标签粒度：先归组，再归一」。
 
 | 约束 | 值 | 越界表现 |
 |---|---|---|

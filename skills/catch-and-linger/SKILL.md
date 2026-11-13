@@ -1,10 +1,10 @@
 ---
-name: catchlinger-capture
+name: catch-and-linger
 description: Capture URLs into the user's CatchLinger bookmark collection. Resolves URLs, GitHub stars, or local Chrome/Edge bookmarks; extracts content; generates a title, summary and a few broad, reusable tags; then saves via REST or MCP. Use when the user asks to 收藏 / 加入 CatchLinger / 保存这些链接 / 导入书签 / 同步 GitHub star / 整理收藏.
 license: Apache-2.0
 ---
 
-# catchlinger-capture
+# catch-and-linger
 
 把链接收进用户的 CatchLinger 收藏系统：**解析正文 → AI 解读 → 写入统一存储**。
 
