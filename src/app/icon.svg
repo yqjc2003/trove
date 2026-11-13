@@ -2,8 +2,8 @@
   <title>CatchLinger · 拾藏</title>
   <desc>A C-shaped match with an orange head and a small return arrow surrounds a paper-colored bookmark.</desc>
   <rect width="64" height="64" rx="15" fill="#1a1c19"/>
-  <path d="M46 18a20 20 0 1 0 0 28" fill="none" stroke="#f3f4f1" stroke-width="5" stroke-linecap="round"/>
-  <path d="m42.5 42.5 9-2-2 9Z" fill="#f3f4f1"/>
+  <path d="M46 18a20 20 0 1 0 0 28" fill="none" stroke="#b8b0a0" stroke-width="5" stroke-linecap="round"/>
+  <path d="m42.5 42.5 9-2-2 9Z" fill="#b8b0a0"/>
   <path d="M29 20h13v27l-6.5-4.5L29 47V20Z" fill="#f3f4f1"/>
   <circle cx="46" cy="18" r="6" fill="#df6547"/>
 </svg>
