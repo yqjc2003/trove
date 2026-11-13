@@ -3,9 +3,11 @@
 import { useState, useTransition } from 'react';
 
 import { updateReminderDaysAction } from '@/app/actions/settings';
+import { useTranslation } from '@/components/LocaleProvider';
 
 /** 超期提醒天数阈值。 */
 export function ReminderDaysForm({ days }: { days: number }) {
+  const { t } = useTranslation();
   const [value, setValue] = useState(String(days));
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -30,7 +32,7 @@ export function ReminderDaysForm({ days }: { days: number }) {
       }}
     >
       <label className="field" style={{ marginBottom: 0, width: 120 }}>
-        <span className="field-label">提醒天数</span>
+        <span className="field-label">{t('reminder.days')}</span>
         <input
           className="input"
           type="number"
@@ -45,9 +47,9 @@ export function ReminderDaysForm({ days }: { days: number }) {
         />
       </label>
       <button type="submit" className="btn" disabled={pending}>
-        {pending ? '保存中…' : '保存'}
+        {pending ? t('form.saving') : t('common.save')}
       </button>
-      <span className="small faint">天（1–365）</span>
+      <span className="small faint">{t('reminder.unit')}</span>
       {error ? (
         <span className="small danger" role="alert">
           {error}

@@ -7,6 +7,7 @@ import { formatDateTime } from '@/lib/format';
 import { buildAgentInstallPrompt } from '@/lib/agent-install-prompt';
 import type { ApiKey } from '@/types';
 import { AgentInstallDialog } from './AgentInstallDialog';
+import { useTranslation } from '@/components/LocaleProvider';
 
 /**
  * API Key 管理。
@@ -19,6 +20,7 @@ export function ApiKeyManager({
   keys: ApiKey[];
   apiBase: string;
 }) {
+  const { t } = useTranslation();
   const activeKeys = keys.filter((key) => !key.revoked_at);
   const [name, setName] = useState('');
   const [instruction, setInstruction] = useState<string | null>(null);
@@ -56,7 +58,7 @@ export function ApiKeyManager({
         }}
       >
         <label className="sr-only" htmlFor="api-key-name">
-          Key 的用途名称
+          {t('keys.nameLabel')}
         </label>
         <input
           id="api-key-name"
@@ -64,13 +66,13 @@ export function ApiKeyManager({
           name="api_key_name"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="例如：定时采集…"
+          placeholder={t('keys.placeholder')}
           disabled={pending}
           autoComplete="off"
           spellCheck={false}
         />
         <button type="submit" className="btn" disabled={pending || !name.trim()}>
-          生成 API Key
+          {t('keys.create')}
         </button>
       </form>
 
@@ -85,11 +87,11 @@ export function ApiKeyManager({
         <table className="table-simple" style={{ marginTop: 20 }}>
           <thead>
             <tr>
-              <th>名称</th>
-              <th>前缀</th>
-              <th>创建于</th>
-              <th>最后使用</th>
-              <th style={{ textAlign: 'right' }}>操作</th>
+              <th>{t('keys.name')}</th>
+              <th>{t('keys.prefix')}</th>
+              <th>{t('keys.created')}</th>
+              <th>{t('keys.lastUsed')}</th>
+              <th style={{ textAlign: 'right' }}>{t('tags.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -110,7 +112,7 @@ export function ApiKeyManager({
                     disabled={pending}
                     onClick={() => revoke(k.id)}
                   >
-                    吊销
+                    {t('keys.revoke')}
                   </button>
                 </td>
               </tr>

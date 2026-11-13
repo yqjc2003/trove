@@ -42,12 +42,11 @@ export default async function SettingsPage() {
 
         <section className="section">
           <div className="section-head">
-            <h2>个人词汇表</h2>
-            <span className="section-count">{tags.length} 个</span>
+            <h2>{translate(locale, 'settings.vocabulary')}</h2>
+            <span className="section-count">{translate(locale, 'settings.tagCount', { count: tags.length })}</span>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
-            标签是系统里唯一的分类维度，每个用户拥有自己独立的一套。
-            AI 解读链接时会自动创建标签，你也可以随时改名或删除。
+            {translate(locale, 'settings.vocabularyHelp')}
           </p>
           <div style={{ marginTop: 16 }}>
             <TagManager tags={tags} />
@@ -56,11 +55,11 @@ export default async function SettingsPage() {
 
         <section className="section">
           <div className="section-head">
-            <h2 id="connections">连接 Agent</h2>
-            <span className="section-count">{keys.length} 个</span>
+            <h2 id="connections">{translate(locale, 'settings.connections')}</h2>
+            <span className="section-count">{translate(locale, 'settings.keyCount', { count: keys.length })}</span>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
-            供 Skill 与 MCP 使用。服务端只保存哈希，明文仅在生成时显示一次。
+            {translate(locale, 'settings.connectionsHelp')}
           </p>
           <div style={{ marginTop: 16 }}>
             <ApiKeyManager keys={keys} apiBase={apiBase} />
@@ -69,10 +68,10 @@ export default async function SettingsPage() {
 
         <section className="section">
           <div className="section-head">
-            <h2>回看节奏</h2>
+            <h2>{translate(locale, 'settings.reviewRhythm')}</h2>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
-            收藏超过这个天数且从未打开过，就会进入待读清单。
+            {translate(locale, 'settings.reviewHelp')}
           </p>
           <div style={{ marginTop: 16 }}>
             <ReminderDaysForm days={profile?.reminder_days ?? 14} />
@@ -81,18 +80,18 @@ export default async function SettingsPage() {
 
         <section className="section">
           <div className="section-head">
-            <h2>导入导出</h2>
+            <h2>{translate(locale, 'settings.importExport')}</h2>
           </div>
           <p className="small muted" style={{ marginTop: 12 }}>
-            导出为 JSON（含收藏、标签、笔记与点击记录）。
+            {translate(locale, 'settings.exportHelp')}
           </p>
           <div className="row-actions" style={{ marginTop: 12 }}>
             <a className="btn" href="/api/trove/export" download="catchlinger-export.json">
-              导出 JSON
+              {translate(locale, 'settings.export')}
             </a>
           </div>
           <div className="import-divider" />
-          <h3>导入浏览器收藏</h3>
+          <h3>{translate(locale, 'settings.importBookmarks')}</h3>
           <div style={{ marginTop: 12 }}>
             <ImportBookmarks />
           </div>

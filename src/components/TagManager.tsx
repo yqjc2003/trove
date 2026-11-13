@@ -9,12 +9,14 @@ import {
   renameTagAction,
 } from '@/app/actions/tags';
 import type { Tag } from '@/types';
+import { useTranslation } from '@/components/LocaleProvider';
 
 /**
  * 标签管理（DIY）：新建 / 改名 / 删除。
  * 每个用户拥有完全独立的标签空间，这里只操作当前用户的标签。
  */
 export function TagManager({ tags }: { tags: Tag[] }) {
+  const { t } = useTranslation();
   const [name, setName] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editingName, setEditingName] = useState('');
@@ -33,7 +35,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
       }
       setName('');
       setError(null);
-      setNotice('标签已创建。');
+      setNotice(t('tags.savedNotice'));
     });
   }
 
@@ -47,7 +49,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
       setEditingId(null);
       setEditingName('');
       setError(null);
-      setNotice('标签已改名，收藏关联保持不变。');
+      setNotice(t('tags.renamedNotice'));
     });
   }
 
@@ -66,7 +68,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
         return;
       }
       setError(null);
-      setNotice('标签已删除，收藏仍保留。');
+      setNotice(t('tags.deletedNotice'));
     });
   }
 
@@ -80,7 +82,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
         }}
       >
         <label className="sr-only" htmlFor="new-tag">
-          新标签名称
+          {t('tags.newName')}
         </label>
         <input
           id="new-tag"
@@ -88,7 +90,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
           name="tag"
           value={name}
           onChange={(e) => setName(e.target.value)}
-          placeholder="新建标签，支持中文…"
+          placeholder={t('tags.placeholder')}
           disabled={pending}
           autoComplete="off"
           spellCheck={false}
@@ -98,7 +100,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
           className="btn"
           disabled={pending || !name.trim()}
         >
-          新建
+          {t('tags.create')}
         </button>
       </form>
 
@@ -131,66 +133,66 @@ export function TagManager({ tags }: { tags: Tag[] }) {
 
       {tags.length === 0 ? (
         <p className="faint small" style={{ marginTop: 16 }}>
-          还没有任何标签。AI 解读链接时会自动创建标签，你也可以在这里手动新建。
+          {t('tags.empty')}
         </p>
       ) : (
         <div className="table-scroll">
           <table className="table-simple">
             <thead>
               <tr>
-                <th>标签</th>
-                <th style={{ textAlign: 'right' }}>收藏数</th>
-                <th style={{ textAlign: 'right' }}>来源</th>
-                <th style={{ textAlign: 'right' }}>操作</th>
+                <th>{t('tags.name')}</th>
+                <th style={{ textAlign: 'right' }}>{t('tags.count')}</th>
+                <th style={{ textAlign: 'right' }}>{t('tags.origin')}</th>
+                <th style={{ textAlign: 'right' }}>{t('tags.actions')}</th>
               </tr>
             </thead>
             <tbody>
-              {tags.map((t) => (
-                <tr key={t.id}>
+              {tags.map((tag) => (
+                <tr key={tag.id}>
                   <td>
-                    {editingId === t.id ? (
+                    {editingId === tag.id ? (
                       <input
                         className="input"
                         name="tag_name"
                         value={editingName}
                         onChange={(e) => setEditingName(e.target.value)}
-                        aria-label={`标签 ${t.name} 的新名称`}
+                        aria-label={t('tags.newNameAria', { name: tag.name })}
                         autoComplete="off"
                         spellCheck={false}
                         autoFocus
                         onKeyDown={(e) => {
                           if (e.key === 'Enter') {
                             e.preventDefault();
-                            rename(t.id);
+                            rename(tag.id);
                           }
                           if (e.key === 'Escape') setEditingId(null);
                         }}
                       />
                     ) : (
-                      <Link href={`/items?tag=${encodeURIComponent(t.name)}`}>
-                        {t.name}
+                      <Link href={`/items?tag=${encodeURIComponent(tag.name)}`}>
+                        {tag.name}
                       </Link>
                     )}
                   </td>
-                  <td style={{ textAlign: 'right' }}>{t.count ?? 0}</td>
+                  <td style={{ textAlign: 'right' }}>{tag.count ?? 0}</td>
                   <td style={{ textAlign: 'right' }}>
                     <span className="faint small">
-                      {t.origin === 'user' ? '我创建' : 'Agent 发现'}
+                      {tag.origin === 'user' ? t('tags.user') : t('tags.agent')}
                     </span>
                   </td>
                   <td>
-                    {editingId === t.id ? (
+                    {editingId === tag.id ? (
                       <>
                         <button
                           type="button"
                           className="btn-quiet"
                           disabled={pending}
-                          onClick={() => rename(t.id)}
+                          onClick={() => rename(tag.id)}
                         >
-                          保存
+                          {t('tags.save')}
                         </button>
                         <p className="small faint">
-                          影响 {t.count ?? 0} 条收藏，关联保持不变。
+                          影响 {tag.count ?? 0} 条收藏，关联保持不变。
                         </p>
                         <button
                           type="button"
@@ -198,7 +200,7 @@ export function TagManager({ tags }: { tags: Tag[] }) {
                           disabled={pending}
                           onClick={() => setEditingId(null)}
                         >
-                          取消
+                          {t('tags.cancel')}
                         </button>
                       </>
                     ) : (
@@ -208,19 +210,19 @@ export function TagManager({ tags }: { tags: Tag[] }) {
                           className="btn-quiet"
                           disabled={pending}
                           onClick={() => {
-                            setEditingId(t.id);
-                            setEditingName(t.name);
+                            setEditingId(tag.id);
+                            setEditingName(tag.name);
                           }}
                         >
-                          改名
+                          {t('tags.rename')}
                         </button>
                         <button
                           type="button"
                           className="btn-quiet btn-danger"
                           disabled={pending}
-                          onClick={() => remove(t)}
+                          onClick={() => remove(tag)}
                         >
-                          删除
+                          {t('tags.delete')}
                         </button>
                       </>
                     )}
