@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import configuredAliases from '../../skills/catch-and-linger/data/tag-aliases.json';
 
 import {
   baseNormalize,
@@ -118,6 +119,51 @@ describe('tag-matching · 解析候选标签', () => {
     const results = resolveTags(['SpringBoot', 'spring boot', 'SPRINGBOOT'], EXISTING, ALIASES);
     expect(results).toHaveLength(1);
     expect(results[0].resolved).toBe('spring boot');
+  });
+});
+
+describe('tag-matching · 输出语言', () => {
+  const bilingual = [
+    { name: '数据库', count: 20 },
+    { name: 'database', count: 2 },
+  ];
+
+  it('英文收录不被中文 canonical 覆盖，仍复用已有英文拼写', () => {
+    const [result] = resolveTags(['Database'], bilingual, configuredAliases, { locale: 'en-US' });
+    expect(result.action).toBe('reuse');
+    expect(result.resolved).toBe('database');
+    expect(result.candidates.map((tag) => tag.name)).not.toContain('数据库');
+  });
+
+  it('只有中文同义词时，允许为英文收录新增英文标签', () => {
+    const [result] = resolveTags(['database'], bilingual.slice(0, 1), configuredAliases, { locale: 'en' });
+    expect(result.action).toBe('new');
+    expect(result.resolved).toBeNull();
+  });
+
+  it('中文候选不会复用英文通用主题，技术名称仍可复用', () => {
+    const results = resolveTags(['数据库', 'Java'], [
+      { name: 'database', count: 20 },
+      { name: 'java', count: 5 },
+    ], configuredAliases, { locale: 'zh-CN' });
+    expect(results[0].action).toBe('new');
+    expect(results[1].resolved).toBe('java');
+  });
+
+  it('繁体中文候选不强制转成英文标签', () => {
+    const [result] = resolveTags(['資料庫'], [{ name: '資料庫', count: 1 }], configuredAliases, { locale: 'zh-TW' });
+    expect(result.resolved).toBe('資料庫');
+  });
+
+  it('英文模式拒绝中文候选，要求 Agent 先按目标语言选词', () => {
+    expect(() => resolveTags(['数据库'], bilingual, configuredAliases, { locale: 'en-US' }))
+      .toThrow('INVALID_TAG_LANGUAGE');
+  });
+
+  it('不传语言时保留旧匹配行为，非法语言显式报错', () => {
+    expect(resolveTags(['database'], bilingual, configuredAliases)[0].resolved).toBe('数据库');
+    expect(() => resolveTags(['database'], bilingual, configuredAliases, { locale: 'fr-FR' }))
+      .toThrow('UNSUPPORTED_LOCALE');
   });
 });
 

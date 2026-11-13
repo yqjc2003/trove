@@ -281,7 +281,10 @@ export function resolveTag(raw, existing, aliasIndex) {
  * 一次性解析多个候选标签（批量场景用）。
  * 输入会按归一 key 去重，避免同一个标签反复查。
  */
-export function resolveTags(proposed, existing, aliasConfig) {
+export function resolveTags(proposed, existing, aliasConfig, { locale } = {}) {
+  if (locale && !/^(en|zh)(?:-[a-z0-9]+)*$/i.test(locale)) {
+    throw new Error('UNSUPPORTED_LOCALE: use en, en-US, zh, zh-CN or zh-TW');
+  }
   const prepared = prepareExisting(existing);
   const aliasIndex = buildAliasIndex(aliasConfig);
   const seen = new Map();
@@ -289,7 +292,18 @@ export function resolveTags(proposed, existing, aliasConfig) {
     const key = similarityKey(raw);
     if (!seen.has(key)) seen.set(key, raw);
   }
-  return [...seen.values()].map((raw) => resolveTag(raw, prepared, aliasIndex));
+  return [...seen.values()].map((raw) => {
+    if (!locale) return resolveTag(raw, prepared, aliasIndex);
+    // Locale controls generated vocabulary, not the source page language.
+    // Technical names such as java remain Latin in Chinese collections too.
+    const hasHan = (name) => /\p{Script=Han}/u.test(name);
+    const english = /^en(?:-|$)/i.test(locale);
+    if (english && hasHan(raw)) {
+      throw new Error('INVALID_TAG_LANGUAGE: generate English candidate tags before resolving');
+    }
+    const compatible = prepared.filter((tag) => hasHan(tag.name) === hasHan(raw));
+    return resolveTag(raw, compatible, aliasIndex);
+  });
 }
 
 /**

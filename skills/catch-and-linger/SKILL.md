@@ -16,6 +16,23 @@ license: Apache-2.0
 4. **每个用户拥有独立的一套标签。** 其他用户的标签你既看不到也用不了。
 5. **重复录入是 upsert，不会产生重复条目。** 详见「重复录入」一节。
 
+## 输出语言 / Output language
+
+Before capturing any links, choose the user's output language. Write every summary, natural-language tag, extraction-failure explanation, and final report in that language, even when this skill or the source page uses another language. English users receive English output; Chinese users receive Chinese output. Keep technical names such as Java, React, PostgreSQL, and GIS unchanged.
+
+按以下优先级确定本次输出语言，并在同一批次中保持一致：
+
+1. 用户本次明确指定的语言，例如「梗概和标签用英文」或 “Summarize and tag in English”。
+2. 当前对话中用户已明确表达的语言偏好。
+3. 用户本次自然语言请求的语言：英文用 `en-US`，简体中文用 `zh-CN`，繁体中文用 `zh-TW`；混合请求按主要表达语言判断。
+4. 只有 URL、无语言线索时使用英文；用户后续指定语言时以其指令为准。
+
+`summary` 和一般主题标签按上述语言生成，包括抓取失败时的限制说明；`title` 保留页面真实标题，不强制翻译。原网页的 `lang`、GitHub 仓库的编程语言、书签文件夹名称，以及本文件中的中文示例，都不是用户的输出语言设置。中文输出中的通用主题用中文（如「源码阅读」「性能优化」），技术栈名称仍用 `java` / `react` 等原名；英文输出使用 `source code` / `performance optimization` 等英文标签，不照搬中文示例。
+
+当前 Web 的界面语言来自浏览器 Cookie / Accept-Language，`GET /account` 不返回语言偏好；API Key 通道不能据此自动读取用户在网页上选择的语言。不要把「界面支持 i18n」当成「采集结果会自动翻译」，也不要根据操作系统语言覆盖对话偏好。
+
+标签归一必须携带本次语言，例如 `node scripts/tag-resolver.mjs resolve "database" "performance optimization" --locale en-US`。先用目标语言提炼候选，再做归一；resolver 不负责翻译。语言参数会阻止中英文标签之间的自动复用，避免 `database` 被既有「数据库」替代；中文候选同样不会被英文通用主题顶替。跨语言同义的历史标签可以保留，不为本次收录批量翻译或改名。简繁体选词由 Agent 遵循用户偏好，resolver 不做简繁转换。
+
 ## 环境准备
 
 需要两个环境变量：
@@ -91,13 +108,15 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
 ## 标准工作流
 
 ```
+⓪ 确定输出语言（用户指令 / 对话偏好 / 请求语言）
+        ↓
 ① 取得 URL 列表（模式 A / B / C）
         ↓
 ② 取得正文：node scripts/fetch-content.mjs "<url1>" "<url2>" ...
         ↓
 ③ Agent 逐条解读：真实标题 → 内容梗概 summary → 从梗概提炼 ≤3 个候选标签
         ↓
-③.5 标签归一：node scripts/tag-resolver.mjs resolve "<所有候选标签>" ...
+③.5 标签归一：node scripts/tag-resolver.mjs resolve "<所有候选标签>" ... --locale <输出语言>
         ↓
 ④ 写入：node scripts/catchlinger-api.mjs save-many '[{...}]'（标签用归一后的）
         ↓
@@ -111,6 +130,8 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
   - `full` —— 阅读返回的正文或仓库资料，再生成内容梗概；不表示原文一定完整，正文可能已截断。
   - `partial` —— 正文较短。可通过可用的浏览器或阅读工具进一步取得正文；仍无法取得时，依据 `og_description` / `meta_description` 等真实元信息整理，并在梗概中说明「未取到完整正文，仅依据页面元信息整理」。不要仅凭该标记断言页面一定是动态渲染。
   - `none` —— 抓取失败。若仍有可信的页面元信息，可以据此写有限梗概并说明限制；只有书签标题或域名时，明确写「未能抓取正文（实际原因），暂无法生成内容梗概」，不推测文章观点或功能，不强行生成主题标签。
+
+上面的失败说明是中文示意，实际按输出语言表述。例如英文用户应收到 “Could not retrieve the article (HTTP 403); a content summary is unavailable.”，而不是中文提示。
 
 ### ③ AI 解读
 
@@ -136,11 +157,21 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
 
 这只是字段示例，不能把其中的结论套用到未读取的网页。API 为兼容手工录入与局部更新仍允许省略 `summary`，不代表本 Skill 可以省略网页解读。
 
+同样的已读内容，英文用户可保存为：
+
+```json
+{
+  "summary": "Explains when Java HashMap resizing occurs, how capacity changes, and how entries are transferred, with references to the implementation. Useful for understanding hash tables and reading Java collection source code.",
+  "tags": ["java", "source code"],
+  "source": "bookmark"
+}
+```
+
 ### 批量收录
 
 按能读完并核对的小批次处理（例如每批 5–10 条）：**抓取 → Agent 解读 → 梗概与候选标签 → 标签归一 → 保存 → 核对响应**，再处理下一批。不得为了数量或执行时限，把整批链接降级为来源说明或照搬文件夹标签。
 
-保存前逐条检查梗概是否有实际内容依据、标签是否由内容提炼且不超过 3 个。采集脚本只负责读取或搬运，不能用脚本拼接标题、域名、文件夹名来冒充 AI 梗概。
+保存前逐条检查梗概是否有实际内容依据、梗概和主题标签是否符合本次输出语言、标签是否由内容提炼且不超过 3 个。采集脚本只负责读取或搬运，不能用脚本拼接标题、域名、文件夹名来冒充 AI 梗概。
 
 批次超时或响应缺失时，先核实已处理条目再续跑；完成数以服务端确认结果和链接核对为准。不能仅凭总数差异推断遗漏条目都是重复项。汇报时单独说明未能生成内容梗概的条数和原因，不将其算作成功解读。
 
@@ -173,10 +204,13 @@ node scripts/read-bookmarks.mjs [--browser chrome|edge|all] [--profile Default] 
 标签空间是长期资产。碎片化一旦成规模就没法收拾，所以**新增任何标签前先查一遍既有标签**：
 
 ```bash
-node scripts/tag-resolver.mjs resolve "标签1" "标签2" "标签3"
+node scripts/tag-resolver.mjs resolve "标签1" "标签2" "标签3" --locale zh-CN
+# English output:
+node scripts/tag-resolver.mjs resolve "database" "performance optimization" --locale en-US
 ```
 
 批量场景把**所有条目用到的候选标签一次传进去**（去重由脚本处理），一次拿回整张映射表。
+语言参数仅约束本次匹配，不更改服务端标签，也不翻译候选。省略 `--locale` 时脚本保留旧的跨语言匹配行为，因此本 Skill 收录时必须显式传入。
 
 返回的每个候选有三种 `action`：
 

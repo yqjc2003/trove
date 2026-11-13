@@ -4,7 +4,8 @@
  *
  * 用法：
  *   node tag-resolver.mjs list                      紧凑列出既有标签（name×count）
- *   node tag-resolver.mjs resolve <标签> [...]      解析候选标签 → 该复用哪个既有标签
+ *   node tag-resolver.mjs resolve <标签> [...] [--locale en-US|zh-CN|zh-TW]
+ *                                                  按输出语言解析候选标签
  *   node tag-resolver.mjs audit                     找出既有标签里的近重复分组
  *   node tag-resolver.mjs merge <from> <to> [--dry-run]   把 from 合并进 to
  *
@@ -101,11 +102,23 @@ function pickTag(tags, name) {
 function argv() {
   const args = process.argv.slice(2);
   const dryRun = args.includes('--dry-run');
-  const positional = args.filter((a) => !a.startsWith('--'));
-  return { positional, dryRun };
+  const positional = [];
+  let locale;
+  for (let i = 0; i < args.length; i += 1) {
+    const arg = args[i];
+    if (arg === '--locale') {
+      locale = args[++i];
+      if (!locale || !/^(en|zh)(?:-[a-z0-9]+)*$/i.test(locale)) {
+        throw new Error('UNSUPPORTED_LOCALE: use --locale en-US, zh-CN or zh-TW');
+      }
+    } else if (!arg.startsWith('--')) {
+      positional.push(arg);
+    }
+  }
+  return { positional, dryRun, locale };
 }
 
-const { positional, dryRun } = argv();
+const { positional, dryRun, locale } = argv();
 const command = positional[0];
 const env = loadEnv();
 const aliases = loadAliases();
@@ -128,7 +141,7 @@ switch (command) {
       process.exit(1);
     }
     const tags = await fetchTags(env);
-    const results = resolveTags(proposed, tags, aliases);
+    const results = resolveTags(proposed, tags, aliases, { locale });
 
     const avoidKeys = new Set(aliases.avoid.map((n) => similarityKey(n)));
     for (const r of results) {
@@ -141,6 +154,7 @@ switch (command) {
       JSON.stringify(
         {
           existingTags: tags.length,
+          ...(locale ? { locale } : {}),
           results,
           hint: 'action=reuse 直接用 resolved；action=candidate 确认语义后用 resolved；action=new 才可新建。',
         },

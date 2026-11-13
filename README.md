@@ -61,6 +61,9 @@ Skill 对单条链接、GitHub star 和 Chrome/Edge 批量书签使用同一规�
 `summary` 不能写成「从 Edge 收藏夹『xx』导入」等采集日志；来源记录在 `source`，
 原文件夹名不直接作为内容标签。网页无法读取时如实说明原因和信息限制，不虚构梗概或标签。
 
+梗概和主题标签按用户指定语言生成，未指定时遵循已明确的对话偏好或请求语言：英文用户用英文，中文用户用中文，
+Java / React 等技术名称保留原名。标签归一携带 `--locale`，避免英文标签被中文同义词替换；详见 [Skill 输出语言](docs/skill.md#输出语言)。
+
 ### GitHub star 免 Token 采集
 
 读 star 列表用 GitHub 的**公开端点** `GET /users/{username}/starred`，**不需要 GITHUB_TOKEN**。

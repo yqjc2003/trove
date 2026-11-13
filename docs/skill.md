@@ -31,6 +31,25 @@ Expand-Archive -LiteralPath $zip -DestinationPath $work
 
 放在环境变量里，或写进 `~/.config/catchlinger/env`（`KEY=VALUE` 格式，每行一条）。
 
+## 输出语言
+
+梗概、主题标签、抓取失败说明和收录报告遵循用户语言：本次明确指令 > 对话中已明确的偏好 > 当前请求语言；只有 URL 且无语言线索时默认英文。
+英文用户得到英文梗概与标签，中文用户得到中文结果，技术名称（如 Java、React）保留原名；页面标题保留原文。
+网页原文语言不决定输出语言，英文网页也可生成中文梗概，中文网页也可生成英文梗概。
+
+Web 界面语言保存在 Cookie 中，当前账号 API 不提供该偏好，因此 API Key 采集按上述对话规则选择语言。
+例如：“Import my Edge bookmarks; use English summaries and tags.” 或「导入 Edge 收藏夹，梗概和标签使用中文」。
+
+归一标签时传 `--locale en-US` / `--locale zh-CN` / `--locale zh-TW`：
+
+```bash
+node scripts/tag-resolver.mjs resolve "database" "performance optimization" --locale en-US
+node scripts/tag-resolver.mjs resolve "数据库" "性能优化" --locale zh-CN
+```
+
+Agent 先按目标语言提炼标签；resolver 仅匹配同文字类型的既有标签，避免把英文标签自动替换为中文同义词或反向替换。
+技术名称可复用，简繁体由 Agent 选词；历史标签不自动翻译或改名。省略语言参数时脚本保留旧行为。
+
 ## 脚本
 
 零依赖 Node ESM 脚本，只用 Node 内置 API。
