@@ -1,7 +1,8 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
-  <title>CatchLinger</title>
-  <rect width="64" height="64" rx="15" fill="#20231f"/>
-  <path d="M23 14h18v36l-9-6-9 6V14Z" fill="#f3f1e9"/>
-  <path d="M29 23.5h7" stroke="#20231f" stroke-width="3.5" stroke-linecap="round"/>
-  <circle cx="45.5" cy="18.5" r="6.5" fill="#df6547"/>
+  <title>CatchLinger · 拾藏</title>
+  <desc>A C-shaped collecting loop surrounds a bookmark; a warm dot marks a discovery worth keeping.</desc>
+  <rect width="64" height="64" rx="15" fill="#1a1c19"/>
+  <path d="M43 16.5a20 20 0 1 0 2 29" fill="none" stroke="#f3f4f1" stroke-width="5" stroke-linecap="round"/>
+  <path d="M29 20h13v27l-6.5-4.5L29 47V20Z" fill="#f3f4f1"/>
+  <circle cx="48" cy="18" r="5" fill="#df6547"/>
 </svg>
