@@ -120,7 +120,7 @@ const AI_GUIDANCE = [
   '正确用法：先用 fetch-content 之类的工具拿到正文 → 自己产出 title（≤300）、summary（≤1000）、tags（≤3）→ 再调用本工具写入。',
   '标签是聚合多篇收藏的检索入口，粒度应略高于文章关键词。通常选 1–2 个，最多 3 个，不必凑满：优先领域/技术栈，必要时加学习方式或使用场景。',
   '例如 Java HashMap、ArrayList 的源码文章可共用「java」「源码阅读」，通常不新建 hashmap、resize、具体方法/API/错误码/版本等细标签；具体细节写进标题和摘要。示例不是固定分类清单。',
-  '保存前先调用 trove_list_tags，优先复用合适的较宽标签。新建前判断是否能自然容纳多篇不同内容；已有细标签不等于应继续细分。批量采集先收敛共享主题，再逐条分配。用户明确要求细分时尊重其选择。',
+  '保存前先调用 catchlinger_list_tags，优先复用合适的较宽标签。新建前判断是否能自然容纳多篇不同内容；已有细标签不等于应继续细分。批量采集先收敛共享主题，再逐条分配。用户明确要求细分时尊重其选择。',
   '不把所有内容泛化为「技术」「学习」；系统没有预设分类清单，也不做服务端语义映射。',
 ].join('\n');
 
@@ -128,7 +128,7 @@ const AI_GUIDANCE = [
  * 注册全部 MCP 工具。
  * 统一返回 `{ content: [{ type: 'text', text }] }`，错误用 isError + 结构化 JSON。
  */
-export function registerTroveTools(server: {
+export function registerCatchlingerTools(server: {
   registerTool: (
     name: string,
     config: {
@@ -142,7 +142,7 @@ export function registerTroveTools(server: {
   const search = server.registerTool.bind(server);
 
   search(
-    'trove_search',
+    'catchlinger_search',
     {
       title: '检索收藏',
       description:
@@ -187,7 +187,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_get',
+    'catchlinger_get',
     {
       title: '查看收藏详情',
       description:
@@ -209,7 +209,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_save',
+    'catchlinger_save',
     {
       title: '保存收藏',
       description: `保存一条收藏（upsert）。\n${AI_GUIDANCE}`,
@@ -232,7 +232,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_save_many',
+    'catchlinger_save_many',
     {
       title: '批量保存收藏',
       description: `批量保存（最多 50 条）。单条失败不影响其余。\n${AI_GUIDANCE}`,
@@ -257,7 +257,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_update',
+    'catchlinger_update',
     {
       title: '更新收藏',
       description: `更新一条收藏的可改字段。传 tags 即整体替换标签集合；不传则保持原样。\n${AI_GUIDANCE}`,
@@ -290,7 +290,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_archive',
+    'catchlinger_archive',
     {
       title: '归档 / 取消归档',
       description:
@@ -329,7 +329,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_delete',
+    'catchlinger_delete',
     {
       title: '删除收藏',
       description:
@@ -353,7 +353,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_add_note',
+    'catchlinger_add_note',
     {
       title: '添加笔记',
       description: '为一条收藏追加一条 Markdown 笔记（可多条，历史可追溯）。',
@@ -378,7 +378,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_mark_read',
+    'catchlinger_mark_read',
     {
       title: '标记已读 / 未读',
       description:
@@ -405,7 +405,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_stats',
+    'catchlinger_stats',
     {
       title: '统计概览',
       description: '返回总数、未读数、超期数、标签分布、来源分布与常用域名。',
@@ -424,7 +424,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_list_reminders',
+    'catchlinger_list_reminders',
     {
       title: '待读清单',
       description: '返回超期未读的收藏（收藏时间超过阈值且从未打开过）。',
@@ -453,7 +453,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_account',
+    'catchlinger_account',
     {
       title: '账号信息',
       description:
@@ -473,7 +473,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_list_tags',
+    'catchlinger_list_tags',
     {
       title: '列出标签',
       description:
@@ -501,7 +501,7 @@ export function registerTroveTools(server: {
   );
 
   search(
-    'trove_manage_tag',
+    'catchlinger_manage_tag',
     {
       title: '管理标签',
       description:

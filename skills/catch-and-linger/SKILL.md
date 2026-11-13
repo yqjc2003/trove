@@ -327,6 +327,6 @@ node scripts/tag-resolver.mjs merge <from> <to> [--dry-run]   # 把 from 合并�
 
 ## 也可以走 MCP
 
-如果 MCP 已配置（`trove` 服务器），同样的能力以工具形式提供：`trove_save`、`trove_save_many`、`trove_search`、`trove_list_tags`、`trove_manage_tag`、`trove_get`、`trove_update`、`trove_archive`、`trove_delete`、`trove_add_note`、`trove_mark_read`、`trove_stats`、`trove_list_reminders`。
+如果 MCP 已配置（`catchlinger` 服务器），同样的能力以工具形式提供：`catchlinger_save`、`catchlinger_save_many`、`catchlinger_search`、`catchlinger_list_tags`、`catchlinger_manage_tag`、`catchlinger_get`、`catchlinger_update`、`catchlinger_archive`、`catchlinger_delete`、`catchlinger_add_note`、`catchlinger_mark_read`、`catchlinger_stats`、`catchlinger_list_reminders`、`catchlinger_account`。
 
-REST 与 MCP 走同一套 service 层，语义完全一致。
+MCP 使用与 Skill 的 `CATCHLINGER_API_KEY` 相同的 `trv_` API Key，通过 `Authorization: Bearer <API Key>` 发送；工具所需 scope 必须已授予。REST 与 MCP 走同一套 service 层。

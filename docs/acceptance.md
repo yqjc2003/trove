@@ -66,9 +66,9 @@ Vercel 生产环境变量已配置。
 
 ## MCP 与 Skill
 
-19. **MCP** —— 用 `trv_` Key 直连 `/api/mcp`，`trove_save` → 条目归属正确用户；
-    重复 `trove_save` 同一 URL → `created=false` 且不新增；
-    `trove_manage_tag` 新建/改名/删除标签均生效；无 Key → 401 + `WWW-Authenticate` 挑战。
+19. **MCP** —— 用 `trv_` Key 直连 `/api/mcp`，`catchlinger_save` → 条目归属正确用户；
+    重复 `catchlinger_save` 同一 URL → `created=false` 且不新增；
+    `catchlinger_manage_tag` 新建/改名/删除标签均生效；无 Key → 401 + `WWW-Authenticate` 挑战。
 20. **Skill** —— `bookmarks` 模式导入 Chrome 书签 ≥10 条（标题/摘要/≤3 标签齐全）；
     `github-stars` 模式导入 star ≥5 条；`url` 模式单条/多条均可。
 21. **GitHub star 免 Token** —— `GET /api/trove/account` 返回 `github_username`；

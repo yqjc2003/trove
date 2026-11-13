@@ -1,7 +1,7 @@
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import type { AuthInfo } from '@modelcontextprotocol/server';
 
-import { registerTroveTools } from '@/lib/mcp/server';
+import { registerCatchlingerTools } from '@/lib/mcp/server';
 import { TroveDb } from '@/lib/db/trove-db';
 import { hashApiKey, isApiKeyFormat, DEFAULT_SCOPES } from '@/lib/auth/api-keys';
 import { createServerSupabaseClient } from '@/lib/supabase/server';
@@ -28,7 +28,7 @@ async function verifyToken(
 
     return {
       token: bearerToken,
-      clientId: 'trove-api-key',
+      clientId: 'catchlinger-api-key',
       scopes: record.scopes?.length ? record.scopes : [...DEFAULT_SCOPES],
       extra: { userId: record.user_id },
     };
@@ -56,7 +56,7 @@ async function verifyToken(
 }
 
 const handler = createMcpHandler((server) => {
-  registerTroveTools(server as never);
+  registerCatchlingerTools(server as never);
 });
 
 const authHandler = withMcpAuth(handler, verifyToken, {
