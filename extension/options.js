@@ -1,9 +1,9 @@
 const presets = {
   openai: ['https://api.openai.com/v1/chat/completions', 'gpt-4o-mini'],
-  deepseek: ['https://api.deepseek.com/chat/completions', 'deepseek-chat'],
+  deepseek: ['https://api.deepseek.com/chat/completions', 'deepseek-flash'],
   kimi: ['https://api.moonshot.cn/v1/chat/completions', 'moonshot-v1-8k'],
   glm: ['https://open.bigmodel.cn/api/paas/v4/chat/completions', 'glm-4-flash'],
-  minimax: ['https://api.minimaxi.com/v1/chat/completions', 'MiniMax-M2.1'],
+  minimax: ['https://api.minimax.cn/v1/chat/completions', 'MiniMax-M3.1-Flash'],
 };
 const $ = (id) => document.getElementById(id);
 const fields = ['base', 'key', 'provider', 'endpoint', 'model', 'aiKey'];
