@@ -1,264 +1,232 @@
-# 拾藏（CatchLinger）
+# CatchLinger
 
-个人收藏统一管理系统。把散落在各个 App、GitHub star、Chrome/Edge 收藏夹里的链接，
-通过 AI Agent 解读后收敛到一个带标签、笔记、归档与阅读追踪的统一存储里。
+English | [简体中文](README.zh-CN.md)
 
-- **后端**：Supabase（Postgres + Auth + RLS）——唯一的数据与认证后端
-- **前端 / API / MCP**：Next.js 16（App Router），部署在 Vercel
-- **采集**：`catch-and-linger` Skill + MCP 服务端 + REST API
+CatchLinger is a personal knowledge-capture system. It consolidates links scattered across apps, GitHub stars, and Chrome/Edge bookmarks into a single library with tags, notes, archiving, and reading history.
 
-## 核心设计
+- **Backend:** Supabase (Postgres, Auth, and RLS), the sole data and authentication backend
+- **Web, API, and MCP:** Next.js 16 (App Router), deployed on Vercel
+- **Capture:** the `catch-and-linger` Skill, an MCP server, and a REST API
 
-Web 界面遵循 [DESIGN.md](DESIGN.md) 的「收集流 / 回看台」规范：回看台一次聚焦一条未读链接，收集流按首次收藏日期呈现来路，藏库提供可分享的检索镜头，「我的语言」维护个人标签词汇表与 Agent 连接。
+## Core design
 
-### 分类即标签
+The web experience follows the “capture stream / review desk” model in [DESIGN.md](DESIGN.md): the review desk focuses on one unread link at a time; the capture stream groups saved content by its original collection date; the library supports shareable search views; and “My Language” manages each user’s tag vocabulary and Agent connection.
 
-系统**没有独立的分类维度**。每个用户拥有一套完全独立的标签空间：
+### Tags are the only category system
 
-- AI Agent 解读出什么标签就存什么标签 —— 不做语义映射、不预置分类清单
-- Web 页面支持 DIY：新建 / 改名 / 删除标签，以及修改任意一条收藏的标签
-- 按标签检索（可多选，AND 语义）
-- 标签数量上限**按通道分层**（见下节）
+There is no separate category dimension. Each user has a completely isolated tag namespace.
 
-Agent 采集通常选 1–2 个可聚合多篇内容的较宽标签，最多 3 个；先复用既有领域/技术栈，必要时加学习方式或场景。例如 HashMap 源码文章用 `java`、`源码阅读`，具体类名、API 等细节留在标题与摘要里。此策略在 Skill 与 MCP 工具指引中执行，服务端不做语义分类映射，历史标签不会自动改写。
+- Store the tags produced by the AI Agent; do not apply semantic mappings or maintain a predefined category list.
+- The web UI supports creating, renaming, and deleting tags, and editing the tags of any saved item.
+- Tag filters support multiple selections with AND semantics.
+- Tag limits vary by write channel, as described below.
 
-另有一个自动识别的**内容形态**字段（文章 / 视频 / 仓库 / 工具 / 社交 / 文档 / 其他），
-它是正交的技术维度，**不承载**「工作 / 生活 / 家庭」这类语义分类。
+An Agent normally chooses one or two broad, reusable tags, with a maximum of three. It should reuse an existing domain or technology tag where possible, adding a learning method or usage context only when needed. For example, an article about `HashMap` source code might use `java` and `source reading`; class names and API details belong in the title and summary. This policy is implemented in the Skill and MCP guidance, not as server-side tag-to-category mapping; existing tags are never rewritten automatically.
 
-### 手工添加收藏（Web）
+Items also have an automatically detected **content type** (article, video, repository, tool, social, document, or other). It is a technical dimension and never represents semantic categories such as work, life, or family.
 
-Web 端不只是只读的：`/items/new` 可以手工新建一条收藏（链接 / 标题 / 摘要 / 标签），
-列表页空状态与页头都有入口；标签也可以在详情页随时增删改。
+### Manual capture in the web UI
 
-标签数量上限按**通道**分层：
+The web UI is not read-only. Use `/items/new` to create a saved link with a URL, title, summary, and tags. The list’s empty state and page header both link to it. Tags can be created, removed, or changed later on the item detail page.
 
-| 通道 | 入口 | 数据库角色 | 标签上限 |
+Tag limits are channel-specific:
+
+| Channel | Entry point | Database role | Tag limit |
 |---|---|---|---|
-| Agent 采集 | MCP / Skill / REST（API Key） | `service_role` | ≤ **3** |
-| 手工整理 | Web UI（Server Action，会话） | `authenticated` | **不限** |
+| Agent capture | MCP, Skill, or REST with an API key | `service_role` | ≤ **3** |
+| Manual organization | Web UI through Server Actions and a session | `authenticated` | **Unlimited** |
 
-两道闸一起生效：
+Both safeguards apply:
 
-- 应用层用 `ItemWriteOptions.maxTags` 显式传 `null` 表示放行（默认是 3）
-- 数据库层用 `auth.role()` 分流 —— `service_role` 限 3，`authenticated` 直接放行
+- The application layer passes `ItemWriteOptions.maxTags`; use `null` to allow unlimited tags (the default is 3).
+- The database layer branches on `auth.role()`: `service_role` is limited to 3 and `authenticated` is unrestricted.
 
-> REST 即便带着会话 Cookie 也仍按程序化通道处理（上限 3）：Web UI 走 Server Action，
-> 才是那条「不限数量」的通道。
+> REST remains a programmatic channel and is limited to three tags even when a session cookie is present. Only the web UI’s Server Actions use the unrestricted path.
 
-### AI 解读在 Agent 侧
+### AI interpretation stays with the Agent
 
-服务端不持有任何 LLM 凭据，也不抓取网页正文（因此没有 SSRF 面）。
-流程是：
+The server has no LLM credentials and does not fetch page bodies, so it does not expose an SSRF surface. The flow is:
 
 ```
-Agent 取 URL 列表  →  Agent 抓正文  →  Agent 自己产出 title/summary/≤3 tags  →  写入 API
+Agent obtains URLs → Agent fetches the page body → Agent creates title, summary, and ≤3 tags → API write
 ```
 
-所以 Skill 与 MCP 的职责边界很清楚：它们负责「搬运」和「校验」，理解内容是 Agent 的事。
+Skills and MCP therefore handle transport and validation; content interpretation belongs to the Agent.
 
-Skill 对单条链接、GitHub star 和 Chrome/Edge 批量书签使用同一规则：先逐条读取网页内容，
-由 Agent 生成说明主题、主要内容与用途的 `summary`，再从梗概中提炼至多 3 个标签并归一后保存。
-`summary` 不能写成「从 Edge 收藏夹『xx』导入」等采集日志；来源记录在 `source`，
-原文件夹名不直接作为内容标签。网页无法读取时如实说明原因和信息限制，不虚构梗概或标签。
+For individual URLs, GitHub stars, and Chrome/Edge bookmark batches, the Skill uses the same rule: read each page first, then have the Agent generate a summary describing the topic, content, and usefulness. Derive no more than three normalized tags from that summary before saving. A `summary` must not be an import log such as “imported from Edge folder xx”; provenance belongs in `source`. Do not use the original folder name directly as a content tag. If a page cannot be read, state the limitation honestly and do not invent a summary or tags.
 
-梗概和主题标签按用户指定语言生成，未指定时遵循已明确的对话偏好或请求语言：英文用户用英文，中文用户用中文，
-Java / React 等技术名称保留原名。标签归一携带 `--locale`，避免英文标签被中文同义词替换；详见 [Skill 输出语言](docs/skill.md#输出语言)。
+Generate summaries and topic tags in the language requested by the user. When no language is specified, use the established conversation preference or request language. Keep technical names such as Java and React unchanged. Tag normalization receives `--locale` so English labels are not replaced with Chinese synonyms; see [Skill output language](docs/skill.md#输出语言).
 
-### GitHub star 免 Token 采集
+### Capture GitHub stars without a token
 
-读 star 列表用 GitHub 的**公开端点** `GET /users/{username}/starred`，**不需要 GITHUB_TOKEN**。
-
-那 username 从哪来？CatchLinger 用 GitHub OAuth 登录时，Supabase 已经把 GitHub 资料
-（`user_name` / `preferred_username`）写进了 `auth.users`。服务端在
-`GET /api/trove/account` 里把它交出来，Skill 拿着已有的 API Key 就能自取：
+The star list uses GitHub’s public `GET /users/{username}/starred` endpoint, so no `GITHUB_TOKEN` is required. When a user signs in through GitHub OAuth, Supabase already stores their GitHub metadata in `auth.users`; `GET /api/trove/account` exposes the username to the Skill when it has an API key:
 
 ```
 node scripts/github-stars.mjs --limit 50
 → { mode: "public-user", user: "…", username_source: "catchlinger-account", stars: [...] }
 ```
 
-所以采集 star **只需要配 `CATCHLINGER_API_BASE` + `CATCHLINGER_API_KEY`**，用户什么都不用额外配。
-`GITHUB_TOKEN` 仍然可选：配了配额从 60 次/小时提到 5000 次/小时，也能读私密 profile 的 star。
+As a result, capturing stars needs only `CATCHLINGER_API_BASE` and `CATCHLINGER_API_KEY`. `GITHUB_TOKEN` is optional: it raises the GitHub API quota from 60 to 5,000 requests per hour and can access stars for a private profile. For a private profile, an unauthenticated public request may return an empty list rather than a 404; an empty result therefore includes a warning.
 
-### 重复录入 = Upsert
+### Duplicate captures are upserts
 
-同一 URL 重复录入永远只对应一条条目，写入即 upsert：
+Repeated capture of the same URL always maps to one item:
 
-| 字段 | 没传时 | 传了时 |
+| Field | When omitted | When supplied |
 |---|---|---|
-| `title` / `summary` | 保留原值 | 覆盖（非空才覆盖） |
-| `tags` | **完全保留原标签** | 整体替换 |
-| `notes` | 不追加 | 追加一条新笔记 |
-| `collected_at` / 归档状态 / 已读状态 / 点击次数 | **不变** | 仍不变 |
+| `title` / `summary` | Retain the old value | Replace it (only non-empty values replace) |
+| `tags` | Preserve all existing tags | Replace the whole tag set |
+| `notes` | Do not append | Append one new note |
+| `collected_at`, archive state, read state, click count | Unchanged | Still unchanged |
 
-因此反复导入同一批书签不会让老条目永远不过期，也不会把用户主动归档的条目复活。
+Importing the same bookmarks repeatedly therefore does not make old items perpetually fresh or revive an item the user archived.
 
-### 点击追踪
+### Click tracking
 
-Web 里的原文链接先走 `/r/{id}`：按当前用户读取收藏，校验 HTTP(S) 目标后立即 **302** 跳转。
-点击追踪通过响应后的后台任务执行，在同一个数据库事务里记录点击行为、累加点击数、首次点击标记已读。
-统计失败或超时不阻断原文访问，服务端仅记录不含敏感请求数据的诊断日志；统计数据为尽力记录。
-未登录、收藏不存在/不属于当前用户，或无法安全读取目标地址时回到站内列表，不泄露收藏链接。
-MCP / Skill 打开收藏时只标记已读，不产生点击事件。
+Links in the web UI open through `/r/{id}`. The route reads the current user’s item, validates an HTTP(S) target, and immediately returns a **302** redirect. A post-response background task records the click, increments the click count, and marks the item as read on its first click in one database transaction.
 
-### 超期提醒
+Tracking failures or timeouts never block the destination from opening; the server writes only diagnostic logs without sensitive request data. Unauthenticated requests, inaccessible items, or unsafe targets return to the in-app list without revealing the saved URL. Opening an item through MCP or the Skill marks it as read but does not create a click event.
 
-`收藏时间 > N 天`（默认 14，天数可配）且 `从未阅读`（`read_at IS NULL`）的条目
-进入「待读」清单，在仪表盘与 `/reminders` 页展示。
+### Overdue reminders
 
-## 快速开始
+Items collected more than N days ago (14 by default, configurable) and never read (`read_at IS NULL`) appear in the “to read” list, shown on the dashboard and `/reminders` page.
+
+## Quick start
 
 ```bash
-# 1. 安装依赖
+# 1. Install dependencies
 pnpm install
 
-# 2. 配置环境变量
-cp .env.example .env.local     # 填入 Supabase URL / publishable key / secret key / pooler 连接串
+# 2. Configure environment variables
+cp .env.example .env.local     # Fill in Supabase URL, publishable key, secret key, and pooler connection string
 
-# 3. 初始化数据库
-pnpm db:push                   # 读 .env.local 的 SUPABASE_DB_URL，逐文件事务化应用 db/migrations/*.sql
-#   或：把 db/migrations/0001_init.sql 粘进 Supabase Dashboard → SQL Editor（幂等，可重复执行）
+# 3. Initialize the database
+pnpm db:push                   # Reads SUPABASE_DB_URL from .env.local and applies db/migrations/*.sql transactionally
+# Or paste db/migrations/0001_init.sql into Supabase Dashboard → SQL Editor (idempotent; safe to rerun)
 
-# 4. 本地起服务
+# 4. Start the local server
 pnpm dev
 ```
 
-打开 http://localhost:3000 注册账号即可使用。注册会自动创建 profile 与**空白**的标签空间
-（不预置任何标签）。
+Open http://localhost:3000 and create an account. Registration creates a profile and an **empty** tag namespace; no tags are pre-populated.
 
-> 本机没有 Docker，无法 `supabase start` 起本地实例，schema 需要推到托管项目。
-> 直连 `db.<ref>.supabase.co` 是 IPv6-only 主机，迁移走 pooler 连接串（用户名要带项目 ref）。
+> Docker and `supabase start` are not available in this project; use the hosted Supabase project for schema changes. `db.<ref>.supabase.co` is IPv6-only, so migrations use a pooler connection string whose username includes the project ref.
 
-## 注册与登录
+## Registration and sign-in
 
-登录页有四种入口：
+The sign-in page provides four entry points:
 
-| 入口 | 什么时候用 | 说明 |
+| Entry point | Use it when | Details |
 |---|---|---|
-| **创建账号** | 第一次用 | 填邮箱 + 密码 → **立即登录**，不需要点确认邮件 |
-| **密码登录** | 已有账号 | 直接登录；密码错时会提示去「创建账号」 |
-| **邮件验证码** | 不想记密码 | 发一次性登录链接；受 Supabase 免费 SMTP 额度限制（每小时约 2 封），不常用 |
-| **使用 GitHub 登录** | 可选 | 需要先在 Supabase 后台启用 GitHub provider，没启用时按钮置灰并说明原因 |
+| **Create account** | First visit | Email + password → **sign in immediately**, without a confirmation email |
+| **Password sign-in** | Existing account | Sign in directly; a wrong password suggests creating an account |
+| **Email verification code** | You do not want to remember a password | Sends a one-time sign-in link; constrained by Supabase’s free SMTP quota (about 2 per hour) |
+| **Sign in with GitHub** | Optional | Enable the GitHub provider in Supabase first; otherwise the button is disabled with an explanation |
 
-注册成功即自动创建 `profiles` 行与**空白**的个人标签空间 —— 由数据库触发器
-`trove_handle_new_user`（触发器名 `trg_on_auth_user_created`）完成，不预置任何标签。
+The database trigger `trove_handle_new_user` (`trg_on_auth_user_created`) creates the `profiles` row and the empty personal tag namespace.
 
-### 注册是「注册即登录」
+### “Create account” signs in immediately
 
-应用侧用 service-role 直接建号并把邮箱标记为已确认（`admin.createUser`），
-**不发确认邮件**，因此也不受 Supabase 免费 SMTP 每小时 2 封额度的限制
-（走公开 `signUp` 会直接吃到 `429 over_email_send_rate_limit`，新用户根本注册不了）。
+The primary registration path uses a service-role client to call `admin.createUser` with a confirmed email. It sends no confirmation mail, avoiding Supabase’s free SMTP limit of roughly two messages per hour. Public `signUp` can otherwise return `429 over_email_send_rate_limit` and prevent new registrations.
 
-**取舍**：这等于放弃邮箱归属验证 —— 任何人都可以用任意邮箱注册。
-个人收藏工具可以接受；哪天要开放给多用户，把这一层换回确认邮件即可
-（改 `src/lib/auth/signup.ts` 的主路径）。
+**Trade-off:** email ownership is not verified, so anyone can register any email address. This is acceptable for a personal bookmarking tool. To require email confirmation later, replace the primary path in `src/lib/auth/signup.ts`.
 
-前提与细节：
+- Registration requires `SUPABASE_SERVICE_ROLE_KEY`, used only on the server. If it is absent, the app falls back to public signup and email confirmation rather than failing hard.
+- Passwords shorter than six characters are rejected by the application before Supabase is called.
+- If an email already exists, the correct password signs in; an incorrect password reports that the account already exists without replacing or exposing it.
+- An existing, unconfirmed account left by an earlier email-rate-limit failure is confirmed and signed in automatically.
 
-- 注册需要 `SUPABASE_SERVICE_ROLE_KEY`（服务端专用，绝不能进前端）。没配时会
-  自动退回「发确认邮件」的旧流程，不会硬失败。
-- 密码少于 6 位在**应用层**就拦下，不会打到 Supabase。
-- 邮箱已存在时：密码对得上直接登录；密码不对提示「已经注册过了」，
-  不会覆盖或泄露已有账号。
-- 上一次注册被邮件额度打断、留下「已存在但未确认」的账号时，会自动确认并登录。
+### Enable GitHub sign-in
 
-### 启用 GitHub 登录（三步）
+The GitHub provider is disabled by default in Supabase. Until configured, the application disables its button and explains why. To enable it:
 
-GitHub provider 在 Supabase 后台默认是关的。不配置时登录页会把按钮置灰并指出原因，
-不会给用户一个必然报错的死按钮。要启用：
+1. **Create a GitHub OAuth App** — GitHub Settings → Developer settings → OAuth Apps → New OAuth App.
+   - Homepage URL: your site URL
+   - Authorization callback URL: `https://sqpmotynmrpglsqvkmht.supabase.co/auth/v1/callback`
+   - Save the Client ID and Client Secret.
+2. **Enable the provider in Supabase** — Dashboard → Authentication → Providers → GitHub, then enter the Client ID and Client Secret.
+3. **Allow callback URLs in Supabase** — Dashboard → Authentication → URL Configuration.
+   - Add `http://localhost:3000/auth/callback` for local development.
+   - Add `https://<your-production-domain>/auth/callback` for production.
+   - Set Site URL to the production domain.
 
-1. **GitHub 建 OAuth App** —— Settings → Developer settings → OAuth Apps → New OAuth App
-   - Homepage URL：你的站点地址
-   - Authorization callback URL：`https://sqpmotynmrpglsqvkmht.supabase.co/auth/v1/callback`
-   - 记下 Client ID 与 Client Secret
-2. **Supabase 开 provider** —— Dashboard → Authentication → Providers → GitHub
-   - 填入 Client ID / Client Secret 并启用
-3. **Supabase 加回调白名单** —— Dashboard → Authentication → URL Configuration → Redirect URLs
-   - 加 `http://localhost:3000/auth/callback`（本地开发）
-   - 加 `https://<你的生产域名>/auth/callback`
-   - Site URL 设为生产域名
+The application callback is `GET /auth/callback`. Browser OAuth with PKCE returns only `?code=`; the server must exchange that code for a session and write the cookie.
 
-应用侧的回调落地页是 `GET /auth/callback`：浏览器走 PKCE，OAuth 回来时只带一个 `?code=`，
-必须由服务端拿它换 session 再写 Cookie —— 少这个路由 OAuth 登录就必然失败。
+## Deploy to Vercel
 
-## 部署到 Vercel
+Import the GitHub repository, configure these variables in the Vercel project, and deploy:
 
-导入 GitHub 仓库后，在 Vercel 项目设置里配好环境变量再部署：
-
-| 变量 | 值 | 说明 |
+| Variable | Value | Description |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL` | `https://<项目ref>.supabase.co` | Supabase 项目地址 |
-| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_...` | publishable key（可暴露给浏览器） |
-| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | **服务端专用**，Dashboard → Project Settings → API Keys；注册流程也要用它建号 |
-| `NEXT_PUBLIC_SITE_URL` | `https://<你的生产域名>` | 生产站点地址，用于 MCP / Skill 回调与绝对链接 |
-| `CATCHLINGER_AGENT_API_BASE` | `https://catchlinger.sxyicheng.tech/api/trove` | 写入 Agent 安装提示的公开 REST API 地址；不要填 localhost |
+| `NEXT_PUBLIC_SUPABASE_URL` | `https://<project-ref>.supabase.co` | Supabase project URL |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY` | `sb_publishable_...` | Publishable key; safe for the browser |
+| `SUPABASE_SERVICE_ROLE_KEY` | `sb_secret_...` | **Server-only** key from Dashboard → Project Settings → API Keys; required for the primary registration path |
+| `NEXT_PUBLIC_SITE_URL` | `https://<your-production-domain>` | Production site URL for MCP, Skill callbacks, and absolute links |
+| `CATCHLINGER_AGENT_API_BASE` | `https://catchlinger.sxyicheng.tech/api/trove` | Public REST API base used in the Agent installation prompt; never use localhost here |
 
-> 仓库里不写任何 key 字面量（见 AGENTS.md 约定 10）。实际取值见本地 `.env.local`
-> 或 Dashboard → Project Settings → API Keys。
+> Never commit keys. Keep local values in `.env.local` (ignored by Git), or retrieve them from Dashboard → Project Settings → API Keys.
 
-`SUPABASE_DB_URL` **不需要**配到 Vercel —— 它只给本地 `pnpm db:push` 用。
+`SUPABASE_DB_URL` is not needed in Vercel; it is only used by local `pnpm db:push`.
 
-## 目录结构
+## Project layout
 
 ```
-db/migrations/0001_init.sql   建表 + RLS + 触发器 + RPC
-scripts/db-push.mjs           迁移执行器（逐文件事务化，幂等）
-src/app/                      页面（概览/收藏/详情/归档/待读/设置）+ API 路由 + MCP
-src/app/r/[id]/route.ts       302 重定向 + 点击追踪
-src/app/actions/auth.ts       注册 Server Action（建号 + 自动确认邮箱）
-src/lib/auth/                 凭据解析、API Key、注册流程编排
-src/lib/domain/               纯逻辑：URL 规范化、内容形态、标签、超期判定
-src/lib/db/trove-db.ts        唯一的数据访问入口（强制 user_id 过滤）
-src/lib/services/             业务逻辑（REST / MCP / Server Action 复用同一层）
-src/lib/mcp/server.ts         MCP 工具注册
-skills/catch-and-linger/      Skill：SKILL.md + 6 个零依赖 Node 脚本
-tests/                        Vitest 单测（离线可跑）+ 集成测试（默认 skip）
-docs/                         API / MCP / Skill / 验收文档
+db/migrations/0001_init.sql   Tables, RLS, triggers, and RPCs
+scripts/db-push.mjs           Transactional, idempotent migration runner
+src/app/                      Dashboard, stream, items, details, archive, reminders, settings, API routes, and MCP
+src/app/r/[id]/route.ts       302 redirect and click tracking
+src/app/actions/auth.ts       Registration Server Action (create user and auto-confirm email)
+src/lib/auth/                 Credential resolution, API keys, and registration orchestration
+src/lib/domain/               Pure URL, content-type, tag, and reminder logic
+src/lib/db/trove-db.ts        The only business-data access entry point (enforces user_id scope)
+src/lib/services/             Shared business logic for REST, MCP, and Server Actions
+src/lib/mcp/server.ts         MCP tool registration
+skills/catch-and-linger/      Skill: SKILL.md plus 7 zero-dependency Node scripts
+tests/                        Offline Vitest unit tests and opt-in integration tests
+docs/                         API, MCP, Skill, and acceptance documentation
 ```
 
-## 安全模型
+## Security model
 
-- 两种凭据统一解析为 `user_id + scopes`：
-  - **Supabase 会话**（Web UI）—— Cookie + RLS
-  - **CatchLinger API Key**（Skill / MCP / CLI）—— `trv_` 前缀，服务端只存 SHA-256 哈希
-- 为什么不用 Supabase JWT 做 MCP：access_token 约 1 小时过期，而 MCP 的请求头是静态的，
-  必须用长效密钥。
-- 所有 service-role 数据访问收口在 `TroveDb` 一个类里，构造函数强制要求 `userId`，
-  并有一条单测扫描 `src/`，断言业务表的 `.from()` 调用不出现在这个文件之外。
+- Both credential types resolve to `user_id + scopes`:
+  - **Supabase session** (web UI): cookie plus RLS
+  - **CatchLinger API key** (Skill, MCP, CLI): `trv_` prefix; only a SHA-256 hash is stored server-side
+- Supabase JWTs are not used for MCP because access tokens expire in about an hour while MCP headers are static; MCP uses a long-lived API key instead.
+- All service-role access to business data goes through `TroveDb`, whose constructor requires `userId`. A unit test scans `src/` to ensure business-table `.from()` calls appear nowhere else.
 
-## 常用命令
+## Common commands
 
 ```bash
-pnpm dev          # 开发服务器
-pnpm build        # 生产构建
-pnpm lint         # ESLint
-pnpm typecheck    # tsc --noEmit
-pnpm test         # Vitest 单测
-pnpm db:push      # 推送数据库迁移
-pnpm skill:install  # 把 Skill 装到 ~/.agents/skills/（Codex 用户级全局目录）
+pnpm dev            # Development server
+pnpm build          # Production build
+pnpm lint           # ESLint
+pnpm typecheck      # tsc --noEmit
+pnpm test           # Vitest unit tests
+pnpm db:push        # Apply database migrations
+pnpm skill:install  # Install the Skill into ~/.agents/skills/ (the Codex user-level directory)
 ```
 
-## 接入方式
+## Integration endpoints
 
-| 方式 | 端点 | 认证 |
+| Channel | Endpoint | Authentication |
 |---|---|---|
-| Web | `https://<你的生产域名>/` `/items` `/items/new` `/items/[id]` `/archive` `/reminders` `/settings` | Supabase 会话 |
-| REST | `https://<你的生产域名>/api/trove/*` | `Authorization: Bearer <trv_key>` |
-| MCP | `https://<你的生产域名>/api/mcp` | `Authorization: Bearer <trv_key>` |
+| Web | `https://<your-production-domain>/`, `/stream`, `/items`, `/items/new`, `/items/[id]`, `/archive`, `/reminders`, `/settings` | Supabase session |
+| REST | `https://<your-production-domain>/api/trove/*` | `Authorization: Bearer <trv_key>` |
+| MCP | `https://<your-production-domain>/api/mcp` | `Authorization: Bearer <trv_key>` |
 
-详见 [docs/api.md](docs/api.md)、[docs/mcp.md](docs/mcp.md)、[docs/skill.md](docs/skill.md)。
+See [docs/api.md](docs/api.md), [docs/mcp.md](docs/mcp.md), and [docs/skill.md](docs/skill.md).
 
-## 许可证
+## Chrome / Edge extension
+
+Pushing an `extension-v*` tag triggers GitHub Actions to package `catchlinger-extension.zip` and attach it to the matching GitHub Release. Download and extract the archive, then load the extracted `extension` directory:
+
+1. Open `chrome://extensions` in Chrome or `edge://extensions` in Edge. Enable Developer mode, choose **Load unpacked**, and select the repository’s `extension` directory. Reload the extension and refresh open pages after code changes.
+2. Open the extension’s login/settings screen. Enter the CatchLinger site URL, sign in to that site, then create an API key under **Settings → Agent connection** and paste it into the extension. If the key expires, create or provide a valid replacement.
+3. Optionally choose an AI provider and enter its API key, Chat Completions endpoint, and model name. Saving verifies the CatchLinger key; the AI key is verified only when content is interpreted. Manual capture works without AI.
+4. On ordinary HTTP(S) pages, use the CatchLinger button on the right (it can be dragged vertically), or select **Capture current page** from the extension popup. Review or edit the title, summary, and up to three tags before saving. Browser-internal and extension-restricted pages cannot receive the injected button.
+
+The extension stores its keys in browser-local extension storage. Its CatchLinger API key is sent to the configured CatchLinger service only when validating the connection or saving an item; the service stores only a hash. When AI is enabled, the page URL, title, and captured page text are sent to the selected AI provider. Use it only if you are willing to share that page content with the provider. If AI interpretation fails, manual entry remains available. The extension uses the API-key channel, so duplicate capture follows the existing upsert rules.
+
+## License
 
 Apache-2.0
-
-## Chrome / Edge 扩展
-
-推送 `extension-v*` 标签会触发 GitHub Actions，将扩展打包为 `catchlinger-extension.zip` 并发布到对应的 GitHub Release。下载后解压，再按以下步骤加载解压后的目录。
-
-1. 打开 Chrome 的 `chrome://extensions` 或 Edge 的 `edge://extensions`，开启开发者模式，选择「加载已解压的扩展程序」，选择仓库的 `extension` 目录。更新代码后在扩展管理页重新加载，并刷新已打开的网页。
-2. 点击扩展图标进入登录 / 设置，填入拾藏网站地址；在网站登录后打开设置中的「Agent 连接」，创建 API Key 并粘贴到扩展中，验证保存。Key 失效时扩展会打开设置页，需重新创建或填写有效 Key。
-3. 可选择 AI 服务商，填写其 API Key、Chat Completions 接口和模型名称（模型与地址可按账号所在地区修改）。保存时会验证拾藏 Key；AI Key 在实际解读时验证。不配置 AI 也可手工收录。
-4. 在普通 HTTP(S) 网页点击右侧的拾藏图标，可上下拖动按钮；也可点击扩展图标中的「收录当前页面」。检查或修改标题、简述与最多 3 个标签后保存。浏览器内部页面及扩展受限页面无法注入按钮。
-
-扩展将密钥保存在浏览器本地扩展存储中，不会提交到拾藏服务端；启用 AI 时，网页地址、标题及截取的正文会发送给所配置的 AI 服务商。请仅在愿意向该服务商提供页面内容时使用。AI 解析失败时仍可手工填写。扩展使用 API Key 通道，重复收录遵循现有 upsert 规则。
