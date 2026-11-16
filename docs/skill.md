@@ -5,7 +5,15 @@
 **源码**：`skills/catch-and-linger/`（仓库内）
 **安装位置**：`~/.agents/skills/catch-and-linger/`（Codex 用户级全局 Skills 目录）
 
-推荐从 GitHub Release 下载，不需要 clone 整个仓库：
+推荐通过 [Skills.sh](https://skills.sh/yqjc2003/trove/catch-and-linger) 安装（Skills CLI 需要 Node.js 22.20+）：
+
+```bash
+npx skills add yqjc2003/trove --skill catch-and-linger
+```
+
+安装器支持选择 Agent，默认安装到当前项目；加 `-g` 安装到用户级目录，例如 `npx skills add yqjc2003/trove --skill catch-and-linger -a codex -g`。脚本与 `data/` 会随 Skill 一起安装，随后按下方配置连接自己的账号。
+
+也可从 GitHub Release 下载，不需要 clone 整个仓库：
 
 ```powershell
 $work = Join-Path $env:TEMP "catch-and-linger-$([guid]::NewGuid())"

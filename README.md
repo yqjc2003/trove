@@ -8,6 +8,16 @@ CatchLinger is a personal knowledge-capture system. It consolidates links scatte
 - **Web, API, and MCP:** Next.js 16 (App Router), deployed on Vercel
 - **Capture:** the `catch-and-linger` Skill, an MCP server, and a REST API
 
+## Install the Agent Skill
+
+Install from [Skills.sh](https://skills.sh/yqjc2003/trove/catch-and-linger):
+
+```bash
+npx skills add yqjc2003/trove --skill catch-and-linger
+```
+
+Choose your agent in the installer. Add `-g` for a user-wide installation. Requires Node.js 22.20+ for the Skills CLI. Create a [CatchLinger](https://catchlinger.sxyicheng.tech) account and generate your own API key, then follow the [configuration guide](docs/skill.md#配置). The Skill includes its helper scripts and tag data; it does not include a model subscription.
+
 ## Core design
 
 The web experience follows the “capture stream / review desk” model in [DESIGN.md](DESIGN.md): the review desk focuses on one unread link at a time; the capture stream groups saved content by its original collection date; the library supports shareable search views; and “My Language” manages each user’s tag vocabulary and Agent connection.

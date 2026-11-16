@@ -9,6 +9,16 @@
 - **前端 / API / MCP**：Next.js 16（App Router），部署在 Vercel
 - **采集**：`catch-and-linger` Skill + MCP 服务端 + REST API
 
+## 安装 Agent Skill
+
+通过 [Skills.sh](https://skills.sh/yqjc2003/trove/catch-and-linger) 安装：
+
+```bash
+npx skills add yqjc2003/trove --skill catch-and-linger
+```
+
+在安装器中选择你的 Agent；加 `-g` 可安装到用户级目录。Skills CLI 需要 Node.js 22.20+。创建 [CatchLinger](https://catchlinger.sxyicheng.tech) 账号并手动生成自己的 API Key，再按[配置说明](docs/skill.md#配置)连接。Skill 包含辅助脚本和标签数据，不包含模型订阅。
+
 ## 核心设计
 
 Web 界面遵循 [DESIGN.md](DESIGN.md) 的「收集流 / 回看台」规范：回看台一次聚焦一条未读链接，收集流按首次收藏日期呈现来路，藏库提供可分享的检索镜头，「我的语言」维护个人标签词汇表与 Agent 连接。
