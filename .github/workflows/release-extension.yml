@@ -1,0 +1,28 @@
+name: Release CatchLinger Browser Extension
+
+on:
+  push:
+    tags:
+      - 'extension-v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Package browser extension
+        shell: pwsh
+        run: |
+          $archive = Join-Path $env:GITHUB_WORKSPACE 'catchlinger-extension.zip'
+          Compress-Archive -Path 'extension/*' -DestinationPath $archive -Force
+
+      - name: Publish release asset
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create $env:GITHUB_REF_NAME 'catchlinger-extension.zip' --title "CatchLinger Browser Extension $env:GITHUB_REF_NAME" --generate-notes

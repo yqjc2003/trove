@@ -254,6 +254,8 @@ Apache-2.0
 
 ## Chrome / Edge 扩展
 
+推送 `extension-v*` 标签会触发 GitHub Actions，将扩展打包为 `catchlinger-extension.zip` 并发布到对应的 GitHub Release。下载后解压，再按以下步骤加载解压后的目录。
+
 1. 打开 Chrome 的 `chrome://extensions` 或 Edge 的 `edge://extensions`，开启开发者模式，选择「加载已解压的扩展程序」，选择仓库的 `extension` 目录。更新代码后在扩展管理页重新加载，并刷新已打开的网页。
 2. 点击扩展图标进入登录 / 设置，填入拾藏网站地址；在网站登录后打开设置中的「Agent 连接」，创建 API Key 并粘贴到扩展中，验证保存。Key 失效时扩展会打开设置页，需重新创建或填写有效 Key。
 3. 可选择 AI 服务商，填写其 API Key、Chat Completions 接口和模型名称（模型与地址可按账号所在地区修改）。保存时会验证拾藏 Key；AI Key 在实际解读时验证。不配置 AI 也可手工收录。
