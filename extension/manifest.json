@@ -8,5 +8,6 @@
   "background": { "service_worker": "background.js" },
   "action": { "default_title": "拾藏", "default_popup": "popup.html" },
   "options_page": "options.html",
+  "web_accessible_resources": [{ "resources": ["favicon.ico"], "matches": ["http://*/*", "https://*/*"] }],
   "content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_idle" }]
 }
