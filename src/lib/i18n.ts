@@ -48,7 +48,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.title': 'Settings', 'settings.subtitle': 'Build a personal vocabulary for the things you keep.', 'settings.language': 'Display language', 'settings.languageHelp': 'Choose the language used throughout the web interface.',
     'format.today': 'Today', 'format.yesterday': 'Yesterday', 'format.daysAgo': '{{count}} days ago', 'format.monthsAgo': '{{count}} months ago', 'format.yearsAgo': '{{count}} years ago',
     'labels.article': 'Article', 'labels.video': 'Video', 'labels.repo': 'Repository', 'labels.tool': 'Tool', 'labels.social': 'Social', 'labels.doc': 'Document', 'labels.other': 'Other',
-    'labels.manual': 'Manual', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP', 'labels.github': 'GitHub Star', 'labels.bookmark': 'Browser bookmark',
+    'labels.manual': 'Manual', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP', 'labels.github': 'GitHub Star', 'labels.bookmark': 'Browser bookmark', 'labels.extension': 'Browser extension',
   },
   'zh-CN': {
     'brand': '拾藏', 'nav.dashboard': '回看台', 'nav.stream': '收集流', 'nav.library': '藏库', 'nav.settings': '设置', 'nav.capture': '收一条链接', 'nav.signOut': '退出',
@@ -76,7 +76,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.title': '设置', 'settings.subtitle': '收藏慢慢积累，描述它们的词汇也由你定义。', 'settings.language': '界面语言', 'settings.languageHelp': '选择整个 Web 界面使用的语言。',
     'format.today': '今天', 'format.yesterday': '昨天', 'format.daysAgo': '{{count}} 天前', 'format.monthsAgo': '{{count}} 个月前', 'format.yearsAgo': '{{count}} 年前',
     'labels.article': '文章', 'labels.video': '视频', 'labels.repo': '仓库', 'labels.tool': '工具', 'labels.social': '社交', 'labels.doc': '文档', 'labels.other': '其他',
-    'labels.manual': '手工收集', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP 采集', 'labels.github': 'GitHub Star', 'labels.bookmark': '浏览器书签',
+    'labels.manual': '手工收集', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP 采集', 'labels.github': 'GitHub Star', 'labels.bookmark': '浏览器书签', 'labels.extension': '浏览器插件',
   },
   'zh-TW': {
     'brand': '拾藏', 'nav.dashboard': '回看台', 'nav.stream': '收藏流', 'nav.library': '藏庫', 'nav.settings': '設定', 'nav.capture': '收一則連結', 'nav.signOut': '登出',
@@ -93,7 +93,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'settings.title': '設定', 'settings.subtitle': '收藏慢慢累積，描述它們的詞彙也由你定義。', 'settings.language': '介面語言', 'settings.languageHelp': '選擇整個 Web 介面使用的語言。',
     'format.today': '今天', 'format.yesterday': '昨天', 'format.daysAgo': '{{count}} 天前', 'format.monthsAgo': '{{count}} 個月前', 'format.yearsAgo': '{{count}} 年前',
     'labels.article': '文章', 'labels.video': '影片', 'labels.repo': '儲存庫', 'labels.tool': '工具', 'labels.social': '社群', 'labels.doc': '文件', 'labels.other': '其他',
-    'labels.manual': '手動收集', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP 收集', 'labels.github': 'GitHub Star', 'labels.bookmark': '瀏覽器書籤',
+    'labels.manual': '手動收集', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP 收集', 'labels.github': 'GitHub Star', 'labels.bookmark': '瀏覽器書籤', 'labels.extension': '瀏覽器擴充功能',
   },
 };
 

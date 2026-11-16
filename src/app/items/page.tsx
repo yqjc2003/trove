@@ -58,7 +58,7 @@ async function ItemsList({ searchParams }: PageProps) {
           : undefined,
       source:
         sourceRaw &&
-        ['manual', 'skill', 'mcp', 'github', 'bookmark'].includes(sourceRaw)
+        ['manual', 'skill', 'mcp', 'github', 'bookmark', 'extension'].includes(sourceRaw)
           ? (sourceRaw as ItemSource)
           : undefined,
       status:

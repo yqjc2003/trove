@@ -5,7 +5,7 @@ import { assertBatchSize, clampLimit, clampOffset } from '@/lib/domain/validatio
 import { isContentType } from '@/lib/domain/content-type';
 import type { ItemFilters, ItemSource } from '@/types';
 
-const SOURCES: ItemSource[] = ['manual', 'skill', 'mcp', 'github', 'bookmark'];
+const SOURCES: ItemSource[] = ['manual', 'skill', 'mcp', 'github', 'bookmark', 'extension'];
 
 /** GET /api/trove/items —— 列表 + 检索 */
 export async function GET(req: Request) {

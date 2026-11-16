@@ -21,6 +21,15 @@ vi.mock('@/app/actions/items', () => ({
 }));
 
 describe('收集流 / 回看台渲染约束', () => {
+  it('浏览器插件与浏览器书签显示不同的来源', async () => {
+    const ctx = fakeContext(new FakeTroveDb());
+    const extension = await saveItem(ctx, { url: 'https://example.com/extension', title: '插件', source: 'extension' });
+    const bookmark = await saveItem(ctx, { url: 'https://example.com/bookmark', title: '书签', source: 'bookmark' });
+    const extensionItem = (await getItem(ctx, extension.id)).item;
+    const bookmarkItem = (await getItem(ctx, bookmark.id)).item;
+    expect(renderToStaticMarkup(createElement(ItemRow, { item: extensionItem }))).toContain('浏览器插件');
+    expect(renderToStaticMarkup(createElement(ItemRow, { item: bookmarkItem }))).toContain('浏览器书签');
+  });
   it('回看操作经过受控跳转，标签进入藏库镜头', async () => {
     const ctx = fakeContext(new FakeTroveDb());
     const saved = await saveItem(ctx, {

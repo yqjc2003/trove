@@ -3,7 +3,7 @@ import type { ContentType } from '@/lib/domain/content-type';
 export type { ContentType };
 
 export type ItemStatus = 'active' | 'archived';
-export type ItemSource = 'manual' | 'skill' | 'mcp' | 'github' | 'bookmark';
+export type ItemSource = 'manual' | 'skill' | 'mcp' | 'github' | 'bookmark' | 'extension';
 export type TagOrigin = 'agent' | 'user';
 export type ClickSource = 'web' | 'mcp' | 'skill' | 'manual';
 

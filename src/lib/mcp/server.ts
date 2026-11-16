@@ -83,7 +83,7 @@ const contentTypeEnum = z.enum([
   'other',
 ]);
 
-const sourceEnum = z.enum(['manual', 'skill', 'mcp', 'github', 'bookmark']);
+const sourceEnum = z.enum(['manual', 'skill', 'mcp', 'github', 'bookmark', 'extension']);
 
 const saveItemSchema = z.object({
   url: z.string().min(1),

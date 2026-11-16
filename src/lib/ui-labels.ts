@@ -18,6 +18,7 @@ export const SOURCE_LABELS: Record<ItemSource, string> = {
   mcp: 'MCP 采集',
   github: 'GitHub Star',
   bookmark: '浏览器书签',
+  extension: '浏览器插件',
 };
 
 export function getTypeLabels(locale: Locale): Record<ContentType, string> {

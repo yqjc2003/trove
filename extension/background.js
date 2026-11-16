@@ -38,7 +38,7 @@ async function handle(message, sender) {
   if (message.type === 'save') {
     const url = new URL(config.base);
     if (url.protocol !== 'https:' && !(url.protocol === 'http:' && ['localhost', '127.0.0.1'].includes(url.hostname))) throw Error('网站地址无效。');
-    const response = await fetch(new URL('/api/trove/items', url), { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ url: sender.tab.url, title: message.title, summary: message.summary, tags: message.tags, source: 'bookmark' }) });
+    const response = await fetch(new URL('/api/trove/items', url), { method: 'POST', redirect: 'error', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${config.key}` }, body: JSON.stringify({ url: sender.tab.url, title: message.title, summary: message.summary, tags: message.tags, source: 'extension' }) });
     if (response.status === 401 || response.status === 403) { await chrome.runtime.openOptionsPage(); return { ok: false, auth: true, error: '登录已失效，请重新配置 API Key。' }; }
     const result = await response.json();
     if (!response.ok || result.data?.errors?.length) throw Error(result.error?.message || result.data?.errors?.[0]?.message || '保存失败。');
