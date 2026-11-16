@@ -1,0 +1,12 @@
+{
+  "manifest_version": 3,
+  "name": "拾藏 CatchLinger",
+  "version": "0.1.0",
+  "description": "将当前网页解读并保存到拾藏。",
+  "permissions": ["storage", "tabs"],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": { "service_worker": "background.js" },
+  "action": { "default_title": "拾藏", "default_popup": "popup.html" },
+  "options_page": "options.html",
+  "content_scripts": [{ "matches": ["http://*/*", "https://*/*"], "js": ["content.js"], "run_at": "document_idle" }]
+}

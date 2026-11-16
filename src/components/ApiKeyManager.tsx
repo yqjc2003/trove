@@ -23,7 +23,7 @@ export function ApiKeyManager({
   const { t } = useTranslation();
   const activeKeys = keys.filter((key) => !key.revoked_at);
   const [name, setName] = useState('');
-  const [instruction, setInstruction] = useState<string | null>(null);
+  const [createdKey, setCreatedKey] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
@@ -34,7 +34,7 @@ export function ApiKeyManager({
         setError(res.error ?? '创建失败');
         return;
       }
-      setInstruction(buildAgentInstallPrompt({ apiBase, apiKey: res.plaintext }));
+      setCreatedKey(res.plaintext);
       setName('');
       setError(null);
     });
@@ -122,8 +122,8 @@ export function ApiKeyManager({
         </div>
       ) : null}
 
-      {instruction ? (
-        <AgentInstallDialog instruction={instruction} onClose={() => setInstruction(null)} />
+      {createdKey ? (
+        <AgentInstallDialog apiKey={createdKey} instruction={buildAgentInstallPrompt({ apiBase, apiKey: createdKey })} onClose={() => setCreatedKey(null)} />
       ) : null}
     </div>
   );

@@ -147,12 +147,14 @@ describe('收集流 / 回看台渲染约束', () => {
   it('新建连接 Key 的安装指令只在独立对话框中展示', () => {
     const html = renderToStaticMarkup(
       createElement(AgentInstallDialog, {
+        apiKey: 'trv_once_only',
         instruction: 'CATCHLINGER_API_KEY=trv_once_only',
         onClose: () => undefined,
       }),
     );
     expect(html).toContain('role="dialog"');
     expect(html).toContain('连接 Key 已生成');
+    expect(html).toContain('复制 API Key');
     expect(html).toContain('CATCHLINGER_API_KEY=trv_once_only');
     expect(html).toContain('我已保存');
   });

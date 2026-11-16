@@ -7,13 +7,24 @@ import { useState } from 'react';
  * 关闭后指令（以及其中的 Key）即从页面状态中移除。
  */
 export function AgentInstallDialog({
+  apiKey,
   instruction,
   onClose,
 }: {
+  apiKey: string;
   instruction: string;
   onClose: () => void;
 }) {
   const [copyNotice, setCopyNotice] = useState<string | null>(null);
+
+  async function copyKey() {
+    try {
+      await navigator.clipboard.writeText(apiKey);
+      setCopyNotice('API Key 已复制，可以粘贴到浏览器扩展。');
+    } catch {
+      setCopyNotice('复制失败，请手动选中下方 API Key 复制。');
+    }
+  }
 
   async function copyInstruction() {
     try {
@@ -33,10 +44,16 @@ export function AgentInstallDialog({
         aria-labelledby="agent-install-dialog-title"
       >
         <p className="agent-setup-kicker">连接 Key 已生成</p>
-        <h2 id="agent-install-dialog-title">把安装指令交给你的 Agent。</h2>
+        <h2 id="agent-install-dialog-title">连接浏览器扩展或 Agent</h2>
         <p className="agent-install-dialog-intro">
-          这段文字含有你的连接 Key，只显示到你关闭此窗口为止。请只发送给你信任的 Agent。
+          Key 只显示到你关闭此窗口为止。请将它粘贴到浏览器扩展，或使用下方指令连接你信任的 Agent。
         </p>
+        <label htmlFor="created-api-key">API Key</label>
+        <input id="created-api-key" className="input" readOnly value={apiKey} onFocus={(event) => event.currentTarget.select()} />
+        <div className="desk-actions">
+          <button type="button" className="btn btn-primary" onClick={copyKey}>复制 API Key</button>
+        </div>
+        <p className="small muted">Agent 安装指令</p>
         <textarea
           className="agent-setup-instruction"
           aria-label="发给 Agent 的 CatchLinger 安装与连接指令"

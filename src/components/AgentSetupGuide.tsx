@@ -8,7 +8,7 @@ import { AgentInstallDialog } from './AgentInstallDialog';
 
 type SetupState =
   | { kind: 'idle' }
-  | { kind: 'ready'; instruction: string }
+  | { kind: 'ready'; instruction: string; apiKey: string }
   | { kind: 'error'; message: string };
 
 /**
@@ -29,6 +29,7 @@ export function AgentSetupGuide({ apiBase }: { apiBase: string }) {
 
       setState({
         kind: 'ready',
+        apiKey: result.plaintext,
         instruction: buildAgentInstallPrompt({ apiBase, apiKey: result.plaintext }),
       });
     });
@@ -57,6 +58,7 @@ export function AgentSetupGuide({ apiBase }: { apiBase: string }) {
 
       {state.kind === 'ready' ? (
         <AgentInstallDialog
+          apiKey={state.apiKey}
           instruction={state.instruction}
           onClose={() => setState({ kind: 'idle' })}
         />
