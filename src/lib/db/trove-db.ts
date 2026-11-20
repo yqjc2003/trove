@@ -129,7 +129,7 @@ export class TroveDb {
     }
 
     const sortField = SORTABLE.has(sort) ? sort : 'collected_at';
-    query = query.order(sortField, { ascending: order === 'asc' });
+    query = query.order(sortField, { ascending: order === 'asc' }).order('id', { ascending: true });
 
     const { data, error, count } = await query.range(offset, offset + limit - 1);
     if (error) throw new AppError('INTERNAL', '读取收藏列表失败');

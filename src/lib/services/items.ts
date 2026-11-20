@@ -13,6 +13,7 @@ import {
 } from '@/lib/domain/validation';
 import type { Item, ItemFilters, ItemListResult, ItemSource, Note, Tag } from '@/types';
 import type { ServiceContext } from './context';
+import { notifyWebhook } from './webhook';
 
 export interface SaveItemInput {
   url: string;
@@ -143,6 +144,9 @@ export async function saveItem(
     await ctx.db.createNote(item.id, noteBody);
   }
 
+  await notifyWebhook(ctx, item.id, created ? 'item.created' : 'item.updated');
+  if (noteBody) await notifyWebhook(ctx, item.id, 'note.changed');
+
   return {
     id: item.id,
     created,
@@ -257,6 +261,8 @@ export async function updateItem(
   }
 
   const finalTags = (await ctx.db.getTagsForItems([id])).get(id) ?? [];
+  await notifyWebhook(ctx, id, input.status === 'archived' && current.status !== 'archived' ? 'item.archived' : 'item.updated');
+  if (input.notes) await notifyWebhook(ctx, id, 'note.changed');
   return { ...updated, tags: finalTags };
 }
 

@@ -66,6 +66,8 @@ export interface Profile {
   email: string | null;
   display_name: string | null;
   reminder_days: number;
+  webhook_url?: string | null;
+  webhook_events?: string[];
   created_at: string;
   updated_at: string;
 }

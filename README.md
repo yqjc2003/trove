@@ -240,3 +240,5 @@ The extension stores its keys in browser-local extension storage. Its CatchLinge
 ## License
 
 Apache-2.0
+
+- [Webhook 配置与同步](docs/webhook.md)

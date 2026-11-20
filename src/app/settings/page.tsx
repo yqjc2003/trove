@@ -2,6 +2,7 @@ import { getServerContext } from '@/lib/server-context';
 import { listTags } from '@/lib/services/tags';
 import { TagManager } from '@/components/TagManager';
 import { ApiKeyManager } from '@/components/ApiKeyManager';
+import { WebhookForm } from '@/components/WebhookForm';
 import { ReminderDaysForm } from '@/components/ReminderDaysForm';
 import { ImportBookmarks } from '@/components/ImportBookmarks';
 import { resolveAgentApiBase } from '@/lib/agent-connection';
@@ -65,6 +66,8 @@ export default async function SettingsPage() {
             <ApiKeyManager keys={keys} apiBase={apiBase} />
           </div>
         </section>
+
+        <section className="section"><div className="section-head"><h2>Webhook</h2></div><div style={{ marginTop: 16 }}><WebhookForm url={profile?.webhook_url ?? ''} events={profile?.webhook_events ?? ['item.created', 'item.updated', 'item.archived', 'note.changed']} /></div></section>
 
         <section className="section">
           <div className="section-head">

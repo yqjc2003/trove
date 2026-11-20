@@ -2,6 +2,7 @@ import { AppError } from '@/lib/domain/errors';
 import { MAX_NOTE_LENGTH, assertString } from '@/lib/domain/validation';
 import type { Note } from '@/types';
 import type { ServiceContext } from './context';
+import { notifyWebhook } from './webhook';
 
 /** 追加一条 Markdown 笔记。 */
 export async function addNote(
@@ -17,7 +18,9 @@ export async function addNote(
     maxLength: MAX_NOTE_LENGTH,
   })!;
 
-  return ctx.db.createNote(itemId, body);
+  const created = await ctx.db.createNote(itemId, body);
+  await notifyWebhook(ctx, itemId, 'note.changed');
+  return created;
 }
 
 /** 编辑一条笔记（必须属于当前用户）。 */
@@ -36,6 +39,7 @@ export async function updateNote(
 
   const updated = await ctx.db.updateNote(noteId, body);
   if (!updated) throw new AppError('NOT_FOUND', '笔记不存在');
+  await notifyWebhook(ctx, note.item_id, 'note.changed');
   return updated;
 }
 
@@ -46,7 +50,9 @@ export async function deleteNote(
 ): Promise<boolean> {
   const note = await ctx.db.getNote(noteId);
   if (!note) throw new AppError('NOT_FOUND', '笔记不存在');
-  return ctx.db.deleteNote(noteId);
+  const deleted = await ctx.db.deleteNote(noteId);
+  if (deleted) await notifyWebhook(ctx, note.item_id, 'note.changed');
+  return deleted;
 }
 
 export async function listNotes(ctx: ServiceContext, itemId: string): Promise<Note[]> {
