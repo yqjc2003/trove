@@ -110,8 +110,13 @@ async function ItemsList({ searchParams }: PageProps) {
         <>
           <ul className="rows">
             {result.items.map((item) => (
-              <ItemRow key={item.id} item={item} locale={locale} actions={
-                <ArchiveButton itemId={item.id} status={item.status} locale={locale} />
+              <ItemRow key={item.id} item={item} locale={locale} tailActions={
+                <>
+                  <Link className="btn-quiet" href={`/items/${item.id}#notes`} aria-label={translate(locale, 'item.notesAria', { title: item.title })}>
+                    {translate(locale, 'item.notes')}
+                  </Link>
+                  <ArchiveButton itemId={item.id} status={item.status} locale={locale} />
+                </>
               } />
             ))}
           </ul>

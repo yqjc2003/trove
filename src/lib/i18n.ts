@@ -23,6 +23,7 @@ type Variables = Record<string, string | number>;
 
 const messages: Record<Locale, Record<string, string>> = {
   'en-US': {
+    'item.notes': 'Notes', 'item.notesAria': 'View notes: {{title}}',
     'item.archive': 'Archive', 'item.unarchive': 'Unarchive', 'item.archivePending': 'Working…', 'item.archiveError': 'Could not update archive status. Please try again.',
     'brand': 'CatchLinger', 'nav.dashboard': 'Review', 'nav.stream': 'Stream', 'nav.library': 'Library', 'nav.settings': 'Settings', 'nav.capture': 'Save a link', 'nav.signOut': 'Sign out',
     'locale.label': 'Language', 'locale.en-US': 'English (US)', 'locale.zh-CN': '简体中文', 'locale.zh-TW': '繁體中文',
@@ -52,6 +53,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'labels.manual': 'Manual', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP', 'labels.github': 'GitHub Star', 'labels.bookmark': 'Browser bookmark', 'labels.extension': 'Browser extension',
   },
   'zh-CN': {
+    'item.notes': '笔记', 'item.notesAria': '查看笔记：{{title}}',
     'item.archive': '归档', 'item.unarchive': '取消归档', 'item.archivePending': '处理中…', 'item.archiveError': '归档状态更新失败，请重试。',
     'brand': '拾藏', 'nav.dashboard': '回看台', 'nav.stream': '收集流', 'nav.library': '藏库', 'nav.settings': '设置', 'nav.capture': '收一条链接', 'nav.signOut': '退出',
     'locale.label': '界面语言', 'locale.en-US': 'English (US)', 'locale.zh-CN': '简体中文', 'locale.zh-TW': '繁體中文',
@@ -81,6 +83,7 @@ const messages: Record<Locale, Record<string, string>> = {
     'labels.manual': '手工收集', 'labels.skill': 'Agent Skill', 'labels.mcp': 'MCP 采集', 'labels.github': 'GitHub Star', 'labels.bookmark': '浏览器书签', 'labels.extension': '浏览器插件',
   },
   'zh-TW': {
+    'item.notes': '筆記', 'item.notesAria': '查看筆記：{{title}}',
     'item.archive': '封存', 'item.unarchive': '取消封存', 'item.archivePending': '處理中…', 'item.archiveError': '封存狀態更新失敗，請重試。',
     'brand': '拾藏', 'nav.dashboard': '回看台', 'nav.stream': '收藏流', 'nav.library': '藏庫', 'nav.settings': '設定', 'nav.capture': '收一則連結', 'nav.signOut': '登出',
     'locale.label': '介面語言', 'locale.en-US': 'English (US)', 'locale.zh-CN': '簡體中文', 'locale.zh-TW': '繁體中文',

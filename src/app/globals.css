@@ -1344,6 +1344,12 @@ button.tag:focus-visible {
   color: var(--ink-3);
   margin-top: 14px;
 }
+.row-tail-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 14px;
+}
 .source-ref {
   overflow-wrap: anywhere;
 }

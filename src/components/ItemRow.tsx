@@ -8,10 +8,12 @@ import { translate, type Locale } from '@/lib/i18n';
 export function ItemRow({
   item,
   actions,
+  tailActions,
   locale = 'zh-CN',
 }: {
   item: Item;
   actions?: React.ReactNode;
+  tailActions?: React.ReactNode;
   locale?: Locale;
 }) {
   const typeLabels = getTypeLabels(locale);
@@ -49,13 +51,16 @@ export function ItemRow({
       {actions ? <div className="row-actions">{actions}</div> : null}
       <div className="row-tail">
         <span>{sourceLabels[item.source]}</span>
-        <Link
-          className="btn-quiet"
-          href={`/items/${item.id}`}
-          aria-label={translate(locale, 'item.detailsAria', { title: item.title })}
-        >
-          {translate(locale, 'item.details')}
-        </Link>
+        <div className="row-tail-actions">
+          {tailActions}
+          <Link
+            className="btn-quiet"
+            href={`/items/${item.id}`}
+            aria-label={translate(locale, 'item.detailsAria', { title: item.title })}
+          >
+            {translate(locale, 'item.details')}
+          </Link>
+        </div>
       </div>
     </li>
   );
