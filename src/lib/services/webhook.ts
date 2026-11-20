@@ -39,7 +39,7 @@ export async function deliverWebhook(url: string, event: WebhookEvent | 'item.sy
   const body = JSON.stringify({ event, sent_at: new Date().toISOString(), ...(data ? { item: { ...data, tags, notes: notes.map(({ id, body_md, created_at, updated_at }) => ({ id, body_md, created_at, updated_at })) } } : {}) });
   await new Promise<void>((resolve, reject) => {
     const req = request(target, {
-      method: 'POST', headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), 'x-catchlinger-event': event },
+      method: 'POST', family: 4, headers: { 'content-type': 'application/json', 'content-length': Buffer.byteLength(body), 'x-catchlinger-event': event },
       lookup: (_hostname, _options, callback) => callback(null, addresses[0].address, 4), signal: AbortSignal.timeout(5000),
     }, (res) => { res.resume(); if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) resolve(); else reject(new Error('Webhook rejected')); });
     req.on('error', reject); req.end(body);
