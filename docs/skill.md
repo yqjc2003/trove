@@ -138,16 +138,16 @@ node catchlinger-api.mjs account
         ↓
 ② 取正文：fetch-content.mjs
         ↓
-③ AI 解读：产出 title / summary / ≤3 tags（标签语义由 Agent 自己决定）
+③ AI 解读：产出 title / summary，查询并优先复用已有的宽泛标签
         ↓
-④ 写入：catchlinger-api.mjs save-many
+④ 写入：保存链接并保护重复收藏原标签；新标签在用户明确同意前只作为建议
         ↓
-⑤ 汇报：新增 N 条 / 更新 M 条 / 失败 K 条
+⑤ 汇报：新增 N 条 / 更新 M 条 / 失败 K 条；汇总新标签建议供用户确认
 ```
 
 ## 硬约束
 
-采集标签通常取 1–2 个较宽、可复用的主题，最多 3 个。先浏览既有标签，再用 resolver 归一；HashMap 源码文章使用 `java`、`源码阅读`，具体类名等细节写入标题和摘要。完整的粒度示例与批量选词规则见 `skills/catch-and-linger/SKILL.md` 的「标签粒度：先归组，再归一」。
+采集标签通常取 1–2 个较宽、可复用的主题，最多 3 个。先浏览既有标签，再用 resolver 归一；没有合适标签时先保存链接并提出新标签建议，用户明确同意具体名称后才创建。重复收录时保留原有标签；HashMap 源码文章使用 `java`、`源码阅读`，具体类名等细节写入标题和摘要。完整的粒度示例与批量选词规则见 `skills/catch-and-linger/SKILL.md` 的「标签粒度：先归组，再归一」。
 
 | 约束 | 值 | 越界表现 |
 |---|---|---|
