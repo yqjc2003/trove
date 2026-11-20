@@ -13,6 +13,7 @@ import { ItemEditor } from '@/components/ItemEditor';
 import { NoteEditor } from '@/components/NoteEditor';
 import { TagPicker } from '@/components/TagPicker';
 import { OpenOriginal } from '@/components/OpenOriginal';
+import { ArchiveButton } from '@/components/ArchiveButton';
 
 export const dynamic = 'force-dynamic';
 
@@ -56,6 +57,7 @@ export default async function ItemDetailPage({
           />
           <div className="row-actions">
             <OpenOriginal id={item.id} read={Boolean(item.read_at)} />
+            <ArchiveButton itemId={item.id} status={item.status} locale={locale} />
           </div>
         </header>
         <details className="item-organize">
@@ -80,7 +82,6 @@ export default async function ItemDetailPage({
             />
             <ItemActions
               itemId={item.id}
-              status={item.status}
               read={Boolean(item.read_at)}
             />
           </div>

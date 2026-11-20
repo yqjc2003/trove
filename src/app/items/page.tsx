@@ -6,6 +6,7 @@ import { listItems } from '@/lib/services/items';
 import { listTags } from '@/lib/services/tags';
 import { EmptyState } from '@/components/StatBlock';
 import { ItemRow } from '@/components/ItemRow';
+import { ArchiveButton } from '@/components/ArchiveButton';
 import { FilterBar } from '@/components/FilterBar';
 import { isContentType, type ContentType } from '@/lib/domain/content-type';
 import type { ItemSource } from '@/types';
@@ -109,7 +110,9 @@ async function ItemsList({ searchParams }: PageProps) {
         <>
           <ul className="rows">
             {result.items.map((item) => (
-              <ItemRow key={item.id} item={item} locale={locale} />
+              <ItemRow key={item.id} item={item} locale={locale} actions={
+                <ArchiveButton itemId={item.id} status={item.status} locale={locale} />
+              } />
             ))}
           </ul>
 

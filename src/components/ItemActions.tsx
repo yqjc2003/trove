@@ -6,18 +6,15 @@ import { useRouter } from 'next/navigation';
 import {
   removeItemAction,
   setItemReadAction,
-  setItemStatusAction,
 } from '@/app/actions/items';
 
 /** 单条收藏的操作按钮组。 */
 export function ItemActions({
   itemId,
-  status,
   read,
   showDelete = true,
 }: {
   itemId: string;
-  status: 'active' | 'archived';
   read: boolean;
   showDelete?: boolean;
 }) {
@@ -48,15 +45,6 @@ export function ItemActions({
 
   return (
     <div className="row-actions">
-      <button
-        type="button"
-        className="btn-quiet"
-        disabled={pending}
-        onClick={() => run(() => setItemStatusAction(itemId, status === 'active' ? 'archived' : 'active'))}
-      >
-        {status === 'active' ? '归档' : '取消归档'}
-      </button>
-
       <button
         type="button"
         className="btn-quiet"
