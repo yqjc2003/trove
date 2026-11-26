@@ -175,9 +175,13 @@ async fn analyze_url(app: tauri::AppHandle, url: String) -> Result<analysis::Ana
 #[tauri::command]
 fn list_items(app: tauri::AppHandle, query: Option<String>) -> Result<Vec<Item>, String> {
     let conn = database(&app)?;
-    let query_text = query.unwrap_or_default().trim().to_string();
+    search_items(&conn, query.as_deref().unwrap_or(""))
+}
+
+fn search_items(conn: &Connection, query_text: &str) -> Result<Vec<Item>, String> {
+    let query_text = query_text.trim();
     let mut query = conn
-        .prepare("SELECT id, url, title, created_at, summary, tags, liked, archived FROM items WHERE ?1 = '' OR instr(lower(title || ' ' || url || ' ' || summary || ' ' || tags || ' ' || body), lower(?1)) > 0 ORDER BY id DESC")
+        .prepare("SELECT id, url, title, created_at, summary, tags, liked, archived FROM items WHERE ?1 = '' OR instr(lower(title), lower(?1)) > 0 OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(items.tags) THEN items.tags ELSE '[]' END) WHERE instr(lower(json_each.value), lower(?1)) > 0) OR instr(lower(body), lower(?1)) > 0 ORDER BY id DESC")
         .map_err(|e| e.to_string())?;
     let rows = query
         .query_map([query_text], |row| {
@@ -417,5 +421,30 @@ mod tests {
             (title.as_str(), body.as_str(), liked, archived),
             ("标题", "正文", false, false)
         );
+    }
+
+    #[test]
+    fn search_matches_title_tags_and_body_including_archived() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        conn.execute(
+            "INSERT INTO items (url, title, tags, body, archived) VALUES (?1, ?2, ?3, ?4, 1)",
+            params![
+                "https://example.com",
+                "Rust 入门",
+                r#"["学习","数据库"]"#,
+                "这篇正文包含百分号 100% 的测试"
+            ],
+        )
+        .unwrap();
+        for query in ["rust", "数据库", "正文", "100%"] {
+            let items = search_items(&conn, query).unwrap();
+            assert_eq!(items.len(), 1, "query: {query}");
+            assert!(items[0].archived);
+        }
+        assert!(search_items(&conn, "不存在").unwrap().is_empty());
+        assert!(search_items(&conn, "_").unwrap().is_empty());
+        assert!(search_items(&conn, "[").unwrap().is_empty());
+        assert_eq!(search_items(&conn, " ").unwrap().len(), 1);
     }
 }

@@ -3,10 +3,12 @@ const form = document.querySelector('#add-form');
 const settingsForm = document.querySelector('#ai-form');
 const items = document.querySelector('#items');
 const message = document.querySelector('#message');
+const libraryMessage = document.querySelector('#library-message');
 const settingsMessage = document.querySelector('#settings-message');
 const analyzeButton = document.querySelector('#analyze');
 const saveButton = form.querySelector('[type="submit"]');
 const aiDialog = document.querySelector('#ai-dialog');
+const readerSettingsDialog = document.querySelector('#reader-settings-dialog');
 const addDialog = document.querySelector('#add-dialog');
 document.querySelector('#open-add').addEventListener('click', () => addDialog.showModal());
 document.querySelector('#close-add').addEventListener('click', () => addDialog.close());
@@ -15,6 +17,11 @@ document.querySelector('#open-ai').addEventListener('click', () => {
   aiDialog.showModal();
 });
 document.querySelector('#close-ai').addEventListener('click', () => aiDialog.close());
+document.querySelector('#open-reader-settings').addEventListener('click', () => {
+  document.querySelector('#settings-menu').open = false;
+  readerSettingsDialog.showModal();
+});
+document.querySelector('#close-reader-settings').addEventListener('click', () => readerSettingsDialog.close());
 
 async function refreshSettings() {
   const settings = await invoke('get_ai_settings');
@@ -72,6 +79,7 @@ async function refresh() {
   const version = ++refreshVersion;
   const result = await invoke('list_items', { query: document.querySelector('#search').value });
   if (version !== refreshVersion) return;
+  libraryMessage.textContent = '';
   allItems = result;
   renderItems();
 }
@@ -115,13 +123,13 @@ function renderItems() {
     const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
     const actions = document.createElement('div'); actions.className = 'item-actions';
     const like = document.createElement('button'); like.textContent = item.liked ? '♥ 已喜欢' : '♡ 喜欢';
-    like.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'liked', value: !item.liked }); await refresh(); } catch (error) { message.textContent = String(error); } });
+    like.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'liked', value: !item.liked }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
     const archive = document.createElement('button'); archive.textContent = item.archived ? '移回待读' : '归档';
-    archive.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'archived', value: !item.archived }); await refresh(); } catch (error) { message.textContent = String(error); } });
+    archive.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'archived', value: !item.archived }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
     const remove = document.createElement('button'); remove.textContent = '删除';
     remove.addEventListener('click', async () => {
       if (!window.confirm(`删除“${item.title}”？`)) return;
-      try { await invoke('delete_item', { id: item.id }); await refresh(); } catch (error) { message.textContent = String(error); }
+      try { await invoke('delete_item', { id: item.id }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); }
     });
     actions.append(like, archive, remove);
     info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
@@ -132,8 +140,12 @@ document.querySelectorAll('.nav-item').forEach((button) => button.addEventListen
 }));
 let searchTimer;
 document.querySelector('#search').addEventListener('input', () => {
+  if (document.querySelector('#search').value.trim()) {
+    currentView = 'all';
+    selectedTag = '';
+  }
   clearTimeout(searchTimer);
-  searchTimer = setTimeout(() => refresh().catch((error) => { message.textContent = String(error); }), 180);
+  searchTimer = setTimeout(() => refresh().catch((error) => { libraryMessage.textContent = String(error); }), 180);
 });
 form.addEventListener('submit', async (event) => {
   event.preventDefault(); message.textContent = '';
@@ -143,7 +155,7 @@ form.addEventListener('submit', async (event) => {
   catch (error) { message.textContent = String(error); }
 });
 refreshSettings().catch((error) => { settingsMessage.textContent = String(error); });
-refresh().catch((error) => { message.textContent = String(error); });
+refresh().catch((error) => { libraryMessage.textContent = String(error); });
 
 const library = document.querySelector('#library');
 const reader = document.querySelector('#reader');
@@ -165,7 +177,7 @@ if (/^#[0-9a-f]{6}$/i.test(preferences.color || '')) color.value = preferences.c
 if (['white', 'eye', 'paper', 'kindle'].includes(preferences.theme)) theme.value = preferences.theme;
 function applyReaderSettings() {
   page.dataset.font = font.value;
-  page.dataset.theme = theme.value;
+  document.documentElement.dataset.theme = theme.value;
   page.style.setProperty('--reader-size', `${size.value}px`);
   page.style.setProperty('--reader-color', color.value);
   document.querySelector('#size-value').textContent = `${size.value} px`;

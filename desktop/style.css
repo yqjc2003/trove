@@ -101,3 +101,14 @@ body { background: #fff; color: #282828; }
 .note p { color: inherit; margin: 0 0 8px; }
 .note small { color: #777; margin-right: 16px; }
 @media (max-width: 760px) { .topbar { padding: 0 16px; justify-content: flex-start; } .top-actions { right: 16px; } #library { padding: 0 20px; } .library-layout { grid-template-columns: 1fr; gap: 0; } .sidebar { display: flex; flex-wrap: wrap; gap: 4px; padding: 20px 0; } .sidebar-label, .tag-filters { display: none; } .nav-item { width: auto; gap: 8px; } .library-content { padding-top: 10px; } .library-toolbar { align-items: stretch; flex-direction: column; } .search-label { flex: auto; } }
+/* 阅读主题应用到整个窗口，包括顶部导航和设置面板。 */
+html { --page-background: #fff; background: var(--page-background); }
+html[data-theme="eye"] { --page-background: #e5eedf; }
+html[data-theme="paper"] { --page-background: #f3ead5; }
+html[data-theme="kindle"] { --page-background: #e2e2df; }
+body, .reading-page, .menu-panel, dialog, input, select, textarea { background-color: var(--page-background); }
+.reader-layout { display: block; }
+.reading-page { max-width: 790px; margin: 0 auto; }
+.reading-settings { position: static; display: grid; grid-template-columns: 1fr; gap: 18px; }
+.top-button { font-size: 23px; line-height: 1; }
+@media (max-width: 760px) { .reading-settings { grid-template-columns: 1fr; } }
