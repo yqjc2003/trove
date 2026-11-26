@@ -1,3 +1,4 @@
+use crate::content_kind::{self, ContentKind};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -10,6 +11,7 @@ pub struct Analysis {
     pub summary: String,
     pub tags: Vec<String>,
     pub body: String,
+    pub content_type: ContentKind,
 }
 
 #[derive(Deserialize)]
@@ -142,7 +144,45 @@ fn extract_page(html: &str) -> Result<(String, String), String> {
     Ok((title.chars().take(500).collect(), body_text))
 }
 
-pub async fn fetch_page(raw_url: &str) -> Result<(String, String), String> {
+fn extract_link_metadata(html: &str) -> Result<(String, String), String> {
+    let document = Html::parse_document(html);
+    let meta = |selector: &str| -> Option<String> {
+        let selector = Selector::parse(selector).ok()?;
+        document.select(&selector).find_map(|node| {
+            let value = node.value().attr("content")?.trim();
+            if value.is_empty() {
+                None
+            } else {
+                Some(value.split_whitespace().collect::<Vec<_>>().join(" "))
+            }
+        })
+    };
+    let title = meta("meta[property='og:title'], meta[name='twitter:title']")
+        .or_else(|| {
+            let selector = Selector::parse("title").ok()?;
+            let value = document
+                .select(&selector)
+                .next()?
+                .text()
+                .collect::<Vec<_>>()
+                .join(" ");
+            let value = value.split_whitespace().collect::<Vec<_>>().join(" ");
+            if value.is_empty() {
+                None
+            } else {
+                Some(value)
+            }
+        })
+        .ok_or("网页没有提供可读取的标题，可手工填写")?;
+    let description = meta("meta[property='og:description'], meta[name='description'], meta[name='twitter:description']")
+        .unwrap_or_default();
+    Ok((
+        title.chars().take(500).collect(),
+        description.chars().take(18000).collect(),
+    ))
+}
+
+async fn fetch_html(raw_url: &str, allow_partial: bool) -> Result<String, String> {
     let url = Url::parse(raw_url.trim()).map_err(|_| "请输入有效的网址".to_string())?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
         return Err("仅支持 HTTP 或 HTTPS 网址".into());
@@ -172,6 +212,9 @@ pub async fn fetch_page(raw_url: &str) -> Result<(String, String), String> {
                 e.status().map(|s| s.as_u16()).unwrap_or(0)
             )
         })?;
+    if !response.status().is_success() {
+        return Err(format!("网页请求失败：{}", response.status().as_u16()));
+    }
     let mut bytes = Vec::new();
     while let Some(chunk) = response
         .chunk()
@@ -179,17 +222,40 @@ pub async fn fetch_page(raw_url: &str) -> Result<(String, String), String> {
         .map_err(|_| "网页读取失败".to_string())?
     {
         if bytes.len() + chunk.len() > 2 * 1024 * 1024 {
-            return Err("网页超过 2 MB，无法解析".into());
+            if !allow_partial {
+                return Err("网页超过 2 MB，无法解析".into());
+            }
+            let remaining = 2 * 1024 * 1024 - bytes.len();
+            bytes.extend_from_slice(&chunk[..remaining]);
+            break;
         }
         bytes.extend_from_slice(&chunk);
     }
-    let html = String::from_utf8_lossy(&bytes);
-    extract_page(&html)
+    Ok(String::from_utf8_lossy(&bytes).into_owned())
+}
+
+pub async fn fetch_page(raw_url: &str) -> Result<(String, String), String> {
+    extract_page(&fetch_html(raw_url, false).await?)
 }
 
 pub async fn analyze(raw_url: &str, model: &str, key: &str) -> Result<Analysis, String> {
-    let (title, body) = fetch_page(raw_url).await?;
-    let text: String = body.chars().take(18000).collect();
+    let content_type = content_kind::detect(raw_url);
+    let (title, body, text) = match content_type {
+        ContentKind::Article => {
+            let (title, body) = fetch_page(raw_url).await?;
+            let text = body.chars().take(18000).collect::<String>();
+            (title, body, text)
+        }
+        ContentKind::Repo | ContentKind::Video => {
+            let (title, description) = extract_link_metadata(&fetch_html(raw_url, true).await?)?;
+            let text = if description.is_empty() {
+                "未获取到页面描述，请仅依据标题说明信息有限，不要推测内容。".to_string()
+            } else {
+                description
+            };
+            (title, String::new(), text)
+        }
+    };
     let request = json!({
         "model": model,
         "response_format": {"type": "json_object"},
@@ -235,6 +301,7 @@ pub async fn analyze(raw_url: &str, model: &str, key: &str) -> Result<Analysis, 
         summary,
         tags,
         body,
+        content_type,
     })
 }
 
@@ -273,5 +340,20 @@ mod tests {
         assert!(body.starts_with("章节\n\n"));
         assert!(body.ends_with(&content));
         assert!(!body.contains("导航"));
+    }
+
+    #[test]
+    fn extracts_metadata_without_archiving_page_content() {
+        let html = r#"<html><head><title>备用标题</title><meta property="og:title" content="项目 &amp; 演示"><meta name="description" content="仓库说明"></head><body><p>正文不应作为仓库描述</p></body></html>"#;
+        let (title, description) = extract_link_metadata(html).unwrap();
+        assert_eq!(title, "项目 & 演示");
+        assert_eq!(description, "仓库说明");
+        assert_eq!(
+            extract_link_metadata("<title>只提供标题</title>")
+                .unwrap()
+                .1,
+            ""
+        );
+        assert!(extract_link_metadata("<body>正文</body>").is_err());
     }
 }

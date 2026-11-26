@@ -1,6 +1,7 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod analysis;
+mod content_kind;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -20,6 +21,7 @@ struct Item {
     liked: bool,
     archived: bool,
     note_count: i64,
+    content_type: content_kind::ContentKind,
 }
 
 fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
@@ -184,6 +186,15 @@ async fn analyze_url(app: tauri::AppHandle, url: String) -> Result<analysis::Ana
 }
 
 #[tauri::command]
+fn classify_url(url: String) -> Result<content_kind::ContentKind, String> {
+    let parsed = Url::parse(url.trim()).map_err(|_| "请输入有效的网址".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return Err("仅支持 HTTP 或 HTTPS 网址".into());
+    }
+    Ok(content_kind::detect(parsed.as_str()))
+}
+
+#[tauri::command]
 fn list_items(app: tauri::AppHandle, query: Option<String>) -> Result<Vec<Item>, String> {
     let conn = database(&app)?;
     search_items(&conn, query.as_deref().unwrap_or(""))
@@ -197,9 +208,11 @@ fn search_items(conn: &Connection, query_text: &str) -> Result<Vec<Item>, String
     let rows = query
         .query_map([query_text], |row| {
             let tags: String = row.get(5)?;
+            let url: String = row.get(1)?;
             Ok(Item {
                 id: row.get(0)?,
-                url: row.get(1)?,
+                content_type: content_kind::detect(&url),
+                url,
                 title: row.get(2)?,
                 created_at: row.get(3)?,
                 summary: row.get(4)?,
@@ -304,6 +317,10 @@ struct SaveItem {
 
 #[tauri::command]
 fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
+    save_item_in_db(&database(&app)?, item)
+}
+
+fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
     let parsed = Url::parse(item.url.trim()).map_err(|_| "请输入有效的网址".to_string())?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
         return Err("仅支持 HTTP 或 HTTPS 网址".into());
@@ -317,11 +334,15 @@ fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
     }
     let tags = analysis::normalize_manual_tags(item.tags)?;
     let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
-    let body = item.body.unwrap_or_default();
+    let body = if content_kind::detect(parsed.as_str()) == content_kind::ContentKind::Article {
+        item.body.unwrap_or_default()
+    } else {
+        String::new()
+    };
     if body.len() > 2 * 1024 * 1024 {
         return Err("正文过长".into());
     }
-    database(&app)?.execute(
+    conn.execute(
         "INSERT INTO items (url, title, summary, tags, body) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, body=CASE WHEN excluded.body = '' THEN items.body ELSE excluded.body END",
         params![parsed.as_str(), title, item.summary.trim(), tags, body],
     ).map_err(|e| e.to_string())?;
@@ -459,6 +480,9 @@ async fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, S
             |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
         )
         .map_err(|_| "找不到这条收藏".to_string())?;
+    if content_kind::detect(&url) != content_kind::ContentKind::Article {
+        return Err("此链接适合在原网站打开".into());
+    }
     if body.is_empty() {
         let (_, fetched) = analysis::fetch_page(&url)
             .await
@@ -514,6 +538,7 @@ fn main() {
             get_ai_settings,
             save_ai_settings,
             analyze_url,
+            classify_url,
             get_reader_item,
             open_original,
             set_item_state,
@@ -674,5 +699,55 @@ mod tests {
         assert!(list_desktop_tags_in_db(&conn)
             .unwrap()
             .contains(&"测试".to_string()));
+    }
+
+    #[test]
+    fn save_archives_only_articles_and_keeps_existing_item_state() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        for (url, expected_body) in [
+            ("https://github.com/a/b", ""),
+            ("https://www.youtube.com/watch?v=abc", ""),
+            ("https://www.bilibili.com/video/BV123", ""),
+            ("https://example.com/article", "正文"),
+        ] {
+            save_item_in_db(
+                &conn,
+                SaveItem {
+                    url: url.into(),
+                    title: "标题".into(),
+                    summary: "摘要".into(),
+                    tags: vec![],
+                    body: Some("正文".into()),
+                },
+            )
+            .unwrap();
+            let body: String = conn
+                .query_row("SELECT body FROM items WHERE url = ?1", [url], |row| {
+                    row.get(0)
+                })
+                .unwrap();
+            assert_eq!(body, expected_body, "{url}");
+        }
+        conn.execute("UPDATE items SET archived=1, liked=1, body='旧正文' WHERE url='https://github.com/a/b'", []).unwrap();
+        save_item_in_db(
+            &conn,
+            SaveItem {
+                url: "https://github.com/a/b".into(),
+                title: "新标题".into(),
+                summary: "".into(),
+                tags: vec![],
+                body: Some("新正文".into()),
+            },
+        )
+        .unwrap();
+        let (body, archived, liked): (String, bool, bool) = conn
+            .query_row(
+                "SELECT body, archived, liked FROM items WHERE url='https://github.com/a/b'",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?)),
+            )
+            .unwrap();
+        assert_eq!((body.as_str(), archived, liked), ("旧正文", true, true));
     }
 }

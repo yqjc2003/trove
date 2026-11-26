@@ -57,6 +57,7 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .item-title { display: block; width: 100%; padding: 0; background: transparent; border: 0; text-align: left; font-size: 15px; line-height: 1.45; font-weight: 600; color: #303a34; overflow-wrap: anywhere; }
 .item-title:hover { text-decoration: underline; }
 .item small { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.item .item-kind { color: #597866; }
 .item p { margin: 8px 0; font-size: 13px; line-height: 1.6; color: #69736d; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
 .item-actions { display: flex; flex-wrap: wrap; gap: 17px; margin-top: 12px; }
 .item-actions button { padding: 0; border: 0; background: transparent; color: #89938d; font-size: 12px; }

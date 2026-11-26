@@ -122,6 +122,29 @@ settingsForm.addEventListener('submit', async (event) => {
 });
 let lastAnalyzedUrl = '';
 let pendingBody = '';
+let classificationVersion = 0;
+let classificationTimer;
+const contentKindHint = document.querySelector('#content-kind-hint');
+const contentHints = {
+  article: '识别为文章：解析时会提取正文并发送给 DeepSeek，用于生成摘要和标签。',
+  repo: '识别为代码仓库：仅使用页面标题和简介生成摘要，保存后可直接打开原站。',
+  video: '识别为视频：仅使用页面标题和简介生成摘要，保存后可直接打开原站。',
+};
+async function showContentKind(url) {
+  const version = ++classificationVersion;
+  if (!url || !form.elements.url.checkValidity()) {
+    contentKindHint.textContent = '文章会提取正文并发送给 DeepSeek；仓库和视频仅使用页面标题和简介。';
+    return;
+  }
+  try {
+    const kind = await invoke('classify_url', { url });
+    if (version === classificationVersion && form.elements.url.value.trim() === url) {
+      contentKindHint.textContent = contentHints[kind] || contentHints.article;
+    }
+  } catch {
+    if (version === classificationVersion) contentKindHint.textContent = '请输入有效的 HTTP 或 HTTPS 网址。';
+  }
+}
 async function analyzeUrl() {
   if (analyzeButton.disabled) return;
   const url = form.elements.url.value.trim();
@@ -137,12 +160,16 @@ async function analyzeUrl() {
     form.elements.tags.value = result.tags.join(', ');
     pendingBody = result.body;
     lastAnalyzedUrl = url;
-    message.textContent = '解析完成，可以检查或修改后保存。';
+    message.textContent = result.content_type === 'article' ? '解析完成，可以检查或修改后保存。' : '简介解析完成，保存后可直接打开原站。';
   } catch (error) { message.textContent = String(error); }
   finally { analyzeButton.disabled = false; saveButton.disabled = false; }
 }
 analyzeButton.addEventListener('click', analyzeUrl);
 form.elements.url.addEventListener('input', () => {
+  clearTimeout(classificationTimer);
+  classificationVersion++;
+  const url = form.elements.url.value.trim();
+  classificationTimer = setTimeout(() => showContentKind(url), 150);
   if (lastAnalyzedUrl && form.elements.url.value.trim() !== lastAnalyzedUrl) {
     form.elements.title.value = '';
     form.elements.summary.value = '';
@@ -239,8 +266,12 @@ function renderItems() {
     row.addEventListener('click', (event) => { if (!event.target.closest('button')) openReader(item); });
     const info = document.createElement('div');
     const title = document.createElement('button'); title.type = 'button'; title.className = 'item-title'; title.textContent = item.title;
+    const direct = item.content_type === 'repo' || item.content_type === 'video';
+    title.title = direct ? '打开原网页' : '打开阅读器';
     title.addEventListener('click', () => openReader(item));
     const url = document.createElement('small'); url.textContent = item.url;
+    const kind = document.createElement('small'); kind.className = 'item-kind';
+    kind.textContent = item.content_type === 'repo' ? '代码仓库 · 打开原网页 ↗' : item.content_type === 'video' ? '视频 · 打开原网页 ↗' : '文章 · 本地阅读';
     const summary = document.createElement('p'); summary.textContent = item.summary;
     const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
     const actions = document.createElement('div'); actions.className = 'item-actions';
@@ -261,7 +292,7 @@ function renderItems() {
       } catch (error) { libraryMessage.textContent = String(error); }
     });
     actions.append(like, archive, editTags, remove);
-    info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
+    info.append(title, url, kind, summary, tags, actions); row.append(info); items.append(row);
   }
 }
 document.querySelectorAll('.nav-item').forEach((button) => button.addEventListener('click', () => {
@@ -287,7 +318,7 @@ form.addEventListener('submit', async (event) => {
   event.preventDefault(); message.textContent = '';
   const data = new FormData(form);
   const item = { url: data.get('url'), title: data.get('title'), summary: data.get('summary'), tags: data.get('tags').split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), body: pendingBody };
-  try { await invoke('save_item', { item }); form.reset(); lastAnalyzedUrl = ''; pendingBody = ''; await refresh(); addDialog.close(); }
+  try { await invoke('save_item', { item }); form.reset(); lastAnalyzedUrl = ''; pendingBody = ''; classificationVersion++; await showContentKind(''); await refresh(); addDialog.close(); }
   catch (error) { message.textContent = String(error); }
 });
 refreshSettings().catch((error) => { settingsMessage.textContent = String(error); });
@@ -353,6 +384,11 @@ function applyReaderSettings() {
 [font, size, color, theme].forEach((control) => control.addEventListener('input', applyReaderSettings));
 applyReaderSettings();
 async function openReader(item) {
+  if (item.content_type === 'repo' || item.content_type === 'video') {
+    try { await invoke('open_original', { url: item.url }); }
+    catch (error) { libraryMessage.textContent = String(error); }
+    return;
+  }
   clearTimeout(positionTimer);
   saveReaderPosition();
   readerReady = false;
