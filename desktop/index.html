@@ -56,7 +56,7 @@
   <div class="dialog-head"><h2 id="add-heading">收录链接</h2><button id="close-add" class="text-button" type="button" aria-label="关闭">✕</button></div>
   <form id="add-form" class="stack">
     <div class="fields"><label>网址<input name="url" type="url" placeholder="https://" required></label><button id="analyze" type="button">解析网页</button></div>
-    <p id="content-kind-hint" class="hint" role="status">文章会提取正文并发送给 DeepSeek；仓库和视频仅使用页面标题和简介。</p>
+    <p id="content-kind-hint" class="hint" role="status">文章提取正文；GitHub 读取公开 README 或用户资料；视频读取公开介绍。</p>
     <label>标题<input name="title" maxlength="500" required></label>
     <label>摘要<textarea name="summary" maxlength="2000" rows="3"></textarea></label>
     <label>标签<input name="tags" placeholder="用逗号分隔，可手工添加多个标签"></label>

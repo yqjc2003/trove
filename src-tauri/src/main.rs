@@ -84,6 +84,13 @@ fn initialize_database(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
     }
+    if !columns.iter().any(|c| c == "source_note") {
+        conn.execute(
+            "ALTER TABLE items ADD COLUMN source_note TEXT NOT NULL DEFAULT ''",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     if !columns.iter().any(|c| c == "liked") {
         conn.execute(
             "ALTER TABLE items ADD COLUMN liked INTEGER NOT NULL DEFAULT 0",
@@ -318,6 +325,8 @@ struct SaveItem {
     summary: String,
     tags: Vec<String>,
     body: Option<String>,
+    #[serde(default)]
+    source_note: Option<String>,
 }
 
 #[tauri::command]
@@ -339,17 +348,17 @@ fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
     }
     let tags = analysis::normalize_manual_tags(item.tags)?;
     let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
-    let body = if content_kind::detect(parsed.as_str()) == content_kind::ContentKind::Article {
-        item.body.unwrap_or_default()
-    } else {
-        String::new()
-    };
+    let body = item.body.unwrap_or_default();
     if body.len() > 2 * 1024 * 1024 {
         return Err("正文过长".into());
     }
+    let source_note = item.source_note.unwrap_or_default();
+    if source_note.chars().count() > 1000 {
+        return Err("内容提示过长".into());
+    }
     conn.execute(
-        "INSERT INTO items (url, title, summary, tags, body) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, body=CASE WHEN excluded.body = '' THEN items.body ELSE excluded.body END",
-        params![parsed.as_str(), title, item.summary.trim(), tags, body],
+        "INSERT INTO items (url, title, summary, tags, body, source_note) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, body=CASE WHEN excluded.body = '' OR (excluded.source_note <> '' AND items.body <> '') THEN items.body ELSE excluded.body END, source_note=CASE WHEN excluded.body = '' OR (excluded.source_note <> '' AND items.body <> '') THEN items.source_note ELSE excluded.source_note END",
+        params![parsed.as_str(), title, item.summary.trim(), tags, body, source_note],
     ).map_err(|e| e.to_string())?;
     Ok(())
 }
@@ -474,34 +483,48 @@ struct ReaderItem {
     title: String,
     summary: String,
     body: String,
+    source_note: String,
 }
 
 #[tauri::command]
 async fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String> {
-    let (url, title, summary, mut body): (String, String, String, String) = database(&app)?
-        .query_row(
-            "SELECT url, title, summary, body FROM items WHERE id = ?1",
-            [id],
-            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
-        )
-        .map_err(|_| "找不到这条收藏".to_string())?;
-    if content_kind::detect(&url) != content_kind::ContentKind::Article {
-        return Err("此链接适合在原网站打开".into());
-    }
+    let (url, title, summary, mut body, mut source_note): (String, String, String, String, String) =
+        database(&app)?
+            .query_row(
+                "SELECT url, title, summary, body, source_note FROM items WHERE id = ?1",
+                [id],
+                |row| {
+                    Ok((
+                        row.get(0)?,
+                        row.get(1)?,
+                        row.get(2)?,
+                        row.get(3)?,
+                        row.get(4)?,
+                    ))
+                },
+            )
+            .map_err(|_| "找不到这条收藏".to_string())?;
     if body.is_empty() {
-        let (_, fetched) = analysis::fetch_page(&url)
+        let source = analysis::fetch_source(&url)
             .await
             .map_err(|e| format!("此收藏尚未保存正文，重新读取失败：{e}"))?;
+        if source.body.trim().is_empty() {
+            return Err(source
+                .warning
+                .unwrap_or_else(|| "没有可读取的原始内容，请打开原网站。".into()));
+        }
         database(&app)?
             .execute(
-                "UPDATE items SET body = ?1 WHERE id = ?2 AND url = ?3 AND body = ''",
-                params![fetched, id, url],
+                "UPDATE items SET body = ?1, source_note = ?2 WHERE id = ?3 AND url = ?4 AND body = ''",
+                params![source.body, source.warning.unwrap_or_default(), id, url],
             )
             .map_err(|e| e.to_string())?;
-        body = database(&app)?
-            .query_row("SELECT body FROM items WHERE id = ?1", [id], |row| {
-                row.get(0)
-            })
+        (body, source_note) = database(&app)?
+            .query_row(
+                "SELECT body, source_note FROM items WHERE id = ?1",
+                [id],
+                |row| Ok((row.get(0)?, row.get(1)?)),
+            )
             .map_err(|_| "收藏已被删除".to_string())?;
     }
     Ok(ReaderItem {
@@ -510,6 +533,7 @@ async fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, S
         title,
         summary,
         body,
+        source_note,
     })
 }
 
@@ -707,13 +731,13 @@ mod tests {
     }
 
     #[test]
-    fn save_archives_only_articles_and_keeps_existing_item_state() {
+    fn saves_source_for_all_types_and_keeps_existing_item_state() {
         let conn = Connection::open_in_memory().unwrap();
         initialize_database(&conn).unwrap();
         for (url, expected_body) in [
-            ("https://github.com/a/b", ""),
-            ("https://www.youtube.com/watch?v=abc", ""),
-            ("https://www.bilibili.com/video/BV123", ""),
+            ("https://github.com/a/b", "正文"),
+            ("https://www.youtube.com/watch?v=abc", "正文"),
+            ("https://www.bilibili.com/video/BV123", "正文"),
             ("https://example.com/article", "正文"),
         ] {
             save_item_in_db(
@@ -724,6 +748,7 @@ mod tests {
                     summary: "摘要".into(),
                     tags: vec![],
                     body: Some("正文".into()),
+                    source_note: None,
                 },
             )
             .unwrap();
@@ -742,7 +767,8 @@ mod tests {
                 title: "新标题".into(),
                 summary: "".into(),
                 tags: vec![],
-                body: Some("新正文".into()),
+                body: Some(String::new()),
+                source_note: Some("未获取到 README".into()),
             },
         )
         .unwrap();
@@ -754,5 +780,48 @@ mod tests {
             )
             .unwrap();
         assert_eq!((body.as_str(), archived, liked), ("旧正文", true, true));
+        let note: String = conn
+            .query_row(
+                "SELECT source_note FROM items WHERE url='https://github.com/a/b'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert!(note.is_empty());
+    }
+
+    #[test]
+    fn keeps_source_warning_with_fallback_and_clears_it_after_full_content() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        let item = |body: &str, note: Option<&str>| SaveItem {
+            url: "https://github.com/a/b".into(),
+            title: "项目".into(),
+            summary: String::new(),
+            tags: vec![],
+            body: Some(body.into()),
+            source_note: note.map(str::to_string),
+        };
+        save_item_in_db(&conn, item("公开简介", Some("README 不可用"))).unwrap();
+        let saved: (String, String) = conn
+            .query_row("SELECT body, source_note FROM items", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(saved, ("公开简介".into(), "README 不可用".into()));
+        save_item_in_db(&conn, item("# README", None)).unwrap();
+        let saved: (String, String) = conn
+            .query_row("SELECT body, source_note FROM items", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(saved, ("# README".into(), String::new()));
+        save_item_in_db(&conn, item("不完整简介", Some("README 不可用"))).unwrap();
+        let saved: (String, String) = conn
+            .query_row("SELECT body, source_note FROM items", [], |row| {
+                Ok((row.get(0)?, row.get(1)?))
+            })
+            .unwrap();
+        assert_eq!(saved, ("# README".into(), String::new()));
     }
 }

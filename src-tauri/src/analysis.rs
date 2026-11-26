@@ -1,4 +1,4 @@
-use crate::content_kind::{self, ContentKind};
+use crate::content_kind::{self, ContentKind, GithubTarget};
 use scraper::{Html, Selector};
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -12,6 +12,7 @@ pub struct Analysis {
     pub tags: Vec<String>,
     pub body: String,
     pub content_type: ContentKind,
+    pub warning: Option<String>,
 }
 
 #[derive(Deserialize)]
@@ -167,7 +168,7 @@ fn extract_link_metadata(html: &str) -> Result<(String, String), String> {
             if value.is_empty() {
                 None
             } else {
-                Some(value.split_whitespace().collect::<Vec<_>>().join(" "))
+                Some(value.to_string())
             }
         })
     };
@@ -191,8 +192,14 @@ fn extract_link_metadata(html: &str) -> Result<(String, String), String> {
     let description = meta("meta[property='og:description'], meta[name='description'], meta[name='twitter:description']")
         .unwrap_or_default();
     Ok((
-        title.chars().take(500).collect(),
-        description.chars().take(18000).collect(),
+        title
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .chars()
+            .take(500)
+            .collect(),
+        description,
     ))
 }
 
@@ -252,6 +259,186 @@ pub async fn fetch_page(raw_url: &str) -> Result<(String, String), String> {
     extract_page(&fetch_html(raw_url, false).await?)
 }
 
+pub struct Source {
+    pub title: String,
+    pub body: String,
+    pub warning: Option<String>,
+}
+
+async fn github_api_text(path: &str, accept: &str) -> Result<Option<String>, String> {
+    let client = reqwest::Client::builder()
+        .timeout(Duration::from_secs(30))
+        .redirect(reqwest::redirect::Policy::custom(|attempt| {
+            if attempt.previous().len() >= 3
+                || attempt.url().scheme() != "https"
+                || attempt.url().host_str() != Some("api.github.com")
+            {
+                attempt.stop()
+            } else {
+                attempt.follow()
+            }
+        }))
+        .user_agent("CatchLinger/0.1")
+        .build()
+        .map_err(|_| "无法创建 GitHub 网络连接".to_string())?;
+    let mut response = client
+        .get(format!("https://api.github.com{path}"))
+        .header("Accept", accept)
+        .header("X-GitHub-Api-Version", "2022-11-28")
+        .send()
+        .await
+        .map_err(|_| "无法连接 GitHub API".to_string())?;
+    if response.status() == reqwest::StatusCode::NOT_FOUND {
+        return Ok(None);
+    }
+    if !response.status().is_success() {
+        return Err(format!(
+            "GitHub API 返回 {}，可能是访问受限或请求额度用尽",
+            response.status().as_u16()
+        ));
+    }
+    let mut bytes = Vec::new();
+    while let Some(chunk) = response
+        .chunk()
+        .await
+        .map_err(|_| "读取 GitHub 内容失败".to_string())?
+    {
+        if bytes.len() + chunk.len() > 2 * 1024 * 1024 {
+            return Err("GitHub 内容超过 2 MB，无法保存".into());
+        }
+        bytes.extend_from_slice(&chunk);
+    }
+    Ok(Some(String::from_utf8_lossy(&bytes).into_owned()))
+}
+
+fn profile_text(profile: &serde_json::Value) -> String {
+    [
+        ("用户名", "login"),
+        ("名称", "name"),
+        ("简介", "bio"),
+        ("地点", "location"),
+        ("网站", "blog"),
+    ]
+    .iter()
+    .filter_map(|(label, key)| {
+        let value = profile.get(key)?.as_str()?.trim();
+        if value.is_empty() {
+            None
+        } else {
+            Some(format!("{label}：{value}"))
+        }
+    })
+    .collect::<Vec<_>>()
+    .join("\n\n")
+}
+
+async fn fetch_github_source(target: GithubTarget) -> Result<Source, String> {
+    match target {
+        GithubTarget::Repository(owner, repo) => {
+            let path = format!("/repos/{owner}/{repo}/readme");
+            let body = github_api_text(&path, "application/vnd.github.raw+json")
+                .await?
+                .filter(|value| !value.trim().is_empty())
+                .ok_or("此项目没有可读取的 README")?;
+            Ok(Source {
+                title: format!("{owner}/{repo}"),
+                body,
+                warning: None,
+            })
+        }
+        GithubTarget::User(owner) => {
+            let response =
+                github_api_text(&format!("/users/{owner}"), "application/vnd.github+json")
+                    .await?
+                    .ok_or("无法找到此 GitHub 用户")?;
+            let profile: serde_json::Value =
+                serde_json::from_str(&response).map_err(|_| "GitHub 用户资料格式无效")?;
+            let mut body = profile_text(&profile);
+            let has_bio = profile
+                .get("bio")
+                .and_then(|value| value.as_str())
+                .is_some_and(|value| !value.trim().is_empty());
+            let readme = github_api_text(
+                &format!("/repos/{owner}/{owner}/readme"),
+                "application/vnd.github.raw+json",
+            )
+            .await;
+            let mut warning = None;
+            let mut has_readme = false;
+            match readme {
+                Ok(Some(readme)) if !readme.trim().is_empty() => {
+                    if !body.is_empty() {
+                        body.push_str("\n\n");
+                    }
+                    body.push_str("Profile README：\n\n");
+                    body.push_str(&readme);
+                    has_readme = true;
+                }
+                Err(error) => {
+                    warning = Some(format!("用户资料已读取，但 Profile README 未获取：{error}"))
+                }
+                _ => {}
+            }
+            if !has_bio && !has_readme && warning.is_none() {
+                warning =
+                    Some("该用户未提供公开简介或 Profile README，仅保存了公开基本资料。".into());
+            }
+            if body.trim().is_empty() {
+                return Err("GitHub 用户没有可读取的公开简介".into());
+            }
+            if body.len() > 2 * 1024 * 1024 {
+                return Err("GitHub 用户资料超过 2 MB，无法保存".into());
+            }
+            Ok(Source {
+                title: format!("{owner} · GitHub"),
+                body,
+                warning,
+            })
+        }
+    }
+}
+
+pub async fn fetch_source(raw_url: &str) -> Result<Source, String> {
+    let content_type = content_kind::detect(raw_url);
+    if content_type == ContentKind::Article {
+        let (title, body) = fetch_page(raw_url).await?;
+        return Ok(Source {
+            title,
+            body,
+            warning: None,
+        });
+    }
+    if let Some(target) = content_kind::github_target(raw_url) {
+        match fetch_github_source(target).await {
+            Ok(source) => return Ok(source),
+            Err(error) => {
+                let html = fetch_html(raw_url, true)
+                    .await
+                    .map_err(|_| format!("{error}，且无法读取网页简介，请确认网址可公开访问"))?;
+                let (title, body) = extract_link_metadata(&html)
+                    .map_err(|_| format!("{error}，且无法读取网页简介"))?;
+                let warning = Some(format!("{error}；已使用网页简介，内容可能不完整。"));
+                return Ok(Source {
+                    title,
+                    body,
+                    warning,
+                });
+            }
+        }
+    }
+    let (title, body) = extract_link_metadata(&fetch_html(raw_url, true).await?)?;
+    let warning = if body.trim().is_empty() {
+        Some("网页未提供可读取的介绍；可保存链接并手工补充摘要。".to_string())
+    } else {
+        None
+    };
+    Ok(Source {
+        title,
+        body,
+        warning,
+    })
+}
+
 fn build_ai_request(
     model: &str,
     title: &str,
@@ -275,21 +462,16 @@ pub async fn analyze(
     available_tags: &[String],
 ) -> Result<Analysis, String> {
     let content_type = content_kind::detect(raw_url);
-    let (title, body, text) = match content_type {
-        ContentKind::Article => {
-            let (title, body) = fetch_page(raw_url).await?;
-            let text = body.chars().take(18000).collect::<String>();
-            (title, body, text)
-        }
-        ContentKind::Repo | ContentKind::Video => {
-            let (title, description) = extract_link_metadata(&fetch_html(raw_url, true).await?)?;
-            let text = if description.is_empty() {
-                "未获取到页面描述，请仅依据标题说明信息有限，不要推测内容。".to_string()
-            } else {
-                description
-            };
-            (title, String::new(), text)
-        }
+    let source = fetch_source(raw_url).await?;
+    let Source {
+        title,
+        body,
+        warning,
+    } = source;
+    let text = if body.trim().is_empty() {
+        "未获取到页面介绍，请仅依据标题说明信息有限，不要推测内容。".to_string()
+    } else {
+        body.chars().take(18000).collect::<String>()
     };
     let request = build_ai_request(model, &title, &text, available_tags);
     let ai_client = reqwest::Client::builder()
@@ -330,6 +512,7 @@ pub async fn analyze(
         tags,
         body,
         content_type,
+        warning,
     })
 }
 
@@ -402,7 +585,7 @@ mod tests {
     }
 
     #[test]
-    fn extracts_metadata_without_archiving_page_content() {
+    fn extracts_link_title_and_description() {
         let html = r#"<html><head><title>备用标题</title><meta property="og:title" content="项目 &amp; 演示"><meta name="description" content="仓库说明"></head><body><p>正文不应作为仓库描述</p></body></html>"#;
         let (title, description) = extract_link_metadata(html).unwrap();
         assert_eq!(title, "项目 & 演示");
@@ -414,5 +597,24 @@ mod tests {
             ""
         );
         assert!(extract_link_metadata("<body>正文</body>").is_err());
+    }
+
+    #[test]
+    fn formats_only_available_public_profile_fields() {
+        let profile = json!({"login":"octocat","name":null,"bio":"写代码\n分享项目","location":"","blog":"https://example.com"});
+        let body = profile_text(&profile);
+        assert!(body.contains("用户名：octocat"));
+        assert!(body.contains("简介：写代码\n分享项目"));
+        assert!(body.contains("网站：https://example.com"));
+        assert!(!body.contains("null"));
+        assert!(!body.contains("地点："));
+    }
+
+    #[test]
+    fn keeps_multiline_video_description() {
+        let html =
+            "<title>视频</title><meta property='og:description' content='第一行&#10;第二行'>";
+        let (_, description) = extract_link_metadata(html).unwrap();
+        assert_eq!(description, "第一行\n第二行");
     }
 }

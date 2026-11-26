@@ -7,7 +7,80 @@ use url::Url;
 pub enum ContentKind {
     Article,
     Repo,
+    Profile,
     Video,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum GithubTarget {
+    User(String),
+    Repository(String, String),
+}
+
+pub fn github_target(raw_url: &str) -> Option<GithubTarget> {
+    let url = Url::parse(raw_url.trim()).ok()?;
+    if !matches!(url.scheme(), "http" | "https")
+        || !matches!(url.host_str(), Some("github.com" | "www.github.com"))
+    {
+        return None;
+    }
+    let parts: Vec<_> = url
+        .path_segments()?
+        .filter(|part| !part.is_empty())
+        .collect();
+    let owner = *parts.first()?;
+    if !owner.chars().all(|c| c.is_ascii_alphanumeric() || c == '-')
+        || [
+            "settings",
+            "login",
+            "signup",
+            "orgs",
+            "users",
+            "explore",
+            "topics",
+            "marketplace",
+            "search",
+            "features",
+            "sponsors",
+            "notifications",
+            "pulls",
+            "issues",
+            "new",
+            "apps",
+            "about",
+            "collections",
+            "events",
+            "codespaces",
+            "site",
+            "enterprise",
+        ]
+        .iter()
+        .any(|name| owner.eq_ignore_ascii_case(name))
+    {
+        return None;
+    }
+    match parts.as_slice() {
+        [_] => Some(GithubTarget::User(owner.to_string())),
+        [_, repo, ..]
+            if repo
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+                && !repo.is_empty()
+                && *repo != "."
+                && *repo != ".." =>
+        {
+            let repo = repo.strip_suffix(".git").unwrap_or(repo);
+            if repo.is_empty() {
+                None
+            } else {
+                Some(GithubTarget::Repository(
+                    owner.to_string(),
+                    repo.to_string(),
+                ))
+            }
+        }
+        _ => None,
+    }
 }
 
 fn host_matches(host: &str, domain: &str) -> bool {
@@ -27,6 +100,9 @@ pub fn detect(raw_url: &str) -> ContentKind {
     let Some(host) = url.host_str() else {
         return ContentKind::Article;
     };
+    if matches!(github_target(raw_url), Some(GithubTarget::User(_))) {
+        return ContentKind::Profile;
+    }
     if [
         "github.com",
         "gitlab.com",
@@ -70,6 +146,19 @@ mod tests {
         ] {
             assert_eq!(detect(url), ContentKind::Repo, "{url}");
         }
+        assert_eq!(detect("https://github.com/yqjc2003"), ContentKind::Profile);
+        assert_eq!(
+            github_target("https://github.com/yqjc2003/fhzy-life"),
+            Some(GithubTarget::Repository(
+                "yqjc2003".into(),
+                "fhzy-life".into()
+            ))
+        );
+        assert_eq!(github_target("https://github.com/settings/profile"), None);
+        assert_eq!(
+            github_target("https://github.com.evil.test/owner/repo"),
+            None
+        );
         for url in [
             "https://www.youtube.com/watch?v=123",
             "https://youtu.be/123",
