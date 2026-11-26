@@ -12,7 +12,12 @@
       <button class="nav-item" type="button" data-view="all"><span>▧ &nbsp; 全部收藏</span><span id="count-all"></span></button>
       <p class="sidebar-label">标签</p><div id="tag-filters" class="tag-filters"></div>
     </div>
-    <div class="sidebar-foot">你的收藏，留在本地</div>
+    <div class="sidebar-foot">
+      <details id="settings-menu" class="settings-menu">
+        <summary aria-label="打开应用设置" title="设置"><span aria-hidden="true">⚙</span> 设置</summary>
+        <div class="menu-panel"><button id="open-reader-settings" type="button">阅读设置</button><button id="open-ai" type="button">AI 设置</button><button type="button" disabled>云同步（尚未开放）</button></div>
+      </details>
+    </div>
   </nav>
   <main id="library" class="library-content" aria-labelledby="list-heading">
     <div class="library-toolbar">
@@ -37,7 +42,6 @@
       </article>
     </div>
   </main>
-  <details id="settings-menu" class="settings-menu"><summary aria-label="打开应用设置" title="设置">···</summary><div class="menu-panel"><button id="open-reader-settings" type="button">阅读设置</button><button id="open-ai" type="button">AI 设置</button><button type="button" disabled>云同步（尚未开放）</button></div></details>
 </div>
 <dialog id="add-dialog" aria-labelledby="add-heading">
   <div class="dialog-head"><h2 id="add-heading">收录链接</h2><button id="close-add" class="text-button" type="button" aria-label="关闭">✕</button></div>
