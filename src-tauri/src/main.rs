@@ -329,6 +329,16 @@ struct SaveItem {
     source_note: Option<String>,
 }
 
+fn validate_item_metadata(title: &str, summary: &str) -> Result<(), String> {
+    if title.trim().is_empty() || title.trim().chars().count() > 500 {
+        return Err("标题不能为空，且不能超过 500 个字符".into());
+    }
+    if summary.chars().count() > 2000 {
+        return Err("摘要不能超过 2000 个字符".into());
+    }
+    Ok(())
+}
+
 #[tauri::command]
 fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
     save_item_in_db(&database(&app)?, item)
@@ -340,12 +350,7 @@ fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
         return Err("仅支持 HTTP 或 HTTPS 网址".into());
     }
     let title = item.title.trim();
-    if title.is_empty() || title.chars().count() > 500 {
-        return Err("标题不能为空，且不能超过 500 个字符".into());
-    }
-    if item.summary.chars().count() > 2000 {
-        return Err("摘要不能超过 2000 个字符".into());
-    }
+    validate_item_metadata(title, &item.summary)?;
     let tags = analysis::normalize_manual_tags(item.tags)?;
     let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
     let body = item.body.unwrap_or_default();
@@ -361,6 +366,35 @@ fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
         params![parsed.as_str(), title, item.summary.trim(), tags, body, source_note],
     ).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[derive(Deserialize)]
+struct EditItem {
+    id: i64,
+    title: String,
+    summary: String,
+    tags: Vec<String>,
+}
+
+fn edit_item_in_db(conn: &Connection, item: EditItem) -> Result<(), String> {
+    validate_item_metadata(&item.title, &item.summary)?;
+    let tags = analysis::normalize_manual_tags(item.tags)?;
+    let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
+    let count = conn
+        .execute(
+            "UPDATE items SET title = ?1, summary = ?2, tags = ?3 WHERE id = ?4",
+            params![item.title.trim(), item.summary.trim(), tags, item.id],
+        )
+        .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("找不到这条收藏".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn edit_item(app: tauri::AppHandle, item: EditItem) -> Result<(), String> {
+    edit_item_in_db(&database(&app)?, item)
 }
 
 fn create_custom_tag_in_db(conn: &Connection, name: &str) -> Result<(), String> {
@@ -487,46 +521,22 @@ struct ReaderItem {
 }
 
 #[tauri::command]
-async fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String> {
-    let (url, title, summary, mut body, mut source_note): (String, String, String, String, String) =
-        database(&app)?
-            .query_row(
-                "SELECT url, title, summary, body, source_note FROM items WHERE id = ?1",
-                [id],
-                |row| {
-                    Ok((
-                        row.get(0)?,
-                        row.get(1)?,
-                        row.get(2)?,
-                        row.get(3)?,
-                        row.get(4)?,
-                    ))
-                },
-            )
-            .map_err(|_| "找不到这条收藏".to_string())?;
-    if body.is_empty() {
-        let source = analysis::fetch_source(&url)
-            .await
-            .map_err(|e| format!("此收藏尚未保存正文，重新读取失败：{e}"))?;
-        if source.body.trim().is_empty() {
-            return Err(source
-                .warning
-                .unwrap_or_else(|| "没有可读取的原始内容，请打开原网站。".into()));
-        }
-        database(&app)?
-            .execute(
-                "UPDATE items SET body = ?1, source_note = ?2 WHERE id = ?3 AND url = ?4 AND body = ''",
-                params![source.body, source.warning.unwrap_or_default(), id, url],
-            )
-            .map_err(|e| e.to_string())?;
-        (body, source_note) = database(&app)?
-            .query_row(
-                "SELECT body, source_note FROM items WHERE id = ?1",
-                [id],
-                |row| Ok((row.get(0)?, row.get(1)?)),
-            )
-            .map_err(|_| "收藏已被删除".to_string())?;
-    }
+fn get_reader_item_in_db(conn: &Connection, id: i64) -> Result<ReaderItem, String> {
+    let (url, title, summary, body, source_note): (String, String, String, String, String) = conn
+        .query_row(
+            "SELECT url, title, summary, body, source_note FROM items WHERE id = ?1",
+            [id],
+            |row| {
+                Ok((
+                    row.get(0)?,
+                    row.get(1)?,
+                    row.get(2)?,
+                    row.get(3)?,
+                    row.get(4)?,
+                ))
+            },
+        )
+        .map_err(|_| "找不到这条收藏".to_string())?;
     Ok(ReaderItem {
         id,
         url,
@@ -535,6 +545,38 @@ async fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, S
         body,
         source_note,
     })
+}
+
+#[tauri::command]
+fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String> {
+    get_reader_item_in_db(&database(&app)?, id)
+}
+
+#[tauri::command]
+async fn fetch_reader_content(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String> {
+    let existing = get_reader_item_in_db(&database(&app)?, id)?;
+    if !existing.body.trim().is_empty() {
+        return Ok(existing);
+    }
+    let source = analysis::fetch_source(&existing.url).await?;
+    if source.body.trim().is_empty() {
+        return Err(source
+            .warning
+            .unwrap_or_else(|| "没有可读取的原始内容，请打开原网页。".into()));
+    }
+    database(&app)?
+        .execute(
+            "UPDATE items SET body = ?1, source_note = ?2 WHERE id = ?3 AND url = ?4 AND body = ?5",
+            params![
+                source.body,
+                source.warning.unwrap_or_default(),
+                id,
+                existing.url,
+                existing.body
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+    get_reader_item_in_db(&database(&app)?, id)
 }
 
 #[tauri::command]
@@ -563,12 +605,14 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             list_items,
             save_item,
+            edit_item,
             delete_item,
             get_ai_settings,
             save_ai_settings,
             analyze_url,
             classify_url,
             get_reader_item,
+            fetch_reader_content,
             open_original,
             set_item_state,
             list_reader_notes,
@@ -823,5 +867,72 @@ mod tests {
             })
             .unwrap();
         assert_eq!(saved, ("# README".into(), String::new()));
+    }
+
+    #[test]
+    fn edits_metadata_without_replacing_original_or_reading_state() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        conn.execute("INSERT INTO items (id, url, title, summary, tags, body, source_note, archived, liked, created_at) VALUES (1, 'https://example.com/a', '旧标题', '旧简介', '[]', '原文', '原来源提示', 1, 1, '2020-01-01')", []).unwrap();
+        edit_item_in_db(
+            &conn,
+            EditItem {
+                id: 1,
+                title: " 新标题 ".into(),
+                summary: " 新简介 ".into(),
+                tags: vec!["Rust".into(), "rust".into(), "学习".into()],
+            },
+        )
+        .unwrap();
+        let row: (String, String, String, String, String, bool, bool, String) = conn.query_row(
+            "SELECT title, summary, tags, body, source_note, archived, liked, created_at FROM items WHERE id = 1", [],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?, row.get(4)?, row.get(5)?, row.get(6)?, row.get(7)?)),
+        ).unwrap();
+        assert_eq!(
+            row,
+            (
+                "新标题".into(),
+                "新简介".into(),
+                r#"["Rust","学习"]"#.into(),
+                "原文".into(),
+                "原来源提示".into(),
+                true,
+                true,
+                "2020-01-01".into()
+            )
+        );
+        assert!(edit_item_in_db(
+            &conn,
+            EditItem {
+                id: 1,
+                title: " ".into(),
+                summary: "".into(),
+                tags: vec![]
+            }
+        )
+        .is_err());
+        assert_eq!(get_reader_item_in_db(&conn, 1).unwrap().title, "新标题");
+    }
+
+    #[test]
+    fn empty_content_can_be_saved_and_read_without_network() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        save_item_in_db(
+            &conn,
+            SaveItem {
+                url: "https://example.com/empty".into(),
+                title: "手工标题".into(),
+                summary: "".into(),
+                tags: vec![],
+                body: None,
+                source_note: None,
+            },
+        )
+        .unwrap();
+        let item = get_reader_item_in_db(&conn, 1).unwrap();
+        assert_eq!(item.title, "手工标题");
+        assert!(item.body.is_empty());
+        assert!(get_reader_item_in_db(&conn, 999).is_err());
     }
 }

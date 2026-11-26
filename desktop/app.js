@@ -78,6 +78,8 @@ function renderTagChoices() {
 editTagsInput.addEventListener('input', renderTagChoices);
 function openTagEditor(item) {
   editingItem = item;
+  document.querySelector('#edit-item-title').value = item.title;
+  document.querySelector('#edit-item-summary').value = item.summary;
   editTagsInput.value = item.tags.join(', ');
   editTagsMessage.textContent = '';
   renderTagChoices();
@@ -88,7 +90,12 @@ editTagsForm.addEventListener('submit', async (event) => {
   if (!editingItem) return;
   editTagsMessage.textContent = '';
   try {
-    await invoke('set_item_tags', { id: editingItem.id, tags: parsedTags(editTagsInput.value) });
+    const item = { id: editingItem.id, title: document.querySelector('#edit-item-title').value, summary: document.querySelector('#edit-item-summary').value, tags: parsedTags(editTagsInput.value) };
+    await invoke('edit_item', { item });
+    if (currentItem?.id === item.id) {
+      currentItem = { ...currentItem, title: item.title.trim(), summary: item.summary.trim(), tags: item.tags };
+      readerTitle.textContent = currentItem.title;
+    }
     await refresh();
     editTagsDialog.close();
   } catch (error) { editTagsMessage.textContent = String(error); }
@@ -153,18 +160,24 @@ async function analyzeUrl() {
   if (!url || !form.elements.url.reportValidity()) return;
   analyzeButton.disabled = true;
   saveButton.disabled = true;
+  const initial = { title: form.elements.title.value, summary: form.elements.summary.value, tags: form.elements.tags.value };
   message.textContent = '正在读取网页并生成摘要，请稍候……';
   try {
     const result = await invoke('analyze_url', { url });
     if (form.elements.url.value.trim() !== url) { message.textContent = '网址已更改，请重新解析。'; return; }
-    form.elements.title.value = result.title;
-    form.elements.summary.value = result.summary;
-    form.elements.tags.value = result.tags.join(', ');
+    if (form.elements.title.value === initial.title) form.elements.title.value = result.title;
+    if (form.elements.summary.value === initial.summary) form.elements.summary.value = result.summary;
+    if (form.elements.tags.value === initial.tags) form.elements.tags.value = result.tags.join(', ');
     pendingBody = result.body;
     pendingSourceNote = result.warning || '';
     lastAnalyzedUrl = url;
     message.textContent = result.warning || '解析完成，可以检查或修改后保存。';
-  } catch (error) { message.textContent = String(error); }
+  } catch (error) {
+    if (form.elements.url.value.trim() === url) {
+      lastAnalyzedUrl = url;
+      message.textContent = `${String(error)}；可手工填写标题、简介和标签后保存。`;
+    }
+  }
   finally { analyzeButton.disabled = false; saveButton.disabled = false; }
 }
 analyzeButton.addEventListener('click', analyzeUrl);
@@ -284,7 +297,7 @@ function renderItems() {
       source.addEventListener('click', () => openReader(item, true));
       actions.append(source);
     }
-    const editTags = document.createElement('button'); editTags.textContent = '编辑标签';
+    const editTags = document.createElement('button'); editTags.textContent = '编辑收藏';
     editTags.addEventListener('click', () => openTagEditor(item));
     const like = document.createElement('button'); like.textContent = item.liked ? '♥ 已喜欢' : '♡ 喜欢';
     like.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'liked', value: !item.liked }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
@@ -340,6 +353,8 @@ const fullscreenButton = document.querySelector('#toggle-fullscreen');
 const readerStatus = document.querySelector('#reader-status');
 const page = document.querySelector('#reading-page');
 const readerBody = document.querySelector('#reader-body');
+const readerEmpty = document.querySelector('#reader-empty');
+const retryReaderContent = document.querySelector('#retry-reader-content');
 const readerTitle = document.querySelector('#reader-title');
 const readerUrl = document.querySelector('#reader-url');
 const font = document.querySelector('#reader-font');
@@ -410,6 +425,8 @@ async function openReader(item, viewSource = false) {
   readerTitle.textContent = item.title;
   readerUrl.textContent = item.url;
   readerBody.textContent = '正在读取正文……';
+  readerEmpty.hidden = true;
+  retryReaderContent.disabled = false;
   readerStatus.textContent = '';
   document.querySelector('#notes').replaceChildren();
   document.querySelector('#note-message').textContent = '';
@@ -418,29 +435,49 @@ async function openReader(item, viewSource = false) {
   try {
     const result = await invoke('get_reader_item', { id: item.id });
     if (version !== readerVersion) return;
-    readerStatus.textContent = result.source_note || '';
-    readerBody.replaceChildren();
-    for (const paragraph of result.body.split(/\n\s*\n/)) {
-      if (!paragraph.trim()) continue;
-      const p = document.createElement('p');
-      p.textContent = paragraph;
-      readerBody.append(p);
-    }
-    const savedPosition = loadReaderPosition(item);
-    requestAnimationFrame(() => {
-      if (version !== readerVersion) return;
-      restoringPosition = true;
-      restorePosition(savedPosition);
-      requestAnimationFrame(() => {
-        if (version !== readerVersion) return;
-        restoringPosition = false;
-        readerReady = true;
-      });
-    });
+    showReaderContent(result, item, version);
   } catch (error) {
     if (version === readerVersion) readerBody.textContent = String(error);
   }
 }
+function showReaderContent(result, item, version) {
+  readerStatus.textContent = result.source_note || '';
+  readerBody.replaceChildren();
+  readerEmpty.hidden = !!result.body.trim();
+  if (!result.body.trim()) return;
+  for (const paragraph of result.body.split(/\n\s*\n/)) {
+    if (!paragraph.trim()) continue;
+    const p = document.createElement('p');
+    p.textContent = paragraph;
+    readerBody.append(p);
+  }
+  const savedPosition = loadReaderPosition(item);
+  requestAnimationFrame(() => {
+    if (version !== readerVersion) return;
+    restoringPosition = true;
+    restorePosition(savedPosition);
+    requestAnimationFrame(() => {
+      if (version !== readerVersion) return;
+      restoringPosition = false;
+      readerReady = true;
+    });
+  });
+}
+retryReaderContent.addEventListener('click', async () => {
+  if (!currentItem) return;
+  const item = currentItem;
+  const version = readerVersion;
+  retryReaderContent.disabled = true;
+  readerStatus.textContent = '正在重新获取正文……';
+  try {
+    const result = await invoke('fetch_reader_content', { id: item.id });
+    if (version === readerVersion) showReaderContent(result, item, version);
+  } catch (error) {
+    if (version === readerVersion) readerStatus.textContent = `无法获取正文：${String(error)}`;
+  } finally {
+    if (version === readerVersion) retryReaderContent.disabled = false;
+  }
+});
 function setReaderFullscreen(enabled) {
   const position = readerReady ? capturePosition() : null;
   saveReaderPosition();
@@ -519,5 +556,5 @@ document.querySelector('#note-form').addEventListener('submit', async (event) =>
 });
 document.querySelector('#open-original').addEventListener('click', async () => {
   try { await invoke('open_original', { url: currentItem.url }); }
-  catch (error) { readerBody.textContent = String(error); }
+  catch (error) { readerStatus.textContent = String(error); }
 });

@@ -47,6 +47,7 @@
       <p id="reader-status" role="status"></p>
       <article class="reading-page" id="reading-page" aria-labelledby="reader-title">
         <h1 id="reader-title"></h1><p id="reader-url" class="reader-url"></p><div id="reader-body" class="reader-body"></div>
+        <div id="reader-empty" class="reader-empty" hidden><p>暂无保存的正文，请通过上方的图标打开原网页访问。</p><button id="retry-reader-content" class="text-button" type="button">尝试重新获取正文</button></div>
         <section class="notes-section"><h2>阅读笔记</h2><form id="note-form"><label for="note-input">记录你的想法</label><textarea id="note-input" maxlength="10000" rows="3" required></textarea><button type="submit">保存笔记</button></form><p id="note-message" role="status"></p><div id="notes"></div></section>
       </article>
     </div>
@@ -56,7 +57,8 @@
   <div class="dialog-head"><h2 id="add-heading">收录链接</h2><button id="close-add" class="text-button" type="button" aria-label="关闭">✕</button></div>
   <form id="add-form" class="stack">
     <div class="fields"><label>网址<input name="url" type="url" placeholder="https://" required></label><button id="analyze" type="button">解析网页</button></div>
-    <p id="content-kind-hint" class="hint" role="status">文章提取正文；GitHub 读取公开 README 或用户资料；视频读取公开介绍。</p>
+    <p id="content-kind-hint" class="hint" role="status">文章提取正文；GitHub 读取公开 README 或用户资料；视频读取公开介绍。无法读取时可手工填写并保存。</p>
+    <p class="hint">无法获取内容时，可手工填写标题、简介和标签；没有正文也可以保存。</p>
     <label>标题<input name="title" maxlength="500" required></label>
     <label>摘要<textarea name="summary" maxlength="2000" rows="3"></textarea></label>
     <label>标签<input name="tags" placeholder="用逗号分隔，可手工添加多个标签"></label>
@@ -66,15 +68,17 @@
 </dialog>
 <dialog id="create-tag-dialog" aria-labelledby="create-tag-heading">
   <div class="dialog-head"><h2 id="create-tag-heading">添加标签</h2><button id="close-create-tag" class="text-button" type="button" aria-label="关闭">✕</button></div>
-  <form id="create-tag-form" class="stack"><label>标签名称<input id="new-tag-name" maxlength="40" required autocomplete="off"></label><p class="hint">创建后可在文章的“编辑标签”中使用。</p><div><button type="submit">添加标签</button></div></form>
+  <form id="create-tag-form" class="stack"><label>标签名称<input id="new-tag-name" maxlength="40" required autocomplete="off"></label><p class="hint">创建后可在文章的“编辑收藏”中使用。</p><div><button type="submit">添加标签</button></div></form>
   <p id="create-tag-message" role="status"></p>
 </dialog>
 <dialog id="edit-tags-dialog" aria-labelledby="edit-tags-heading">
-  <div class="dialog-head"><h2 id="edit-tags-heading">编辑标签</h2><button id="close-edit-tags" class="text-button" type="button" aria-label="关闭">✕</button></div>
+  <div class="dialog-head"><h2 id="edit-tags-heading">编辑收藏</h2><button id="close-edit-tags" class="text-button" type="button" aria-label="关闭">✕</button></div>
   <form id="edit-tags-form" class="stack">
+    <label>标题<input id="edit-item-title" maxlength="500" required></label>
+    <label>简介<textarea id="edit-item-summary" maxlength="2000" rows="3"></textarea></label>
     <label>文章标签<input id="edit-tags-input" placeholder="用逗号分隔标签" autocomplete="off"></label>
     <div><p class="hint">点击标签可添加到文章，再次点击可移除。</p><div id="edit-tag-choices" class="tag-choices"></div></div>
-    <div><button type="submit">保存标签</button></div>
+    <div><button type="submit">保存修改</button></div>
   </form><p id="edit-tags-message" role="status"></p>
 </dialog>
 <dialog id="reader-settings-dialog" aria-labelledby="reader-settings-heading">

@@ -87,6 +87,8 @@ body.reader-fullscreen #reader { display: block; height: 100vh; height: 100dvh; 
 .reader-url { margin: 0 0 50px; font: 12px/1.6 "Microsoft YaHei UI", sans-serif; opacity: .65; }
 .reader-body { font-size: var(--reader-size); line-height: 1.95; white-space: pre-wrap; }
 .reader-body p { margin: 1.25em 0; color: inherit; }
+.reader-empty { padding: 28px 0; color: #78837b; font: 14px/1.7 "Microsoft YaHei UI", sans-serif; }
+.reader-empty .text-button { text-decoration: underline; }
 .notes-section { margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--rule); font: 14px/1.5 "Microsoft YaHei UI", sans-serif; }
 .notes-section h2 { font-size: 18px; }
 .notes-section form, .stack, .reading-settings { display: grid; gap: 16px; }
