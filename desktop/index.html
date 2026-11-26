@@ -10,7 +10,7 @@
       <button class="nav-item" type="button" data-view="liked"><span class="nav-label"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M20.5 8.8c0 4.2-8.5 10.1-8.5 10.1S3.5 13 3.5 8.8a4.5 4.5 0 0 1 8.5-2.1 4.5 4.5 0 0 1 8.5 2.1Z"/></svg>喜欢</span><span id="count-liked"></span></button>
       <button class="nav-item" type="button" data-view="archive"><span class="nav-label"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 5h16v4H4zM5.5 9v10h13V9M9 13h6"/></svg>归档</span><span id="count-archive"></span></button>
       <button class="nav-item" type="button" data-view="notes"><span class="nav-label"><svg class="nav-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4.5h14v11l-5 4H5zM14 19.5v-4h5M8 8h8M8 11h7"/></svg>笔记</span><span id="count-notes"></span></button>
-      <p class="sidebar-label">标签</p><div id="tag-filters" class="tag-filters"></div>
+      <div class="sidebar-heading"><p class="sidebar-label">标签</p><button id="add-tag" class="add-tag-button" type="button" aria-label="添加标签" title="添加标签">＋</button></div><div id="tag-filters" class="tag-filters"></div>
     </div>
     <div class="sidebar-foot">
       <details id="settings-menu" class="settings-menu">
@@ -59,9 +59,22 @@
     <p class="hint">解析时，网页标题和正文会发送给 DeepSeek 生成摘要与标签。</p>
     <label>标题<input name="title" maxlength="500" required></label>
     <label>摘要<textarea name="summary" maxlength="2000" rows="3"></textarea></label>
-    <label>标签<input name="tags" placeholder="最多 3 个标签，用逗号分隔"></label>
+    <label>标签<input name="tags" placeholder="用逗号分隔，可手工添加多个标签"></label>
     <div><button type="submit">保存收藏</button></div>
   </form><p id="message" role="status"></p>
+</dialog>
+<dialog id="create-tag-dialog" aria-labelledby="create-tag-heading">
+  <div class="dialog-head"><h2 id="create-tag-heading">添加标签</h2><button id="close-create-tag" class="text-button" type="button" aria-label="关闭">✕</button></div>
+  <form id="create-tag-form" class="stack"><label>标签名称<input id="new-tag-name" maxlength="40" required autocomplete="off"></label><p class="hint">创建后可在文章的“编辑标签”中使用。</p><div><button type="submit">添加标签</button></div></form>
+  <p id="create-tag-message" role="status"></p>
+</dialog>
+<dialog id="edit-tags-dialog" aria-labelledby="edit-tags-heading">
+  <div class="dialog-head"><h2 id="edit-tags-heading">编辑标签</h2><button id="close-edit-tags" class="text-button" type="button" aria-label="关闭">✕</button></div>
+  <form id="edit-tags-form" class="stack">
+    <label>文章标签<input id="edit-tags-input" placeholder="用逗号分隔标签" autocomplete="off"></label>
+    <div><p class="hint">点击标签可添加到文章，再次点击可移除。</p><div id="edit-tag-choices" class="tag-choices"></div></div>
+    <div><button type="submit">保存标签</button></div>
+  </form><p id="edit-tags-message" role="status"></p>
 </dialog>
 <dialog id="reader-settings-dialog" aria-labelledby="reader-settings-heading">
   <div class="dialog-head"><h2 id="reader-settings-heading">阅读设置</h2><button id="close-reader-settings" class="text-button" type="button" aria-label="关闭">✕</button></div>

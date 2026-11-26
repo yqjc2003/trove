@@ -12,8 +12,76 @@ const saveButton = form.querySelector('[type="submit"]');
 const aiDialog = document.querySelector('#ai-dialog');
 const readerSettingsDialog = document.querySelector('#reader-settings-dialog');
 const addDialog = document.querySelector('#add-dialog');
+const createTagDialog = document.querySelector('#create-tag-dialog');
+const editTagsDialog = document.querySelector('#edit-tags-dialog');
+const createTagForm = document.querySelector('#create-tag-form');
+const editTagsForm = document.querySelector('#edit-tags-form');
+const editTagsInput = document.querySelector('#edit-tags-input');
+const createTagMessage = document.querySelector('#create-tag-message');
+const editTagsMessage = document.querySelector('#edit-tags-message');
+let editingItem = null;
+let availableTags = [];
 document.querySelector('#open-add').addEventListener('click', () => addDialog.showModal());
 document.querySelector('#close-add').addEventListener('click', () => addDialog.close());
+document.querySelector('#add-tag').addEventListener('click', () => {
+  createTagForm.reset();
+  createTagMessage.textContent = '';
+  createTagDialog.showModal();
+});
+document.querySelector('#close-create-tag').addEventListener('click', () => createTagDialog.close());
+document.querySelector('#close-edit-tags').addEventListener('click', () => editTagsDialog.close());
+createTagForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  createTagMessage.textContent = '';
+  try {
+    await invoke('create_custom_tag', { name: document.querySelector('#new-tag-name').value });
+    await refresh();
+    createTagDialog.close();
+  } catch (error) { createTagMessage.textContent = String(error); }
+});
+function parsedTags(value) {
+  return value.split(/[,，]/).map((tag) => tag.trim()).filter(Boolean);
+}
+function renderTagChoices() {
+  const selected = parsedTags(editTagsInput.value);
+  const choices = document.querySelector('#edit-tag-choices');
+  choices.replaceChildren();
+  const tags = [...availableTags];
+  for (const tag of selected) {
+    if (!tags.some((candidate) => candidate.toLowerCase() === tag.toLowerCase())) tags.push(tag);
+  }
+  for (const tag of tags) {
+    const active = selected.some((candidate) => candidate.toLowerCase() === tag.toLowerCase());
+    const button = document.createElement('button');
+    button.type = 'button'; button.textContent = tag; button.classList.toggle('active', active);
+    button.setAttribute('aria-pressed', String(active));
+    button.addEventListener('click', () => {
+      const current = parsedTags(editTagsInput.value);
+      const exists = current.some((candidate) => candidate.toLowerCase() === tag.toLowerCase());
+      editTagsInput.value = (exists ? current.filter((candidate) => candidate.toLowerCase() !== tag.toLowerCase()) : [...current, tag]).join(', ');
+      renderTagChoices();
+    });
+    choices.append(button);
+  }
+}
+editTagsInput.addEventListener('input', renderTagChoices);
+function openTagEditor(item) {
+  editingItem = item;
+  editTagsInput.value = item.tags.join(', ');
+  editTagsMessage.textContent = '';
+  renderTagChoices();
+  editTagsDialog.showModal();
+}
+editTagsForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!editingItem) return;
+  editTagsMessage.textContent = '';
+  try {
+    await invoke('set_item_tags', { id: editingItem.id, tags: parsedTags(editTagsInput.value) });
+    await refresh();
+    editTagsDialog.close();
+  } catch (error) { editTagsMessage.textContent = String(error); }
+});
 document.querySelector('#open-ai').addEventListener('click', () => {
   document.querySelector('#settings-menu').open = false;
   aiDialog.showModal();
@@ -79,10 +147,14 @@ form.elements.url.addEventListener('blur', () => {
 let refreshVersion = 0;
 async function refresh() {
   const version = ++refreshVersion;
-  const result = await invoke('list_items', { query: document.querySelector('#search').value });
+  const [result, tags] = await Promise.all([
+    invoke('list_items', { query: document.querySelector('#search').value }),
+    invoke('list_desktop_tags'),
+  ]);
   if (version !== refreshVersion) return;
   libraryMessage.textContent = '';
   allItems = result;
+  availableTags = tags.sort((a, b) => a.localeCompare(b));
   renderItems();
 }
 let allItems = [];
@@ -94,14 +166,23 @@ function renderItems() {
   document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked).length;
   document.querySelector('#count-archive').textContent = allItems.filter((item) => item.archived).length;
   document.querySelector('#count-notes').textContent = allItems.filter((item) => item.note_count > 0).length;
-  const tags = [...new Set(allItems.flatMap((item) => item.tags))].sort((a, b) => a.localeCompare(b));
   const tagFilters = document.querySelector('#tag-filters');
   tagFilters.replaceChildren();
-  for (const tag of tags) {
+  for (const tag of availableTags) {
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'tag-filter'; button.textContent = tag;
     button.classList.toggle('active', tag === selectedTag);
-    button.addEventListener('click', () => { selectedTag = selectedTag === tag ? '' : tag; renderItems(); });
+    button.addEventListener('click', () => {
+      selectedTag = selectedTag === tag ? '' : tag;
+      currentView = selectedTag ? 'all' : 'unread';
+      const search = document.querySelector('#search');
+      if (search.value) {
+        search.value = '';
+        refresh().catch((error) => { libraryMessage.textContent = String(error); });
+      } else {
+        renderItems();
+      }
+    });
     tagFilters.append(button);
   }
   const titles = { unread: '首页', liked: '喜欢', archive: '归档', notes: '笔记', all: '搜索结果' };
@@ -110,7 +191,7 @@ function renderItems() {
   document.querySelector('#list-subtitle').textContent = selectedTag ? '按标签筛选收藏' : subtitles[currentView];
   document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === currentView));
   const result = allItems.filter((item) => {
-    if (selectedTag && !item.tags.includes(selectedTag)) return false;
+    if (selectedTag && !item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase())) return false;
     return currentView === 'all' || (currentView === 'unread' && !item.archived)
       || (currentView === 'liked' && item.liked) || (currentView === 'archive' && item.archived)
       || (currentView === 'notes' && item.note_count > 0);
@@ -130,6 +211,8 @@ function renderItems() {
     const summary = document.createElement('p'); summary.textContent = item.summary;
     const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
     const actions = document.createElement('div'); actions.className = 'item-actions';
+    const editTags = document.createElement('button'); editTags.textContent = '编辑标签';
+    editTags.addEventListener('click', () => openTagEditor(item));
     const like = document.createElement('button'); like.textContent = item.liked ? '♥ 已喜欢' : '♡ 喜欢';
     like.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'liked', value: !item.liked }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
     const archive = document.createElement('button'); archive.textContent = item.archived ? '移回首页' : '归档';
@@ -144,7 +227,7 @@ function renderItems() {
         await refresh();
       } catch (error) { libraryMessage.textContent = String(error); }
     });
-    actions.append(like, archive, remove);
+    actions.append(like, archive, editTags, remove);
     info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
   }
 }

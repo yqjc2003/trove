@@ -18,7 +18,7 @@ struct ModelResult {
     tags: Vec<String>,
 }
 
-pub fn normalize_tags(tags: Vec<String>) -> Result<Vec<String>, String> {
+fn normalize(tags: Vec<String>) -> Result<Vec<String>, String> {
     let mut result = Vec::new();
     for tag in tags {
         let tag = tag.trim();
@@ -35,8 +35,24 @@ pub fn normalize_tags(tags: Vec<String>) -> Result<Vec<String>, String> {
             result.push(tag.to_string());
         }
     }
+    Ok(result)
+}
+
+pub fn normalize_tags(tags: Vec<String>) -> Result<Vec<String>, String> {
+    let result = normalize(tags)?;
     if result.len() > 3 {
         return Err("最多支持 3 个标签".into());
+    }
+    Ok(result)
+}
+
+pub fn normalize_manual_tags(tags: Vec<String>) -> Result<Vec<String>, String> {
+    let result = normalize(tags)?;
+    if result
+        .iter()
+        .any(|tag| tag.contains([',', '，', '\n', '\r']))
+    {
+        return Err("标签不能包含逗号或换行".into());
     }
     Ok(result)
 }
@@ -238,6 +254,13 @@ mod tests {
             vec!["Rust"]
         );
         assert!(normalize_tags(vec!["a".into(), "b".into(), "c".into(), "d".into()]).is_err());
+        assert_eq!(
+            normalize_manual_tags(vec!["a".into(), "b".into(), "c".into(), "d".into()])
+                .unwrap()
+                .len(),
+            4
+        );
+        assert!(normalize_manual_tags(vec!["a,b".into()]).is_err());
     }
 
     #[test]

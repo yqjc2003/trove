@@ -3,8 +3,11 @@
 mod analysis;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
+use std::sync::Mutex;
 use tauri::Manager;
 use url::Url;
+
+static DATABASE_INIT: Mutex<()> = Mutex::new(());
 
 #[derive(Serialize)]
 struct Item {
@@ -26,6 +29,9 @@ fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 }
 
 fn database(app: &tauri::AppHandle) -> Result<Connection, String> {
+    let _guard = DATABASE_INIT
+        .lock()
+        .map_err(|_| "无法初始化本地数据库".to_string())?;
     let conn = Connection::open(data_dir(app)?.join("trove.sqlite3")).map_err(|e| e.to_string())?;
     initialize_database(&conn)?;
     Ok(conn)
@@ -41,6 +47,9 @@ fn initialize_database(conn: &Connection) -> Result<(), String> {
         CREATE TABLE IF NOT EXISTS reader_notes (
             id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL,
             body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS custom_tags (
+            name TEXT PRIMARY KEY COLLATE NOCASE
         );
         CREATE INDEX IF NOT EXISTS reader_notes_item_id_idx ON reader_notes(item_id);",
     )
@@ -306,7 +315,7 @@ fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
     if item.summary.chars().count() > 2000 {
         return Err("摘要不能超过 2000 个字符".into());
     }
-    let tags = analysis::normalize_tags(item.tags)?;
+    let tags = analysis::normalize_manual_tags(item.tags)?;
     let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
     let body = item.body.unwrap_or_default();
     if body.len() > 2 * 1024 * 1024 {
@@ -317,6 +326,69 @@ fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
         params![parsed.as_str(), title, item.summary.trim(), tags, body],
     ).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+fn create_custom_tag_in_db(conn: &Connection, name: &str) -> Result<(), String> {
+    let normalized = analysis::normalize_manual_tags(vec![name.to_string()])?;
+    let name = normalized.first().ok_or("标签不能为空")?;
+    conn.execute(
+        "INSERT INTO custom_tags (name) VALUES (?1) ON CONFLICT(name) DO NOTHING",
+        [name],
+    )
+    .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn create_custom_tag(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    create_custom_tag_in_db(&database(&app)?, &name)
+}
+
+#[tauri::command]
+fn list_desktop_tags(app: tauri::AppHandle) -> Result<Vec<String>, String> {
+    let conn = database(&app)?;
+    list_desktop_tags_in_db(&conn)
+}
+
+fn list_desktop_tags_in_db(conn: &Connection) -> Result<Vec<String>, String> {
+    let mut stmt = conn.prepare("SELECT name FROM custom_tags UNION ALL SELECT json_each.value FROM items, json_each(CASE WHEN json_valid(items.tags) THEN items.tags ELSE '[]' END) WHERE json_each.type = 'text'")
+        .map_err(|e| e.to_string())?;
+    let names = stmt
+        .query_map([], |row| row.get::<_, String>(0))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    let mut unique: Vec<String> = Vec::new();
+    for name in names {
+        if !name.trim().is_empty()
+            && !unique
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(&name))
+        {
+            unique.push(name);
+        }
+    }
+    Ok(unique)
+}
+
+fn set_item_tags_in_db(conn: &Connection, id: i64, tags: Vec<String>) -> Result<(), String> {
+    let tags = analysis::normalize_manual_tags(tags)?;
+    let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
+    let count = conn
+        .execute(
+            "UPDATE items SET tags = ?1 WHERE id = ?2",
+            params![tags, id],
+        )
+        .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("找不到这条收藏".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn set_item_tags(app: tauri::AppHandle, id: i64, tags: Vec<String>) -> Result<(), String> {
+    set_item_tags_in_db(&database(&app)?, id, tags)
 }
 
 #[derive(Serialize)]
@@ -397,7 +469,10 @@ fn main() {
             set_item_state,
             list_reader_notes,
             add_reader_note,
-            delete_reader_note
+            delete_reader_note,
+            create_custom_tag,
+            list_desktop_tags,
+            set_item_tags
         ])
         .run(tauri::generate_context!())
         .expect("无法启动拾藏桌面应用");
@@ -470,5 +545,48 @@ mod tests {
             items.iter().find(|item| item.id == 2).unwrap().note_count,
             0
         );
+    }
+
+    #[test]
+    fn custom_tags_persist_and_manual_assignment_preserves_item() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        create_custom_tag_in_db(&conn, "  Rust  ").unwrap();
+        create_custom_tag_in_db(&conn, "rust").unwrap();
+        let count: i64 = conn
+            .query_row("SELECT count(*) FROM custom_tags", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(count, 1);
+        assert!(create_custom_tag_in_db(&conn, " ").is_err());
+        conn.execute("INSERT INTO items(id, url, title, body, archived) VALUES (1, 'https://example.com', '标题', '正文', 1)", []).unwrap();
+        set_item_tags_in_db(
+            &conn,
+            1,
+            vec![
+                " Rust ".into(),
+                "rust".into(),
+                "学习".into(),
+                "技术".into(),
+                "设计".into(),
+            ],
+        )
+        .unwrap();
+        let items = search_items(&conn, "学习").unwrap();
+        assert_eq!(items[0].tags, vec!["Rust", "学习", "技术", "设计"]);
+        assert!(items[0].archived);
+        let available = list_desktop_tags_in_db(&conn).unwrap();
+        assert_eq!(
+            available
+                .iter()
+                .filter(|tag| tag.eq_ignore_ascii_case("rust"))
+                .count(),
+            1
+        );
+        assert!(available.contains(&"学习".to_string()));
+        conn.execute("DELETE FROM items WHERE id = 1", []).unwrap();
+        assert!(list_desktop_tags_in_db(&conn)
+            .unwrap()
+            .contains(&"Rust".to_string()));
+        assert!(set_item_tags_in_db(&conn, 99, vec![]).is_err());
     }
 }
