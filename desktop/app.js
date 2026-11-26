@@ -19,6 +19,17 @@ const editTagsForm = document.querySelector('#edit-tags-form');
 const editTagsInput = document.querySelector('#edit-tags-input');
 const createTagMessage = document.querySelector('#create-tag-message');
 const editTagsMessage = document.querySelector('#edit-tags-message');
+const tagToggle = document.querySelector('#toggle-tags');
+const tagFilters = document.querySelector('#tag-filters');
+function setTagsExpanded(expanded) {
+  tagToggle.setAttribute('aria-expanded', String(expanded));
+  tagFilters.hidden = !expanded;
+  try { localStorage.setItem('tags-expanded', String(expanded)); } catch { /* 偏好无法保存时仍允许切换 */ }
+}
+let tagsExpanded = true;
+try { tagsExpanded = localStorage.getItem('tags-expanded') !== 'false'; } catch { /* 使用默认展开状态 */ }
+setTagsExpanded(tagsExpanded);
+tagToggle.addEventListener('click', () => setTagsExpanded(tagToggle.getAttribute('aria-expanded') !== 'true'));
 let editingItem = null;
 let availableTags = [];
 document.querySelector('#open-add').addEventListener('click', () => addDialog.showModal());
