@@ -7,6 +7,9 @@ const settingsMessage = document.querySelector('#settings-message');
 const analyzeButton = document.querySelector('#analyze');
 const saveButton = form.querySelector('[type="submit"]');
 const aiDialog = document.querySelector('#ai-dialog');
+const addDialog = document.querySelector('#add-dialog');
+document.querySelector('#open-add').addEventListener('click', () => addDialog.showModal());
+document.querySelector('#close-add').addEventListener('click', () => addDialog.close());
 document.querySelector('#open-ai').addEventListener('click', () => {
   document.querySelector('#settings-menu').open = false;
   aiDialog.showModal();
@@ -64,11 +67,44 @@ form.elements.url.addEventListener('blur', () => {
   const url = form.elements.url.value.trim();
   if (url && url !== lastAnalyzedUrl && form.elements.url.checkValidity()) analyzeUrl();
 });
+let refreshVersion = 0;
 async function refresh() {
-  const result = await invoke('list_items');
+  const version = ++refreshVersion;
+  const result = await invoke('list_items', { query: document.querySelector('#search').value });
+  if (version !== refreshVersion) return;
+  allItems = result;
+  renderItems();
+}
+let allItems = [];
+let currentView = 'unread';
+let selectedTag = '';
+function renderItems() {
+  document.querySelector('#count-all').textContent = allItems.length;
+  document.querySelector('#count-unread').textContent = allItems.filter((item) => !item.archived).length;
+  document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked).length;
+  document.querySelector('#count-archive').textContent = allItems.filter((item) => item.archived).length;
+  const tags = [...new Set(allItems.flatMap((item) => item.tags))].sort((a, b) => a.localeCompare(b));
+  const tagFilters = document.querySelector('#tag-filters');
+  tagFilters.replaceChildren();
+  for (const tag of tags) {
+    const button = document.createElement('button');
+    button.type = 'button'; button.className = 'tag-filter'; button.textContent = tag;
+    button.classList.toggle('active', tag === selectedTag);
+    button.addEventListener('click', () => { selectedTag = selectedTag === tag ? '' : tag; renderItems(); });
+    tagFilters.append(button);
+  }
+  const titles = { unread: '待读', liked: '喜欢', archive: '归档', all: '全部收藏' };
+  document.querySelector('#list-heading').textContent = selectedTag || titles[currentView];
+  document.querySelector('#list-subtitle').textContent = selectedTag ? '按标签筛选收藏' : '留给稍后的好文章';
+  document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === currentView));
+  const result = allItems.filter((item) => {
+    if (selectedTag && !item.tags.includes(selectedTag)) return false;
+    return currentView === 'all' || (currentView === 'unread' && !item.archived)
+      || (currentView === 'liked' && item.liked) || (currentView === 'archive' && item.archived);
+  });
   items.replaceChildren();
   document.querySelector('#count').textContent = `${result.length} 条`;
-  if (!result.length) items.textContent = '还没有收藏。从上方添加第一个链接。';
+  if (!result.length) items.textContent = '这里还没有收藏。';
   for (const item of result) {
     const row = document.createElement('div'); row.className = 'item';
     const info = document.createElement('div');
@@ -77,19 +113,33 @@ async function refresh() {
     const url = document.createElement('small'); url.textContent = item.url;
     const summary = document.createElement('p'); summary.textContent = item.summary;
     const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
+    const actions = document.createElement('div'); actions.className = 'item-actions';
+    const like = document.createElement('button'); like.textContent = item.liked ? '♥ 已喜欢' : '♡ 喜欢';
+    like.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'liked', value: !item.liked }); await refresh(); } catch (error) { message.textContent = String(error); } });
+    const archive = document.createElement('button'); archive.textContent = item.archived ? '移回待读' : '归档';
+    archive.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'archived', value: !item.archived }); await refresh(); } catch (error) { message.textContent = String(error); } });
     const remove = document.createElement('button'); remove.textContent = '删除';
     remove.addEventListener('click', async () => {
       if (!window.confirm(`删除“${item.title}”？`)) return;
       try { await invoke('delete_item', { id: item.id }); await refresh(); } catch (error) { message.textContent = String(error); }
     });
-    info.append(title, url, summary, tags); row.append(info, remove); items.append(row);
+    actions.append(like, archive, remove);
+    info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
   }
 }
+document.querySelectorAll('.nav-item').forEach((button) => button.addEventListener('click', () => {
+  currentView = button.dataset.view; selectedTag = ''; renderItems();
+}));
+let searchTimer;
+document.querySelector('#search').addEventListener('input', () => {
+  clearTimeout(searchTimer);
+  searchTimer = setTimeout(() => refresh().catch((error) => { message.textContent = String(error); }), 180);
+});
 form.addEventListener('submit', async (event) => {
   event.preventDefault(); message.textContent = '';
   const data = new FormData(form);
   const item = { url: data.get('url'), title: data.get('title'), summary: data.get('summary'), tags: data.get('tags').split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), body: pendingBody };
-  try { await invoke('save_item', { item }); form.reset(); lastAnalyzedUrl = ''; pendingBody = ''; await refresh(); message.textContent = '收藏已保存。'; }
+  try { await invoke('save_item', { item }); form.reset(); lastAnalyzedUrl = ''; pendingBody = ''; await refresh(); addDialog.close(); }
   catch (error) { message.textContent = String(error); }
 });
 refreshSettings().catch((error) => { settingsMessage.textContent = String(error); });
@@ -131,6 +181,9 @@ async function openReader(item) {
   readerTitle.textContent = item.title;
   readerUrl.textContent = item.url;
   readerBody.textContent = '正在读取正文……';
+  document.querySelector('#notes').replaceChildren();
+  document.querySelector('#note-message').textContent = '';
+  refreshNotes(item.id).catch((error) => { document.querySelector('#note-message').textContent = String(error); });
   window.scrollTo(0, 0);
   try {
     const result = await invoke('get_reader_item', { id: item.id });
@@ -151,6 +204,38 @@ document.querySelector('#back').addEventListener('click', () => {
   reader.hidden = true;
   library.hidden = false;
   window.scrollTo(0, 0);
+});
+document.querySelector('#show-library').addEventListener('click', () => {
+  if (!reader.hidden) document.querySelector('#back').click();
+});
+async function refreshNotes(itemId) {
+  const notes = await invoke('list_reader_notes', { itemId });
+  if (!currentItem || currentItem.id !== itemId || reader.hidden) return;
+  const container = document.querySelector('#notes');
+  container.replaceChildren();
+  for (const note of notes) {
+    const row = document.createElement('div'); row.className = 'note';
+    const text = document.createElement('p'); text.textContent = note.body;
+    const date = document.createElement('small'); date.textContent = note.created_at;
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button'; remove.textContent = '删除笔记';
+    remove.addEventListener('click', async () => {
+      if (!window.confirm('删除这条笔记？')) return;
+      try { await invoke('delete_reader_note', { id: note.id, itemId }); await refreshNotes(itemId); }
+      catch (error) { document.querySelector('#note-message').textContent = String(error); }
+    });
+    row.append(text, date, remove); container.append(row);
+  }
+}
+document.querySelector('#note-form').addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const itemId = currentItem.id;
+  const input = document.querySelector('#note-input');
+  try {
+    await invoke('add_reader_note', { itemId, body: input.value });
+    input.value = '';
+    document.querySelector('#note-message').textContent = '笔记已保存。';
+    await refreshNotes(itemId);
+  } catch (error) { document.querySelector('#note-message').textContent = String(error); }
 });
 document.querySelector('#open-original').addEventListener('click', async () => {
   try { await invoke('open_original', { url: currentItem.url }); }

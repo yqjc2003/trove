@@ -2,11 +2,27 @@
 <html lang="zh-CN">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>拾藏</title><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
 <body>
-<div class="topbar"><span class="mark">拾藏</span><details id="settings-menu" class="settings-menu"><summary aria-label="打开应用设置">···</summary><div class="menu-panel"><button id="open-ai" type="button">AI 设置</button><button type="button" disabled>云同步（尚未开放）</button></div></details></div>
+<div class="topbar"><button id="show-library" class="brand-button" type="button">CatchLinger <span>拾藏</span></button><div class="top-actions"><button id="open-add" class="top-button" type="button">＋ 收录</button><details id="settings-menu" class="settings-menu"><summary aria-label="打开应用设置">···</summary><div class="menu-panel"><button id="open-ai" type="button">AI 设置</button><button type="button" disabled>云同步（尚未开放）</button></div></details></div></div>
 <main id="library">
-  <header><h1>留下值得回看的内容</h1><p>你的收藏保存在这台设备上。</p></header>
-  <section aria-labelledby="add-heading">
-    <h2 id="add-heading">收录链接</h2>
+  <div class="library-layout">
+    <nav class="sidebar" aria-label="收藏导航">
+      <p class="sidebar-label">我的藏书</p>
+      <button class="nav-item active" type="button" data-view="unread">待读 <span id="count-unread"></span></button>
+      <button class="nav-item" type="button" data-view="liked">喜欢 <span id="count-liked"></span></button>
+      <button class="nav-item" type="button" data-view="archive">归档 <span id="count-archive"></span></button>
+      <button class="nav-item" type="button" data-view="all">全部收藏 <span id="count-all"></span></button>
+      <p class="sidebar-label tag-label">标签</p>
+      <div id="tag-filters" class="tag-filters"></div>
+    </nav>
+    <section class="library-content" aria-labelledby="list-heading">
+      <div class="library-toolbar"><div><h1 id="list-heading">待读</h1><p id="list-subtitle">留给稍后的好文章</p></div><label class="search-label"><span class="sr-only">搜索收藏</span><input id="search" type="search" placeholder="搜索收藏"></label></div>
+      <div class="list-count"><span id="count"></span><span>按收藏时间排序</span></div>
+      <div id="items"></div>
+    </section>
+  </div>
+</main>
+<dialog id="add-dialog">
+  <div class="dialog-head"><h2 id="add-heading">收录链接</h2><button id="close-add" class="text-button" type="button" aria-label="关闭">✕</button></div>
     <form id="add-form" class="stack">
       <div class="fields"><label>网址<input name="url" type="url" placeholder="https://" required></label><button id="analyze" type="button">解析网页</button></div>
       <p class="hint">解析时，网页标题和正文会发送给 DeepSeek 生成摘要与标签。</p>
@@ -15,14 +31,13 @@
       <label>标签<input name="tags" placeholder="最多 3 个标签，用逗号分隔"></label>
       <div><button type="submit">保存收藏</button></div>
     </form><p id="message" role="status"></p>
-  </section>
-  <section aria-labelledby="list-heading"><div class="section-head"><h2 id="list-heading">我的收藏</h2><span id="count"></span></div><div id="items"></div></section>
-</main>
+</dialog>
 <main id="reader" hidden>
   <div class="reader-actions"><button id="back" class="text-button" type="button">← 返回收藏</button><button id="open-original" class="text-button" type="button">打开原网页 ↗</button></div>
   <div class="reader-layout">
     <article class="reading-page" id="reading-page" aria-labelledby="reader-title">
       <div class="reader-meta">拾藏 / 阅读</div><h1 id="reader-title"></h1><p id="reader-url" class="reader-url"></p><div id="reader-body" class="reader-body"></div>
+      <section class="notes-section"><h2>阅读笔记</h2><form id="note-form"><label for="note-input">记录你的想法</label><textarea id="note-input" maxlength="10000" rows="3" required></textarea><button type="submit">保存笔记</button></form><p id="note-message" role="status"></p><div id="notes"></div></section>
     </article>
     <aside class="reading-settings" aria-label="阅读设置">
       <h2>阅读设置</h2>

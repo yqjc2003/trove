@@ -14,6 +14,8 @@ struct Item {
     summary: String,
     tags: Vec<String>,
     created_at: String,
+    liked: bool,
+    archived: bool,
 }
 
 fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
@@ -24,12 +26,21 @@ fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
 
 fn database(app: &tauri::AppHandle) -> Result<Connection, String> {
     let conn = Connection::open(data_dir(app)?.join("trove.sqlite3")).map_err(|e| e.to_string())?;
+    initialize_database(&conn)?;
+    Ok(conn)
+}
+
+fn initialize_database(conn: &Connection) -> Result<(), String> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS items (
             id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
             created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
         );
-        CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+        CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+        CREATE TABLE IF NOT EXISTS reader_notes (
+            id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL,
+            body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );",
     )
     .map_err(|e| e.to_string())?;
     let columns = conn
@@ -60,7 +71,21 @@ fn database(app: &tauri::AppHandle) -> Result<Connection, String> {
         )
         .map_err(|e| e.to_string())?;
     }
-    Ok(conn)
+    if !columns.iter().any(|c| c == "liked") {
+        conn.execute(
+            "ALTER TABLE items ADD COLUMN liked INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if !columns.iter().any(|c| c == "archived") {
+        conn.execute(
+            "ALTER TABLE items ADD COLUMN archived INTEGER NOT NULL DEFAULT 0",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(())
 }
 
 #[derive(Serialize)]
@@ -148,13 +173,14 @@ async fn analyze_url(app: tauri::AppHandle, url: String) -> Result<analysis::Ana
 }
 
 #[tauri::command]
-fn list_items(app: tauri::AppHandle) -> Result<Vec<Item>, String> {
+fn list_items(app: tauri::AppHandle, query: Option<String>) -> Result<Vec<Item>, String> {
     let conn = database(&app)?;
+    let query_text = query.unwrap_or_default().trim().to_string();
     let mut query = conn
-        .prepare("SELECT id, url, title, created_at, summary, tags FROM items ORDER BY id DESC")
+        .prepare("SELECT id, url, title, created_at, summary, tags, liked, archived FROM items WHERE ?1 = '' OR instr(lower(title || ' ' || url || ' ' || summary || ' ' || tags || ' ' || body), lower(?1)) > 0 ORDER BY id DESC")
         .map_err(|e| e.to_string())?;
     let rows = query
-        .query_map([], |row| {
+        .query_map([query_text], |row| {
             let tags: String = row.get(5)?;
             Ok(Item {
                 id: row.get(0)?,
@@ -163,11 +189,92 @@ fn list_items(app: tauri::AppHandle) -> Result<Vec<Item>, String> {
                 created_at: row.get(3)?,
                 summary: row.get(4)?,
                 tags: serde_json::from_str(&tags).unwrap_or_default(),
+                liked: row.get(6)?,
+                archived: row.get(7)?,
             })
         })
         .map_err(|e| e.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn set_item_state(
+    app: tauri::AppHandle,
+    id: i64,
+    field: String,
+    value: bool,
+) -> Result<(), String> {
+    let sql = match field.as_str() {
+        "liked" => "UPDATE items SET liked = ?1 WHERE id = ?2",
+        "archived" => "UPDATE items SET archived = ?1 WHERE id = ?2",
+        _ => return Err("不支持的操作".into()),
+    };
+    let updated = database(&app)?
+        .execute(sql, params![value, id])
+        .map_err(|e| e.to_string())?;
+    if updated == 0 {
+        return Err("找不到这条收藏".into());
+    }
+    Ok(())
+}
+
+#[derive(Serialize)]
+struct ReaderNote {
+    id: i64,
+    body: String,
+    created_at: String,
+}
+
+#[tauri::command]
+fn list_reader_notes(app: tauri::AppHandle, item_id: i64) -> Result<Vec<ReaderNote>, String> {
+    let conn = database(&app)?;
+    let mut stmt = conn
+        .prepare(
+            "SELECT id, body, created_at FROM reader_notes WHERE item_id = ?1 ORDER BY id DESC",
+        )
+        .map_err(|e| e.to_string())?;
+    let rows = stmt
+        .query_map([item_id], |row| {
+            Ok(ReaderNote {
+                id: row.get(0)?,
+                body: row.get(1)?,
+                created_at: row.get(2)?,
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn add_reader_note(app: tauri::AppHandle, item_id: i64, body: String) -> Result<(), String> {
+    let body = body.trim();
+    if body.is_empty() || body.chars().count() > 10000 {
+        return Err("笔记不能为空，且不能超过 10000 字".into());
+    }
+    let conn = database(&app)?;
+    let count = conn
+        .execute(
+            "INSERT INTO reader_notes (item_id, body) SELECT id, ?1 FROM items WHERE id = ?2",
+            params![body, item_id],
+        )
+        .map_err(|e| e.to_string())?;
+    if count == 0 {
+        return Err("找不到这条收藏".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_reader_note(app: tauri::AppHandle, id: i64, item_id: i64) -> Result<(), String> {
+    database(&app)?
+        .execute(
+            "DELETE FROM reader_notes WHERE id = ?1 AND item_id = ?2",
+            params![id, item_id],
+        )
+        .map_err(|e| e.to_string())?;
+    Ok(())
 }
 
 #[derive(Deserialize)]
@@ -259,9 +366,13 @@ fn open_original(url: String) -> Result<(), String> {
 
 #[tauri::command]
 fn delete_item(app: tauri::AppHandle, id: i64) -> Result<(), String> {
-    database(&app)?
-        .execute("DELETE FROM items WHERE id = ?1", [id])
+    let mut conn = database(&app)?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM reader_notes WHERE item_id = ?1", [id])
         .map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM items WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(())
 }
 
@@ -275,8 +386,36 @@ fn main() {
             save_ai_settings,
             analyze_url,
             get_reader_item,
-            open_original
+            open_original,
+            set_item_state,
+            list_reader_notes,
+            add_reader_note,
+            delete_reader_note
         ])
         .run(tauri::generate_context!())
         .expect("无法启动拾藏桌面应用");
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn upgrades_existing_items_without_losing_content() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE items (id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, summary TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '[]', body TEXT NOT NULL DEFAULT ''); INSERT INTO items(url,title,body) VALUES ('https://example.com','标题','正文');").unwrap();
+        initialize_database(&conn).unwrap();
+        initialize_database(&conn).unwrap();
+        let (title, body, liked, archived): (String, String, bool, bool) = conn
+            .query_row(
+                "SELECT title, body, liked, archived FROM items",
+                [],
+                |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+            )
+            .unwrap();
+        assert_eq!(
+            (title.as_str(), body.as_str(), liked, archived),
+            ("标题", "正文", false, false)
+        );
+    }
 }
