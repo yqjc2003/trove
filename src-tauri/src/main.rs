@@ -182,7 +182,12 @@ async fn analyze_url(app: tauri::AppHandle, url: String) -> Result<analysis::Ana
     if key.is_empty() {
         return Err("请先在 AI 设置中配置 DeepSeek API Key".into());
     }
-    analysis::analyze(&url, &settings.model, &key).await
+    let available_tags = list_desktop_tags_in_db(&database(&app)?)?;
+    let mut result = analysis::analyze(&url, &settings.model, &key, &available_tags).await?;
+    // AI 请求期间标签可能被删除；返回前再按当前标签库校验。
+    let current_tags = list_desktop_tags_in_db(&database(&app)?)?;
+    result.tags = analysis::select_existing_tags(&result.tags, &current_tags);
+    Ok(result)
 }
 
 #[tauri::command]
