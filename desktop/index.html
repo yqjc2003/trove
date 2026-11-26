@@ -23,7 +23,7 @@
     <div class="library-toolbar">
       <div class="list-title"><h1 id="list-heading">首页</h1><span id="count"></span></div>
       <div class="top-actions">
-        <button id="open-add" class="icon-button add-button" type="button" aria-label="收录链接" title="收录链接">＋</button>
+        <button id="open-add" class="icon-button add-button" type="button" aria-label="添加收藏" title="添加收藏">＋</button>
       </div>
     </div>
     <label class="search-label"><span class="sr-only">搜索标题、标签和正文</span><input id="search" type="search" placeholder="搜索标题、标签和正文"></label>
@@ -54,14 +54,16 @@
   </main>
 </div>
 <dialog id="add-dialog" aria-labelledby="add-heading">
-  <div class="dialog-head"><h2 id="add-heading">收录链接</h2><button id="close-add" class="text-button" type="button" aria-label="关闭">✕</button></div>
+  <div class="dialog-head"><h2 id="add-heading">添加收藏</h2><button id="close-add" class="text-button" type="button" aria-label="关闭">✕</button></div>
   <form id="add-form" class="stack">
-    <div class="fields"><label>网址<input name="url" type="url" placeholder="https://" required></label><button id="analyze" type="button">解析网页</button></div>
+    <label>添加方式<select name="mode"><option value="link">收录链接</option><option value="note">手写文章</option></select></label>
+    <div id="link-fields"><div class="fields"><label>网址<input name="url" type="url" placeholder="https://" required></label><button id="analyze" type="button">解析网页</button></div>
     <p id="content-kind-hint" class="hint" role="status">文章提取正文；GitHub 读取公开 README 或用户资料；视频读取公开介绍。无法读取时可手工填写并保存。</p>
-    <p class="hint">无法获取内容时，可手工填写标题、简介和标签；没有正文也可以保存。</p>
+    <p class="hint">无法获取内容时，可手工填写标题、简介和标签；没有正文也可以保存。</p></div>
     <label>标题<input name="title" maxlength="500" required></label>
     <label>摘要<textarea name="summary" maxlength="2000" rows="3"></textarea></label>
     <label>标签<input name="tags" placeholder="用逗号分隔，可手工添加多个标签"></label>
+    <label id="note-body-field" hidden>文章内容（支持 Markdown）<textarea name="body" rows="12"></textarea></label>
     <p class="hint">AI 仅从已有标签中选择；没有合适标签时留空。你也可以手工修改。</p>
     <div><button type="submit">保存收藏</button></div>
   </form><p id="message" role="status"></p>
@@ -77,6 +79,7 @@
     <label>标题<input id="edit-item-title" maxlength="500" required></label>
     <label>简介<textarea id="edit-item-summary" maxlength="2000" rows="3"></textarea></label>
     <label>文章标签<input id="edit-tags-input" placeholder="用逗号分隔标签" autocomplete="off"></label>
+    <label id="edit-note-body-field" hidden>文章内容（支持 Markdown）<textarea id="edit-note-body" rows="12"></textarea></label>
     <div><p class="hint">点击标签可添加到文章，再次点击可移除。</p><div id="edit-tag-choices" class="tag-choices"></div></div>
     <div><button type="submit">保存修改</button></div>
   </form><p id="edit-tags-message" role="status"></p>

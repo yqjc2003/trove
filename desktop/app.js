@@ -76,12 +76,17 @@ function renderTagChoices() {
   }
 }
 editTagsInput.addEventListener('input', renderTagChoices);
-function openTagEditor(item) {
+async function openTagEditor(item) {
   editingItem = item;
   document.querySelector('#edit-item-title').value = item.title;
   document.querySelector('#edit-item-summary').value = item.summary;
   editTagsInput.value = item.tags.join(', ');
   editTagsMessage.textContent = '';
+  document.querySelector('#edit-note-body-field').hidden = item.content_type !== 'note';
+  if (item.content_type === 'note') {
+    try { document.querySelector('#edit-note-body').value = (await invoke('get_reader_item', { id: item.id })).body; }
+    catch (error) { libraryMessage.textContent = String(error); return; }
+  }
   renderTagChoices();
   editTagsDialog.showModal();
 }
@@ -90,11 +95,12 @@ editTagsForm.addEventListener('submit', async (event) => {
   if (!editingItem) return;
   editTagsMessage.textContent = '';
   try {
-    const item = { id: editingItem.id, title: document.querySelector('#edit-item-title').value, summary: document.querySelector('#edit-item-summary').value, tags: parsedTags(editTagsInput.value) };
+    const item = { id: editingItem.id, title: document.querySelector('#edit-item-title').value, summary: document.querySelector('#edit-item-summary').value, tags: parsedTags(editTagsInput.value), body: editingItem.content_type === 'note' ? document.querySelector('#edit-note-body').value : null };
     await invoke('edit_item', { item });
     if (currentItem?.id === item.id) {
       currentItem = { ...currentItem, title: item.title.trim(), summary: item.summary.trim(), tags: item.tags };
       readerTitle.textContent = currentItem.title;
+      if (item.body !== null) await openReader(currentItem);
     }
     await refresh();
     editTagsDialog.close();
@@ -135,6 +141,15 @@ let pendingSourceIncomplete = false;
 let classificationVersion = 0;
 let classificationTimer;
 const contentKindHint = document.querySelector('#content-kind-hint');
+function setAddMode() {
+  const note = form.elements.mode.value === 'note';
+  document.querySelector('#link-fields').hidden = note;
+  document.querySelector('#note-body-field').hidden = !note;
+  form.elements.url.required = !note;
+  form.elements.url.disabled = note;
+  message.textContent = '';
+}
+form.elements.mode.addEventListener('change', setAddMode);
 const contentHints = {
   article: '识别为文章：解析时会提取正文并发送给 DeepSeek，用于生成摘要和标签。',
   repo: '识别为代码仓库：GitHub 项目会读取公开 README 并交给 DeepSeek 分析。',
@@ -166,7 +181,7 @@ async function analyzeUrl() {
   message.textContent = '正在读取网页并生成摘要，请稍候……';
   try {
     const result = await invoke('analyze_url', { url });
-    if (form.elements.url.value.trim() !== url) { message.textContent = '网址已更改，请重新解析。'; return; }
+    if (form.elements.mode.value !== 'link' || form.elements.url.value.trim() !== url) return;
     if (form.elements.title.value === initial.title) form.elements.title.value = result.title;
     if (form.elements.summary.value === initial.summary) form.elements.summary.value = result.summary;
     if (form.elements.tags.value === initial.tags) form.elements.tags.value = result.tags.join(', ');
@@ -226,7 +241,7 @@ function renderItems() {
   document.querySelector('#count-unread').textContent = allItems.filter((item) => !item.archived).length;
   document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked).length;
   document.querySelector('#count-archive').textContent = allItems.filter((item) => item.archived).length;
-  document.querySelector('#count-notes').textContent = allItems.filter((item) => item.note_count > 0).length;
+  document.querySelector('#count-notes').textContent = allItems.filter((item) => item.note_count > 0 || item.content_type === 'note').length;
   const tagFilters = document.querySelector('#tag-filters');
   tagFilters.replaceChildren();
   for (const tag of availableTags) {
@@ -275,7 +290,7 @@ function renderItems() {
     if (selectedTag && !item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase())) return false;
     return currentView === 'all' || (currentView === 'unread' && !item.archived)
       || (currentView === 'liked' && item.liked) || (currentView === 'archive' && item.archived)
-      || (currentView === 'notes' && item.note_count > 0);
+      || (currentView === 'notes' && (item.note_count > 0 || item.content_type === 'note'));
   });
   items.replaceChildren();
   document.querySelector('#count').textContent = `${result.length} 条`;
@@ -290,9 +305,15 @@ function renderItems() {
     const direct = ['repo', 'profile', 'video'].includes(item.content_type);
     title.title = direct ? '打开原网页' : '打开阅读器';
     title.addEventListener('click', () => openReader(item));
-    const url = document.createElement('small'); url.textContent = item.url;
-    const kind = document.createElement('small'); kind.className = 'item-kind';
-    kind.textContent = item.content_type === 'repo' ? '代码仓库 · 打开原网页 ↗' : item.content_type === 'profile' ? 'GitHub 用户 · 打开原网页 ↗' : item.content_type === 'video' ? '视频 · 打开原网页 ↗' : '文章';
+    const url = document.createElement('small'); url.className = 'item-source';
+    const type = item.content_type === 'profile' ? 'repo' : item.content_type;
+    const icons = { article: ['文章链接', 'M6 3h8l4 4v14H6z M14 3v5h4 M9 12h6 M9 16h6'], video: ['视频链接', 'M3 5h18v14H3z M10 9l5 3-5 3z'], repo: ['代码库', 'M5 3h13v18H5z M8 3v18 M11 8l-2 2 2 2 M14 8l2 2-2 2'], note: ['笔记文章', 'M5 4h14v16H5z M8 8h8 M8 12h8 M8 16h5'] };
+    const [label, path] = icons[type] || icons.article;
+    const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+    icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('role', 'img'); icon.setAttribute('aria-label', label); icon.classList.add('item-kind-icon');
+    const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); shape.setAttribute('d', path); icon.append(shape);
+    const address = document.createElement('span'); address.textContent = item.url || '';
+    url.title = label; url.append(icon, address);
     const summary = document.createElement('p'); summary.textContent = item.summary;
     const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
     const actions = document.createElement('div'); actions.className = 'item-actions';
@@ -318,7 +339,7 @@ function renderItems() {
       } catch (error) { libraryMessage.textContent = String(error); }
     });
     actions.append(like, archive, editTags, remove);
-    info.append(title, url, kind, summary, tags, actions); row.append(info); items.append(row);
+    info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
   }
 }
 document.querySelectorAll('.nav-item').forEach((button) => button.addEventListener('click', () => {
@@ -343,8 +364,15 @@ document.querySelector('#search').addEventListener('input', () => {
 form.addEventListener('submit', async (event) => {
   event.preventDefault(); message.textContent = '';
   const data = new FormData(form);
+  if (data.get('mode') === 'note') {
+    try {
+      await invoke('create_note_article', { note: { title: data.get('title'), summary: data.get('summary'), tags: parsedTags(data.get('tags')), body: data.get('body') } });
+      form.reset(); setAddMode(); lastAnalyzedUrl = ''; pendingBody = ''; pendingSourceNote = ''; pendingImages = []; pendingSourceIncomplete = false; classificationVersion++; await refresh(); addDialog.close();
+    } catch (error) { message.textContent = String(error); }
+    return;
+  }
   const item = { url: data.get('url'), title: data.get('title'), summary: data.get('summary'), tags: data.get('tags').split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), body: pendingBody, source_note: pendingSourceNote, images: pendingImages, source_incomplete: pendingSourceIncomplete };
-  try { await invoke('save_item', { item }); form.reset(); lastAnalyzedUrl = ''; pendingBody = ''; pendingSourceNote = ''; pendingImages = []; pendingSourceIncomplete = false; classificationVersion++; await showContentKind(''); await refresh(); addDialog.close(); }
+  try { await invoke('save_item', { item }); form.reset(); setAddMode(); lastAnalyzedUrl = ''; pendingBody = ''; pendingSourceNote = ''; pendingImages = []; pendingSourceIncomplete = false; classificationVersion++; await showContentKind(''); await refresh(); addDialog.close(); }
   catch (error) { message.textContent = String(error); }
 });
 refreshSettings().catch((error) => { settingsMessage.textContent = String(error); });
@@ -429,6 +457,10 @@ async function openReader(item, viewSource = false) {
   document.querySelectorAll('.item').forEach((row) => row.classList.toggle('selected', row.dataset.itemId === String(item.id)));
   readerTitle.textContent = item.title;
   readerUrl.textContent = item.url;
+  document.querySelector('#open-original').hidden = !item.url;
+  refreshReaderContent.hidden = !item.url;
+  document.querySelector('#reader-empty p').textContent = item.url ? '暂无保存的正文，请通过上方的图标打开原网页访问。' : '暂无正文，可通过“编辑收藏”填写文章内容。';
+  retryReaderContent.hidden = !item.url;
   readerBody.textContent = '正在读取正文……';
   readerEmpty.hidden = true;
   retryReaderContent.disabled = false;

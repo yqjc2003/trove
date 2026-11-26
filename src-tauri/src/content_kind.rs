@@ -9,6 +9,29 @@ pub enum ContentKind {
     Repo,
     Profile,
     Video,
+    Note,
+}
+
+impl ContentKind {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::Article => "article",
+            Self::Repo => "repo",
+            Self::Profile => "profile",
+            Self::Video => "video",
+            Self::Note => "note",
+        }
+    }
+    pub fn from_stored(value: &str, url: &str) -> Self {
+        match value {
+            "article" => Self::Article,
+            "repo" => Self::Repo,
+            "profile" => Self::Profile,
+            "video" => Self::Video,
+            "note" => Self::Note,
+            _ => detect(url),
+        }
+    }
 }
 
 #[derive(Debug, PartialEq, Eq)]

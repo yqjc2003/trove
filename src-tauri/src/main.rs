@@ -113,6 +113,45 @@ fn initialize_database(conn: &Connection) -> Result<(), String> {
         )
         .map_err(|e| e.to_string())?;
     }
+    if !columns.iter().any(|c| c == "content_type") {
+        conn.execute(
+            "ALTER TABLE items ADD COLUMN content_type TEXT NOT NULL DEFAULT ''",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    // 旧数据库的 url 不允许 NULL；手写文章没有外部地址，需要一次性迁移。
+    let url_not_null: bool = conn
+        .query_row(
+            "SELECT \"notnull\" FROM pragma_table_info('items') WHERE name = 'url'",
+            [],
+            |r| r.get(0),
+        )
+        .map_err(|e| e.to_string())?;
+    if url_not_null {
+        let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+        tx.execute_batch("CREATE TABLE items_migrated (id INTEGER PRIMARY KEY, url TEXT UNIQUE, title TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP, summary TEXT NOT NULL DEFAULT '', tags TEXT NOT NULL DEFAULT '[]', body TEXT NOT NULL DEFAULT '', source_note TEXT NOT NULL DEFAULT '', liked INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0, content_type TEXT NOT NULL DEFAULT '');
+            INSERT INTO items_migrated (id,url,title,created_at,summary,tags,body,source_note,liked,archived,content_type) SELECT id,url,title,created_at,summary,tags,body,source_note,liked,archived,content_type FROM items;
+            DROP TABLE items; ALTER TABLE items_migrated RENAME TO items;").map_err(|e| e.to_string())?;
+        tx.commit().map_err(|e| e.to_string())?;
+    }
+    let missing = {
+        let mut stmt = conn
+            .prepare("SELECT id, url FROM items WHERE content_type = '' AND url IS NOT NULL")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, String>(1)?)))
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+    for (id, url) in missing {
+        conn.execute(
+            "UPDATE items SET content_type = ?1 WHERE id = ?2",
+            params![content_kind::detect(&url).as_str(), id],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -236,7 +275,7 @@ fn list_items(app: tauri::AppHandle, query: Option<String>) -> Result<Vec<Item>,
 fn search_items(conn: &Connection, query_text: &str) -> Result<Vec<Item>, String> {
     let query_text = query_text.trim();
     let mut query = conn
-        .prepare("SELECT id, url, title, created_at, summary, tags, liked, archived, (SELECT count(*) FROM reader_notes WHERE item_id = items.id) AS note_count FROM items WHERE ?1 = '' OR instr(lower(title), lower(?1)) > 0 OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(items.tags) THEN items.tags ELSE '[]' END) WHERE instr(lower(json_each.value), lower(?1)) > 0) OR instr(lower(body), lower(?1)) > 0 ORDER BY id DESC")
+        .prepare("SELECT id, coalesce(url, ''), title, created_at, summary, tags, liked, archived, (SELECT count(*) FROM reader_notes WHERE item_id = items.id) AS note_count, content_type FROM items WHERE ?1 = '' OR instr(lower(title), lower(?1)) > 0 OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(items.tags) THEN items.tags ELSE '[]' END) WHERE instr(lower(json_each.value), lower(?1)) > 0) OR instr(lower(body), lower(?1)) > 0 ORDER BY id DESC")
         .map_err(|e| e.to_string())?;
     let rows = query
         .query_map([query_text], |row| {
@@ -244,7 +283,10 @@ fn search_items(conn: &Connection, query_text: &str) -> Result<Vec<Item>, String
             let url: String = row.get(1)?;
             Ok(Item {
                 id: row.get(0)?,
-                content_type: content_kind::detect(&url),
+                content_type: content_kind::ContentKind::from_stored(
+                    &row.get::<_, String>(9)?,
+                    &url,
+                ),
                 url,
                 title: row.get(2)?,
                 created_at: row.get(3)?,
@@ -369,6 +411,30 @@ fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
     save_item_in_db(&database(&app)?, item)
 }
 
+#[derive(Deserialize)]
+struct NewNoteArticle {
+    title: String,
+    summary: String,
+    tags: Vec<String>,
+    body: String,
+}
+
+fn create_note_article_in_db(conn: &Connection, note: NewNoteArticle) -> Result<(), String> {
+    validate_item_metadata(&note.title, &note.summary)?;
+    if note.body.len() > 2 * 1024 * 1024 {
+        return Err("正文过长".into());
+    }
+    let tags = serde_json::to_string(&analysis::normalize_manual_tags(note.tags)?)
+        .map_err(|e| e.to_string())?;
+    conn.execute("INSERT INTO items (url, title, summary, tags, body, content_type) VALUES (NULL, ?1, ?2, ?3, ?4, 'note')", params![note.title.trim(), note.summary.trim(), tags, note.body]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn create_note_article(app: tauri::AppHandle, note: NewNoteArticle) -> Result<(), String> {
+    create_note_article_in_db(&database(&app)?, note)
+}
+
 fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
     let parsed = Url::parse(item.url.trim()).map_err(|_| "请输入有效的网址".to_string())?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
@@ -419,8 +485,8 @@ fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
     let replace_source =
         !body.is_empty() && (!source_incomplete || old_body.as_deref().unwrap_or("").is_empty());
     tx.execute(
-        "INSERT INTO items (url, title, summary, tags, body, source_note) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, body=CASE WHEN excluded.body = '' OR (?7 AND items.body <> '') THEN items.body ELSE excluded.body END, source_note=CASE WHEN excluded.body = '' OR (?7 AND items.body <> '') THEN items.source_note ELSE excluded.source_note END",
-        params![parsed.as_str(), title, item.summary.trim(), tags, body, source_note, source_incomplete],
+        "INSERT INTO items (url, title, summary, tags, body, source_note, content_type) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?8) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, content_type=excluded.content_type, body=CASE WHEN excluded.body = '' OR (?7 AND items.body <> '') THEN items.body ELSE excluded.body END, source_note=CASE WHEN excluded.body = '' OR (?7 AND items.body <> '') THEN items.source_note ELSE excluded.source_note END",
+        params![parsed.as_str(), title, item.summary.trim(), tags, body, source_note, source_incomplete, content_kind::detect(parsed.as_str()).as_str()],
     ).map_err(|e| e.to_string())?;
     if replace_source {
         let id: i64 = tx
@@ -459,16 +525,25 @@ struct EditItem {
     title: String,
     summary: String,
     tags: Vec<String>,
+    #[serde(default)]
+    body: Option<String>,
 }
 
 fn edit_item_in_db(conn: &Connection, item: EditItem) -> Result<(), String> {
     validate_item_metadata(&item.title, &item.summary)?;
     let tags = analysis::normalize_manual_tags(item.tags)?;
     let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
+    if item
+        .body
+        .as_ref()
+        .is_some_and(|body| body.len() > 2 * 1024 * 1024)
+    {
+        return Err("正文过长".into());
+    }
     let count = conn
         .execute(
-            "UPDATE items SET title = ?1, summary = ?2, tags = ?3 WHERE id = ?4",
-            params![item.title.trim(), item.summary.trim(), tags, item.id],
+            "UPDATE items SET title = ?1, summary = ?2, tags = ?3, body = CASE WHEN content_type = 'note' AND ?5 IS NOT NULL THEN ?5 ELSE body END WHERE id = ?4",
+            params![item.title.trim(), item.summary.trim(), tags, item.id, item.body],
         )
         .map_err(|e| e.to_string())?;
     if count == 0 {
@@ -610,7 +685,7 @@ struct ReaderItem {
 fn get_reader_item_in_db(conn: &Connection, id: i64) -> Result<ReaderItem, String> {
     let (url, title, summary, body, source_note): (String, String, String, String, String) = conn
         .query_row(
-            "SELECT url, title, summary, body, source_note FROM items WHERE id = ?1",
+            "SELECT coalesce(url, ''), title, summary, body, source_note FROM items WHERE id = ?1",
             [id],
             |row| {
                 Ok((
@@ -661,6 +736,9 @@ async fn fetch_reader_content(
     force: Option<bool>,
 ) -> Result<ReaderItem, String> {
     let existing = get_reader_item_in_db(&database(&app)?, id)?;
+    if existing.url.is_empty() {
+        return Err("手写文章没有原网页，不能重新获取。".into());
+    }
     if !existing.body.trim().is_empty() && !force.unwrap_or(false) {
         return Ok(existing);
     }
@@ -759,6 +837,7 @@ fn main() {
         .invoke_handler(tauri::generate_handler![
             list_items,
             save_item,
+            create_note_article,
             edit_item,
             delete_item,
             get_ai_settings,
@@ -785,6 +864,57 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn migrates_types_and_saves_multiple_editable_notes_without_urls() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE items (id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP); INSERT INTO items(id,url,title) VALUES(7,'https://github.com/a/b','项目');").unwrap();
+        initialize_database(&conn).unwrap();
+        initialize_database(&conn).unwrap();
+        for title in ["第一篇", "第二篇"] {
+            create_note_article_in_db(
+                &conn,
+                NewNoteArticle {
+                    title: title.into(),
+                    summary: "简介".into(),
+                    tags: vec!["学习".into()],
+                    body: "# 独立正文\n内容".into(),
+                },
+            )
+            .unwrap();
+        }
+        let all = search_items(&conn, "").unwrap();
+        assert_eq!(all.len(), 3);
+        assert_eq!(
+            all.iter().find(|i| i.id == 7).unwrap().content_type,
+            content_kind::ContentKind::Repo
+        );
+        let note = all.iter().find(|i| i.title == "第一篇").unwrap();
+        assert_eq!(note.content_type, content_kind::ContentKind::Note);
+        assert_eq!(note.url, "");
+        edit_item_in_db(
+            &conn,
+            EditItem {
+                id: note.id,
+                title: "改后".into(),
+                summary: "".into(),
+                tags: vec![],
+                body: Some("更新后的正文".into()),
+            },
+        )
+        .unwrap();
+        assert_eq!(
+            get_reader_item_in_db(&conn, note.id).unwrap().body,
+            "更新后的正文"
+        );
+        assert_eq!(search_items(&conn, "更新后的正文").unwrap().len(), 1);
+        assert_eq!(
+            conn.query_row("SELECT count(*) FROM items WHERE url IS NULL", [], |r| r
+                .get::<_, i64>(0))
+                .unwrap(),
+            2
+        );
+    }
 
     #[test]
     fn upgrades_existing_items_without_losing_content() {
@@ -1049,6 +1179,7 @@ mod tests {
                 title: " 新标题 ".into(),
                 summary: " 新简介 ".into(),
                 tags: vec!["Rust".into(), "rust".into(), "学习".into()],
+                body: None,
             },
         )
         .unwrap();
@@ -1075,7 +1206,8 @@ mod tests {
                 id: 1,
                 title: " ".into(),
                 summary: "".into(),
-                tags: vec![]
+                tags: vec![],
+                body: None,
             }
         )
         .is_err());
