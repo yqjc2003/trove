@@ -86,6 +86,7 @@ async function refresh() {
 let allItems = [];
 let currentView = 'unread';
 let selectedTag = '';
+let currentItem = null;
 function renderItems() {
   document.querySelector('#count-all').textContent = allItems.length;
   document.querySelector('#count-unread').textContent = allItems.filter((item) => !item.archived).length;
@@ -115,6 +116,9 @@ function renderItems() {
   if (!result.length) items.textContent = '这里还没有收藏。';
   for (const item of result) {
     const row = document.createElement('div'); row.className = 'item';
+    row.dataset.itemId = String(item.id);
+    row.classList.toggle('selected', currentItem?.id === item.id);
+    row.addEventListener('click', (event) => { if (!event.target.closest('button')) openReader(item); });
     const info = document.createElement('div');
     const title = document.createElement('button'); title.type = 'button'; title.className = 'item-title'; title.textContent = item.title;
     title.addEventListener('click', () => openReader(item));
@@ -129,7 +133,7 @@ function renderItems() {
     const remove = document.createElement('button'); remove.textContent = '删除';
     remove.addEventListener('click', async () => {
       if (!window.confirm(`删除“${item.title}”？`)) return;
-      try { await invoke('delete_item', { id: item.id }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); }
+      try { await invoke('delete_item', { id: item.id }); if (currentItem?.id === item.id) await closeReader(); await refresh(); } catch (error) { libraryMessage.textContent = String(error); }
     });
     actions.append(like, archive, remove);
     info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
@@ -157,8 +161,11 @@ form.addEventListener('submit', async (event) => {
 refreshSettings().catch((error) => { settingsMessage.textContent = String(error); });
 refresh().catch((error) => { libraryMessage.textContent = String(error); });
 
-const library = document.querySelector('#library');
 const reader = document.querySelector('#reader');
+const readerContent = document.querySelector('#reader-content');
+const readerPlaceholder = document.querySelector('#reader-placeholder');
+const fullscreenButton = document.querySelector('#toggle-fullscreen');
+const readerStatus = document.querySelector('#reader-status');
 const page = document.querySelector('#reading-page');
 const readerBody = document.querySelector('#reader-body');
 const readerTitle = document.querySelector('#reader-title');
@@ -167,7 +174,6 @@ const font = document.querySelector('#reader-font');
 const size = document.querySelector('#reader-size');
 const color = document.querySelector('#reader-color');
 const theme = document.querySelector('#reader-theme');
-let currentItem = null;
 let readerVersion = 0;
 let preferences = {};
 try { preferences = JSON.parse(localStorage.getItem('reader-settings') || '{}'); } catch { preferences = {}; }
@@ -188,15 +194,18 @@ applyReaderSettings();
 async function openReader(item) {
   const version = ++readerVersion;
   currentItem = item;
-  library.hidden = true;
-  reader.hidden = false;
+  readerPlaceholder.hidden = true;
+  readerContent.hidden = false;
+  document.body.classList.add('reading-active');
+  document.querySelectorAll('.item').forEach((row) => row.classList.toggle('selected', row.dataset.itemId === String(item.id)));
   readerTitle.textContent = item.title;
   readerUrl.textContent = item.url;
   readerBody.textContent = '正在读取正文……';
+  readerStatus.textContent = '';
   document.querySelector('#notes').replaceChildren();
   document.querySelector('#note-message').textContent = '';
   refreshNotes(item.id).catch((error) => { document.querySelector('#note-message').textContent = String(error); });
-  window.scrollTo(0, 0);
+  reader.scrollTop = 0;
   try {
     const result = await invoke('get_reader_item', { id: item.id });
     if (version !== readerVersion) return;
@@ -211,18 +220,47 @@ async function openReader(item) {
     if (version === readerVersion) readerBody.textContent = String(error);
   }
 }
-document.querySelector('#back').addEventListener('click', () => {
-  readerVersion++;
-  reader.hidden = true;
-  library.hidden = false;
-  window.scrollTo(0, 0);
+async function setReaderFullscreen(enabled) {
+  fullscreenButton.disabled = true;
+  try {
+    await window.__TAURI__.window.getCurrentWindow().setFullscreen(enabled);
+    document.body.classList.toggle('reader-fullscreen', enabled);
+    fullscreenButton.textContent = enabled ? '⛶ 退出全屏' : '⛶ 全屏';
+    fullscreenButton.setAttribute('aria-pressed', String(enabled));
+    readerStatus.textContent = '';
+    return true;
+  } catch {
+    readerStatus.textContent = enabled ? '无法进入全屏，请重试。' : '无法退出全屏，请重试。';
+    return false;
+  } finally {
+    fullscreenButton.disabled = false;
+  }
+}
+fullscreenButton.addEventListener('click', () => {
+  setReaderFullscreen(!document.body.classList.contains('reader-fullscreen'));
 });
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && document.body.classList.contains('reader-fullscreen') && !document.querySelector('dialog[open]')) {
+    event.preventDefault();
+    setReaderFullscreen(false);
+  }
+});
+async function closeReader() {
+  if (document.body.classList.contains('reader-fullscreen') && !await setReaderFullscreen(false)) return;
+  readerVersion++;
+  currentItem = null;
+  readerContent.hidden = true;
+  readerPlaceholder.hidden = false;
+  document.body.classList.remove('reading-active');
+  document.querySelectorAll('.item.selected').forEach((row) => row.classList.remove('selected'));
+}
+document.querySelector('#back').addEventListener('click', closeReader);
 document.querySelector('#show-library').addEventListener('click', () => {
-  if (!reader.hidden) document.querySelector('#back').click();
+  if (!readerContent.hidden) closeReader();
 });
 async function refreshNotes(itemId) {
   const notes = await invoke('list_reader_notes', { itemId });
-  if (!currentItem || currentItem.id !== itemId || reader.hidden) return;
+  if (!currentItem || currentItem.id !== itemId || readerContent.hidden) return;
   const container = document.querySelector('#notes');
   container.replaceChildren();
   for (const note of notes) {
