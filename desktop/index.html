@@ -1,0 +1,27 @@
+<!doctype html>
+<html lang="zh-CN">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>拾藏</title><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
+<body><main>
+  <header><div><span class="mark">拾藏</span><h1>留下值得回看的内容</h1><p>你的收藏保存在这台设备上。</p></div></header>
+  <section aria-labelledby="ai-heading">
+    <h2 id="ai-heading">AI 设置</h2>
+    <form id="ai-form" class="stack">
+      <div class="fields"><label>服务商<select name="provider"><option value="deepseek">DeepSeek</option></select></label><label>模型<input name="model" value="deepseek-chat" required></label></div>
+      <label>API Key<input name="apiKey" type="password" autocomplete="off" placeholder="输入 DeepSeek API Key"></label>
+      <p class="hint" id="key-status">密钥保存在本机，不会显示已有密钥。</p>
+      <div><button type="submit">保存设置</button></div>
+    </form><p id="settings-message" role="status"></p>
+  </section>
+  <section aria-labelledby="add-heading">
+    <h2 id="add-heading">收录链接</h2>
+    <form id="add-form" class="stack">
+      <div class="fields"><label>网址<input name="url" type="url" placeholder="https://" required></label><button id="analyze" type="button">解析网页</button></div>
+      <p class="hint">解析时，网页标题和正文会发送给 DeepSeek 生成摘要与标签。</p>
+      <label>标题<input name="title" maxlength="500" required></label>
+      <label>摘要<textarea name="summary" maxlength="2000" rows="3"></textarea></label>
+      <label>标签<input name="tags" placeholder="最多 3 个标签，用逗号分隔"></label>
+      <div><button type="submit">保存收藏</button></div>
+    </form><p id="message" role="status"></p>
+  </section>
+  <section aria-labelledby="list-heading"><div class="section-head"><h2 id="list-heading">我的收藏</h2><span id="count"></span></div><div id="items"></div></section>
+</main></body></html>

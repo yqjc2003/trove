@@ -1,0 +1,216 @@
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
+mod analysis;
+use rusqlite::{params, Connection};
+use serde::{Deserialize, Serialize};
+use tauri::Manager;
+use url::Url;
+
+#[derive(Serialize)]
+struct Item {
+    id: i64,
+    url: String,
+    title: String,
+    summary: String,
+    tags: Vec<String>,
+    created_at: String,
+}
+
+fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
+    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir)
+}
+
+fn database(app: &tauri::AppHandle) -> Result<Connection, String> {
+    let conn = Connection::open(data_dir(app)?.join("trove.sqlite3")).map_err(|e| e.to_string())?;
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS items (
+            id INTEGER PRIMARY KEY, url TEXT NOT NULL UNIQUE, title TEXT NOT NULL,
+            created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+        );
+        CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT NOT NULL);",
+    )
+    .map_err(|e| e.to_string())?;
+    let columns = conn
+        .prepare("PRAGMA table_info(items)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    if !columns.iter().any(|c| c == "summary") {
+        conn.execute(
+            "ALTER TABLE items ADD COLUMN summary TEXT NOT NULL DEFAULT ''",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    if !columns.iter().any(|c| c == "tags") {
+        conn.execute(
+            "ALTER TABLE items ADD COLUMN tags TEXT NOT NULL DEFAULT '[]'",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
+    Ok(conn)
+}
+
+#[derive(Serialize)]
+struct AiSettings {
+    provider: String,
+    model: String,
+    has_key: bool,
+}
+
+fn read_key(app: &tauri::AppHandle) -> Result<String, String> {
+    let path = data_dir(app)?.join(".env.local");
+    let contents = match std::fs::read_to_string(path) {
+        Ok(s) => s,
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
+        Err(e) => return Err(format!("无法读取 AI 密钥：{e}")),
+    };
+    Ok(contents
+        .lines()
+        .find_map(|line| line.strip_prefix("DEEPSEEK_API_KEY="))
+        .unwrap_or("")
+        .to_string())
+}
+
+#[tauri::command]
+fn get_ai_settings(app: tauri::AppHandle) -> Result<AiSettings, String> {
+    let conn = database(&app)?;
+    let model = conn
+        .query_row(
+            "SELECT value FROM settings WHERE key = 'deepseek_model'",
+            [],
+            |r| r.get(0),
+        )
+        .unwrap_or_else(|_| "deepseek-chat".to_string());
+    Ok(AiSettings {
+        provider: "deepseek".into(),
+        model,
+        has_key: !read_key(&app)?.is_empty(),
+    })
+}
+
+#[tauri::command]
+fn save_ai_settings(
+    app: tauri::AppHandle,
+    provider: String,
+    model: String,
+    api_key: String,
+) -> Result<(), String> {
+    if provider != "deepseek" {
+        return Err("暂不支持该 AI 服务商".into());
+    }
+    let model = model.trim();
+    if model.is_empty()
+        || model.len() > 100
+        || !model
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+    {
+        return Err("模型名称无效".into());
+    }
+    let key = api_key.trim();
+    if key.contains(['\n', '\r']) || key.len() > 1024 {
+        return Err("API Key 格式无效".into());
+    }
+    if !key.is_empty() {
+        std::fs::write(
+            data_dir(&app)?.join(".env.local"),
+            format!("DEEPSEEK_API_KEY={key}\n"),
+        )
+        .map_err(|_| "无法保存 AI 密钥".to_string())?;
+    } else if read_key(&app)?.is_empty() {
+        return Err("请输入 DeepSeek API Key".into());
+    }
+    database(&app)?.execute("INSERT INTO settings(key, value) VALUES ('deepseek_model', ?1) ON CONFLICT(key) DO UPDATE SET value=excluded.value", [model]).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+async fn analyze_url(app: tauri::AppHandle, url: String) -> Result<analysis::Analysis, String> {
+    let settings = get_ai_settings(app.clone())?;
+    let key = read_key(&app)?;
+    if key.is_empty() {
+        return Err("请先在 AI 设置中配置 DeepSeek API Key".into());
+    }
+    analysis::analyze(&url, &settings.model, &key).await
+}
+
+#[tauri::command]
+fn list_items(app: tauri::AppHandle) -> Result<Vec<Item>, String> {
+    let conn = database(&app)?;
+    let mut query = conn
+        .prepare("SELECT id, url, title, created_at, summary, tags FROM items ORDER BY id DESC")
+        .map_err(|e| e.to_string())?;
+    let rows = query
+        .query_map([], |row| {
+            let tags: String = row.get(5)?;
+            Ok(Item {
+                id: row.get(0)?,
+                url: row.get(1)?,
+                title: row.get(2)?,
+                created_at: row.get(3)?,
+                summary: row.get(4)?,
+                tags: serde_json::from_str(&tags).unwrap_or_default(),
+            })
+        })
+        .map_err(|e| e.to_string())?;
+    rows.collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())
+}
+
+#[derive(Deserialize)]
+struct SaveItem {
+    url: String,
+    title: String,
+    summary: String,
+    tags: Vec<String>,
+}
+
+#[tauri::command]
+fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
+    let parsed = Url::parse(item.url.trim()).map_err(|_| "请输入有效的网址".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return Err("仅支持 HTTP 或 HTTPS 网址".into());
+    }
+    let title = item.title.trim();
+    if title.is_empty() || title.chars().count() > 500 {
+        return Err("标题不能为空，且不能超过 500 个字符".into());
+    }
+    if item.summary.chars().count() > 2000 {
+        return Err("摘要不能超过 2000 个字符".into());
+    }
+    let tags = analysis::normalize_tags(item.tags)?;
+    let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
+    database(&app)?.execute(
+        "INSERT INTO items (url, title, summary, tags) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags",
+        params![parsed.as_str(), title, item.summary.trim(), tags],
+    ).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+#[tauri::command]
+fn delete_item(app: tauri::AppHandle, id: i64) -> Result<(), String> {
+    database(&app)?
+        .execute("DELETE FROM items WHERE id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn main() {
+    tauri::Builder::default()
+        .invoke_handler(tauri::generate_handler![
+            list_items,
+            save_item,
+            delete_item,
+            get_ai_settings,
+            save_ai_settings,
+            analyze_url
+        ])
+        .run(tauri::generate_context!())
+        .expect("无法启动拾藏桌面应用");
+}

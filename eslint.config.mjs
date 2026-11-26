@@ -12,6 +12,8 @@ export default defineConfig([
     'build/**',
     'coverage/**',
     'next-env.d.ts',
+    'src-tauri/target/**',
+    'src-tauri/gen/**',
     // Skill 脚本是独立的零依赖 Node 工具，不参与 Next 应用构建
     'skills/**',
   ]),

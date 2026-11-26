@@ -1,0 +1,25 @@
+:root { font-family: "Microsoft YaHei UI", sans-serif; color: #222a28; background: #f7f8f5; }
+* { box-sizing: border-box; }
+body { margin: 0; }
+main { max-width: 960px; margin: 0 auto; padding: 64px 36px; }
+header { padding-bottom: 40px; border-bottom: 1px solid #cfd7d1; }
+.mark { color: #456b59; font-size: 15px; font-weight: bold; }
+h1 { font-size: 32px; margin: 24px 0 10px; }
+h2 { font-size: 19px; margin: 0 0 22px; }
+p { color: #65716b; }
+section { padding: 36px 0; border-bottom: 1px solid #cfd7d1; }
+.stack { display: grid; gap: 16px; max-width: 760px; }
+.fields { display: flex; align-items: end; gap: 16px; }
+label { display: grid; gap: 8px; flex: 1; font-size: 14px; }
+input, button, select, textarea { font: inherit; padding: 10px 12px; border: 1px solid #a8b5ac; border-radius: 3px; background: white; }
+button { color: white; background: #345b48; border-color: #345b48; cursor: pointer; }
+button:disabled { opacity: .6; cursor: wait; }
+button:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid #9cbcac; outline-offset: 2px; }
+.hint { margin: 0; font-size: 13px; }
+.section-head { display: flex; justify-content: space-between; color: #65716b; }
+.item { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; border-top: 1px solid #dce2dd; }
+.item strong, .item small { display: block; overflow-wrap: anywhere; }
+.item small { margin-top: 7px; color: #65716b; }
+.item button { background: transparent; color: #775047; border-color: #d8c9c4; }
+#message { min-height: 1em; }
+@media (max-width: 700px) { main { padding: 36px 20px; } .fields { align-items: stretch; flex-direction: column; } }

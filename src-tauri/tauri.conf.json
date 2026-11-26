@@ -1,0 +1,13 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "拾藏",
+  "version": "0.1.0",
+  "identifier": "tech.sxyicheng.catchlinger",
+  "build": { "frontendDist": "../desktop" },
+  "app": {
+    "withGlobalTauri": true,
+    "windows": [{ "title": "拾藏", "width": 1100, "height": 760, "minWidth": 680, "minHeight": 480 }],
+    "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost" }
+  },
+  "bundle": { "active": false }
+}
