@@ -1,6 +1,6 @@
 # 桌面端开发中
 
-这是 Rust + Tauri 本地客户端的初始骨架，尚不能替代现有应用。可以配置 DeepSeek、读取网页标题和正文、生成摘要及最多三个标签，并保存在本地 SQLite；网页离线保存、MCP、CLI、备份和 WebDAV 均尚未实现。
+这是 Rust + Tauri 本地客户端的初始骨架，尚不能替代现有应用。可以配置 DeepSeek、读取网页标题和正文、生成摘要及最多三个标签，并保存在本地 SQLite。点击收藏标题可以阅读已提取的正文，调整字体、字号、文字颜色和背景；旧收藏首次打开时会尝试重新抓取正文。图片等静态资源的离线保存、MCP、CLI、备份和 WebDAV 均尚未实现。
 
 Windows 开发需要 Rust、Microsoft C++ Build Tools（包含 C++ 桌面开发和 Windows SDK）及 WebView2 Runtime。安装依赖后，在仓库根目录运行：
 

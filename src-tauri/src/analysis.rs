@@ -9,6 +9,7 @@ pub struct Analysis {
     pub title: String,
     pub summary: String,
     pub tags: Vec<String>,
+    pub body: String,
 }
 
 #[derive(Deserialize)]
@@ -52,9 +53,13 @@ fn extract_page(html: &str) -> Result<(String, String), String> {
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
+    let article_selector = Selector::parse("article").unwrap();
+    let main_selector = Selector::parse("main, [role=main]").unwrap();
     let body = document
-        .select(&body_selector)
+        .select(&article_selector)
         .next()
+        .or_else(|| document.select(&main_selector).next())
+        .or_else(|| document.select(&body_selector).next())
         .ok_or("网页没有可读取的正文")?;
     let text = body
         .descendants()
@@ -82,13 +87,46 @@ fn extract_page(html: &str) -> Result<(String, String), String> {
     if title.is_empty() || text.is_empty() {
         return Err("网页缺少标题或可读取的正文，可能需要登录或由 JavaScript 动态加载".into());
     }
-    Ok((
-        title.chars().take(500).collect(),
-        text.chars().take(18000).collect(),
-    ))
+    let blocks = Selector::parse("p, h1, h2, h3, h4, pre, blockquote, li").unwrap();
+    let paragraphs = body
+        .select(&blocks)
+        .filter(|element| {
+            !element.ancestors().skip(1).any(|node| {
+                node.value().as_element().is_some_and(|e| {
+                    matches!(
+                        e.name(),
+                        "script"
+                            | "style"
+                            | "noscript"
+                            | "svg"
+                            | "template"
+                            | "pre"
+                            | "blockquote"
+                            | "li"
+                    )
+                })
+            })
+        })
+        .map(|element| {
+            element
+                .text()
+                .collect::<Vec<_>>()
+                .join(" ")
+                .split_whitespace()
+                .collect::<Vec<_>>()
+                .join(" ")
+        })
+        .filter(|s| !s.is_empty())
+        .collect::<Vec<_>>();
+    let body_text = if paragraphs.is_empty() {
+        text
+    } else {
+        paragraphs.join("\n\n")
+    };
+    Ok((title.chars().take(500).collect(), body_text))
 }
 
-pub async fn analyze(raw_url: &str, model: &str, key: &str) -> Result<Analysis, String> {
+pub async fn fetch_page(raw_url: &str) -> Result<(String, String), String> {
     let url = Url::parse(raw_url.trim()).map_err(|_| "请输入有效的网址".to_string())?;
     if !matches!(url.scheme(), "http" | "https") || url.host_str().is_none() {
         return Err("仅支持 HTTP 或 HTTPS 网址".into());
@@ -130,7 +168,12 @@ pub async fn analyze(raw_url: &str, model: &str, key: &str) -> Result<Analysis, 
         bytes.extend_from_slice(&chunk);
     }
     let html = String::from_utf8_lossy(&bytes);
-    let (title, text) = extract_page(&html)?;
+    extract_page(&html)
+}
+
+pub async fn analyze(raw_url: &str, model: &str, key: &str) -> Result<Analysis, String> {
+    let (title, body) = fetch_page(raw_url).await?;
+    let text: String = body.chars().take(18000).collect();
     let request = json!({
         "model": model,
         "response_format": {"type": "json_object"},
@@ -175,6 +218,7 @@ pub async fn analyze(raw_url: &str, model: &str, key: &str) -> Result<Analysis, 
         title,
         summary,
         tags,
+        body,
     })
 }
 
@@ -185,7 +229,7 @@ mod tests {
     fn extracts_title_and_body_without_scripts() {
         let (title, body) = extract_page("<html><head><title> Hello   World </title></head><body><p>正文</p><script>ignore me</script><style>.x{}</style><p>内容</p></body></html>").unwrap();
         assert_eq!(title, "Hello World");
-        assert_eq!(body, "正文 内容");
+        assert_eq!(body, "正文\n\n内容");
     }
     #[test]
     fn normalizes_and_limits_tags() {
@@ -194,5 +238,17 @@ mod tests {
             vec!["Rust"]
         );
         assert!(normalize_tags(vec!["a".into(), "b".into(), "c".into(), "d".into()]).is_err());
+    }
+
+    #[test]
+    fn extracts_article_paragraphs_without_ai_length_limit() {
+        let content = "a".repeat(20000);
+        let html = format!(
+            "<title>文章</title><nav>导航</nav><article><h2>章节</h2><p>{content}</p></article>"
+        );
+        let (_, body) = extract_page(&html).unwrap();
+        assert!(body.starts_with("章节\n\n"));
+        assert!(body.ends_with(&content));
+        assert!(!body.contains("导航"));
     }
 }

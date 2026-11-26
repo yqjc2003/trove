@@ -53,6 +53,13 @@ fn database(app: &tauri::AppHandle) -> Result<Connection, String> {
         )
         .map_err(|e| e.to_string())?;
     }
+    if !columns.iter().any(|c| c == "body") {
+        conn.execute(
+            "ALTER TABLE items ADD COLUMN body TEXT NOT NULL DEFAULT ''",
+            [],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(conn)
 }
 
@@ -169,6 +176,7 @@ struct SaveItem {
     title: String,
     summary: String,
     tags: Vec<String>,
+    body: Option<String>,
 }
 
 #[tauri::command]
@@ -186,11 +194,67 @@ fn save_item(app: tauri::AppHandle, item: SaveItem) -> Result<(), String> {
     }
     let tags = analysis::normalize_tags(item.tags)?;
     let tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
+    let body = item.body.unwrap_or_default();
+    if body.len() > 2 * 1024 * 1024 {
+        return Err("正文过长".into());
+    }
     database(&app)?.execute(
-        "INSERT INTO items (url, title, summary, tags) VALUES (?1, ?2, ?3, ?4) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags",
-        params![parsed.as_str(), title, item.summary.trim(), tags],
+        "INSERT INTO items (url, title, summary, tags, body) VALUES (?1, ?2, ?3, ?4, ?5) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, body=CASE WHEN excluded.body = '' THEN items.body ELSE excluded.body END",
+        params![parsed.as_str(), title, item.summary.trim(), tags, body],
     ).map_err(|e| e.to_string())?;
     Ok(())
+}
+
+#[derive(Serialize)]
+struct ReaderItem {
+    id: i64,
+    url: String,
+    title: String,
+    summary: String,
+    body: String,
+}
+
+#[tauri::command]
+async fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String> {
+    let (url, title, summary, mut body): (String, String, String, String) = database(&app)?
+        .query_row(
+            "SELECT url, title, summary, body FROM items WHERE id = ?1",
+            [id],
+            |row| Ok((row.get(0)?, row.get(1)?, row.get(2)?, row.get(3)?)),
+        )
+        .map_err(|_| "找不到这条收藏".to_string())?;
+    if body.is_empty() {
+        let (_, fetched) = analysis::fetch_page(&url)
+            .await
+            .map_err(|e| format!("此收藏尚未保存正文，重新读取失败：{e}"))?;
+        database(&app)?
+            .execute(
+                "UPDATE items SET body = ?1 WHERE id = ?2 AND url = ?3 AND body = ''",
+                params![fetched, id, url],
+            )
+            .map_err(|e| e.to_string())?;
+        body = database(&app)?
+            .query_row("SELECT body FROM items WHERE id = ?1", [id], |row| {
+                row.get(0)
+            })
+            .map_err(|_| "收藏已被删除".to_string())?;
+    }
+    Ok(ReaderItem {
+        id,
+        url,
+        title,
+        summary,
+        body,
+    })
+}
+
+#[tauri::command]
+fn open_original(url: String) -> Result<(), String> {
+    let parsed = Url::parse(&url).map_err(|_| "网址无效".to_string())?;
+    if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
+        return Err("仅支持 HTTP 或 HTTPS 网址".into());
+    }
+    open::that(parsed.as_str()).map_err(|_| "无法打开原网页".into())
 }
 
 #[tauri::command]
@@ -209,7 +273,9 @@ fn main() {
             delete_item,
             get_ai_settings,
             save_ai_settings,
-            analyze_url
+            analyze_url,
+            get_reader_item,
+            open_original
         ])
         .run(tauri::generate_context!())
         .expect("无法启动拾藏桌面应用");
