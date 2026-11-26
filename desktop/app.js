@@ -130,6 +130,8 @@ settingsForm.addEventListener('submit', async (event) => {
 let lastAnalyzedUrl = '';
 let pendingBody = '';
 let pendingSourceNote = '';
+let pendingImages = [];
+let pendingSourceIncomplete = false;
 let classificationVersion = 0;
 let classificationTimer;
 const contentKindHint = document.querySelector('#content-kind-hint');
@@ -170,6 +172,8 @@ async function analyzeUrl() {
     if (form.elements.tags.value === initial.tags) form.elements.tags.value = result.tags.join(', ');
     pendingBody = result.body;
     pendingSourceNote = result.warning || '';
+    pendingImages = result.images || [];
+    pendingSourceIncomplete = !!result.source_incomplete;
     lastAnalyzedUrl = url;
     message.textContent = result.warning || '解析完成，可以检查或修改后保存。';
   } catch (error) {
@@ -192,6 +196,8 @@ form.elements.url.addEventListener('input', () => {
     form.elements.tags.value = '';
     pendingBody = '';
     pendingSourceNote = '';
+    pendingImages = [];
+    pendingSourceIncomplete = false;
     lastAnalyzedUrl = '';
   }
 });
@@ -264,8 +270,6 @@ function renderItems() {
   }
   const titles = { unread: '首页', liked: '喜欢', archive: '归档', notes: '笔记', all: '搜索结果' };
   document.querySelector('#list-heading').textContent = selectedTag || titles[currentView];
-  const subtitles = { unread: '留给稍后的好文章', liked: '喜欢的文章', archive: '已归档的文章', notes: '写有阅读笔记的文章', all: '在全部收藏中搜索' };
-  document.querySelector('#list-subtitle').textContent = selectedTag ? '按标签筛选收藏' : subtitles[currentView];
   document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === currentView));
   const result = allItems.filter((item) => {
     if (selectedTag && !item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase())) return false;
@@ -288,7 +292,7 @@ function renderItems() {
     title.addEventListener('click', () => openReader(item));
     const url = document.createElement('small'); url.textContent = item.url;
     const kind = document.createElement('small'); kind.className = 'item-kind';
-    kind.textContent = item.content_type === 'repo' ? '代码仓库 · 打开原网页 ↗' : item.content_type === 'profile' ? 'GitHub 用户 · 打开原网页 ↗' : item.content_type === 'video' ? '视频 · 打开原网页 ↗' : '文章 · 本地阅读';
+    kind.textContent = item.content_type === 'repo' ? '代码仓库 · 打开原网页 ↗' : item.content_type === 'profile' ? 'GitHub 用户 · 打开原网页 ↗' : item.content_type === 'video' ? '视频 · 打开原网页 ↗' : '文章';
     const summary = document.createElement('p'); summary.textContent = item.summary;
     const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
     const actions = document.createElement('div'); actions.className = 'item-actions';
@@ -339,8 +343,8 @@ document.querySelector('#search').addEventListener('input', () => {
 form.addEventListener('submit', async (event) => {
   event.preventDefault(); message.textContent = '';
   const data = new FormData(form);
-  const item = { url: data.get('url'), title: data.get('title'), summary: data.get('summary'), tags: data.get('tags').split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), body: pendingBody, source_note: pendingSourceNote };
-  try { await invoke('save_item', { item }); form.reset(); lastAnalyzedUrl = ''; pendingBody = ''; pendingSourceNote = ''; classificationVersion++; await showContentKind(''); await refresh(); addDialog.close(); }
+  const item = { url: data.get('url'), title: data.get('title'), summary: data.get('summary'), tags: data.get('tags').split(/[,，]/).map((tag) => tag.trim()).filter(Boolean), body: pendingBody, source_note: pendingSourceNote, images: pendingImages, source_incomplete: pendingSourceIncomplete };
+  try { await invoke('save_item', { item }); form.reset(); lastAnalyzedUrl = ''; pendingBody = ''; pendingSourceNote = ''; pendingImages = []; pendingSourceIncomplete = false; classificationVersion++; await showContentKind(''); await refresh(); addDialog.close(); }
   catch (error) { message.textContent = String(error); }
 });
 refreshSettings().catch((error) => { settingsMessage.textContent = String(error); });
@@ -355,6 +359,7 @@ const page = document.querySelector('#reading-page');
 const readerBody = document.querySelector('#reader-body');
 const readerEmpty = document.querySelector('#reader-empty');
 const retryReaderContent = document.querySelector('#retry-reader-content');
+const refreshReaderContent = document.querySelector('#refresh-reader-content');
 const readerTitle = document.querySelector('#reader-title');
 const readerUrl = document.querySelector('#reader-url');
 const font = document.querySelector('#reader-font');
@@ -427,6 +432,7 @@ async function openReader(item, viewSource = false) {
   readerBody.textContent = '正在读取正文……';
   readerEmpty.hidden = true;
   retryReaderContent.disabled = false;
+  refreshReaderContent.disabled = false;
   readerStatus.textContent = '';
   document.querySelector('#notes').replaceChildren();
   document.querySelector('#note-message').textContent = '';
@@ -435,22 +441,20 @@ async function openReader(item, viewSource = false) {
   try {
     const result = await invoke('get_reader_item', { id: item.id });
     if (version !== readerVersion) return;
-    showReaderContent(result, item, version);
+    await showReaderContent(result, item, version);
   } catch (error) {
     if (version === readerVersion) readerBody.textContent = String(error);
   }
 }
-function showReaderContent(result, item, version) {
+async function showReaderContent(result, item, version) {
   readerStatus.textContent = result.source_note || '';
   readerBody.replaceChildren();
   readerEmpty.hidden = !!result.body.trim();
   if (!result.body.trim()) return;
-  for (const paragraph of result.body.split(/\n\s*\n/)) {
-    if (!paragraph.trim()) continue;
-    const p = document.createElement('p');
-    p.textContent = paragraph;
-    readerBody.append(p);
-  }
+  const html = await invoke('render_markdown', { body: result.body, images: result.images || [] });
+  if (version !== readerVersion) return;
+  // HTML 由 Rust 的 Markdown 渲染器和白名单清理器共同生成。
+  readerBody.innerHTML = html;
   const savedPosition = loadReaderPosition(item);
   requestAnimationFrame(() => {
     if (version !== readerVersion) return;
@@ -463,20 +467,31 @@ function showReaderContent(result, item, version) {
     });
   });
 }
-retryReaderContent.addEventListener('click', async () => {
+async function retrieveReaderContent(force) {
   if (!currentItem) return;
+  if (force && !window.confirm('重新获取会替换当前保存的正文和图片。继续吗？')) return;
   const item = currentItem;
   const version = readerVersion;
   retryReaderContent.disabled = true;
+  refreshReaderContent.disabled = true;
   readerStatus.textContent = '正在重新获取正文……';
   try {
-    const result = await invoke('fetch_reader_content', { id: item.id });
-    if (version === readerVersion) showReaderContent(result, item, version);
+    const result = await invoke('fetch_reader_content', { id: item.id, force });
+    if (version === readerVersion) await showReaderContent(result, item, version);
   } catch (error) {
     if (version === readerVersion) readerStatus.textContent = `无法获取正文：${String(error)}`;
   } finally {
-    if (version === readerVersion) retryReaderContent.disabled = false;
+    if (version === readerVersion) { retryReaderContent.disabled = false; refreshReaderContent.disabled = false; }
   }
+}
+retryReaderContent.addEventListener('click', () => retrieveReaderContent(false));
+refreshReaderContent.addEventListener('click', () => retrieveReaderContent(true));
+readerBody.addEventListener('click', async (event) => {
+  const link = event.target.closest('a');
+  if (!link) return;
+  event.preventDefault();
+  try { await invoke('open_original', { url: link.href }); }
+  catch (error) { readerStatus.textContent = String(error); }
 });
 function setReaderFullscreen(enabled) {
   const position = readerReady ? capturePosition() : null;

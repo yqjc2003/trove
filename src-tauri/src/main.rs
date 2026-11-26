@@ -1,7 +1,11 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod analysis;
+mod assets;
 mod content_kind;
+mod markdown;
+use base64::{engine::general_purpose::STANDARD, Engine};
+use rusqlite::OptionalExtension;
 use rusqlite::{params, Connection};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
@@ -52,6 +56,10 @@ fn initialize_database(conn: &Connection) -> Result<(), String> {
         );
         CREATE TABLE IF NOT EXISTS custom_tags (
             name TEXT PRIMARY KEY COLLATE NOCASE
+        );
+        CREATE TABLE IF NOT EXISTS item_images (
+            item_id INTEGER NOT NULL, source TEXT NOT NULL, mime TEXT NOT NULL, data BLOB NOT NULL,
+            PRIMARY KEY(item_id, source)
         );
         CREATE INDEX IF NOT EXISTS reader_notes_item_id_idx ON reader_notes(item_id);",
     )
@@ -187,7 +195,20 @@ async fn analyze_url(app: tauri::AppHandle, url: String) -> Result<analysis::Ana
     let settings = get_ai_settings(app.clone())?;
     let key = read_key(&app)?;
     if key.is_empty() {
-        return Err("请先在 AI 设置中配置 DeepSeek API Key".into());
+        let source = analysis::fetch_source(&url).await?;
+        return Ok(analysis::Analysis {
+            title: source.title,
+            summary: String::new(),
+            tags: vec![],
+            body: source.body,
+            content_type: content_kind::detect(&url),
+            warning: Some(format!(
+                "{}未配置 AI，已使用本地转换；可手工填写摘要和标签。",
+                source.warning.unwrap_or_default()
+            )),
+            images: source.images,
+            source_incomplete: source.incomplete,
+        });
     }
     let available_tags = list_desktop_tags_in_db(&database(&app)?)?;
     let mut result = analysis::analyze(&url, &settings.model, &key, &available_tags).await?;
@@ -327,6 +348,10 @@ struct SaveItem {
     body: Option<String>,
     #[serde(default)]
     source_note: Option<String>,
+    #[serde(default)]
+    images: Option<Vec<assets::LocalImage>>,
+    #[serde(default)]
+    source_incomplete: Option<bool>,
 }
 
 fn validate_item_metadata(title: &str, summary: &str) -> Result<(), String> {
@@ -361,10 +386,70 @@ fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
     if source_note.chars().count() > 1000 {
         return Err("内容提示过长".into());
     }
-    conn.execute(
-        "INSERT INTO items (url, title, summary, tags, body, source_note) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, body=CASE WHEN excluded.body = '' OR (excluded.source_note <> '' AND items.body <> '') THEN items.body ELSE excluded.body END, source_note=CASE WHEN excluded.body = '' OR (excluded.source_note <> '' AND items.body <> '') THEN items.source_note ELSE excluded.source_note END",
-        params![parsed.as_str(), title, item.summary.trim(), tags, body, source_note],
+    let source_incomplete = item.source_incomplete.unwrap_or(!source_note.is_empty());
+    let images = item.images.unwrap_or_default();
+    if images.len() > 24 {
+        return Err("图片数量超过限制".into());
+    }
+    let mut decoded = Vec::new();
+    let mut total_size = 0;
+    for image in images {
+        let bytes = assets::validate(&image)?;
+        total_size += bytes.len();
+        if total_size > 8 * 1024 * 1024 {
+            return Err("图片总大小超过限制".into());
+        }
+        if decoded
+            .iter()
+            .any(|(source, _, _): &(String, String, Vec<u8>)| source == &image.source)
+        {
+            return Err("图片地址重复".into());
+        }
+        decoded.push((image.source, image.mime, bytes));
+    }
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    let old_body: Option<String> = tx
+        .query_row(
+            "SELECT body FROM items WHERE url = ?1",
+            [parsed.as_str()],
+            |row| row.get(0),
+        )
+        .optional()
+        .map_err(|e| e.to_string())?;
+    let replace_source =
+        !body.is_empty() && (!source_incomplete || old_body.as_deref().unwrap_or("").is_empty());
+    tx.execute(
+        "INSERT INTO items (url, title, summary, tags, body, source_note) VALUES (?1, ?2, ?3, ?4, ?5, ?6) ON CONFLICT(url) DO UPDATE SET title=excluded.title, summary=excluded.summary, tags=excluded.tags, body=CASE WHEN excluded.body = '' OR (?7 AND items.body <> '') THEN items.body ELSE excluded.body END, source_note=CASE WHEN excluded.body = '' OR (?7 AND items.body <> '') THEN items.source_note ELSE excluded.source_note END",
+        params![parsed.as_str(), title, item.summary.trim(), tags, body, source_note, source_incomplete],
     ).map_err(|e| e.to_string())?;
+    if replace_source {
+        let id: i64 = tx
+            .query_row(
+                "SELECT id FROM items WHERE url = ?1",
+                [parsed.as_str()],
+                |row| row.get(0),
+            )
+            .map_err(|e| e.to_string())?;
+        replace_images(&tx, id, &decoded)?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
+    Ok(())
+}
+
+fn replace_images(
+    conn: &Connection,
+    item_id: i64,
+    images: &[(String, String, Vec<u8>)],
+) -> Result<(), String> {
+    conn.execute("DELETE FROM item_images WHERE item_id = ?1", [item_id])
+        .map_err(|e| e.to_string())?;
+    for (source, mime, data) in images {
+        conn.execute(
+            "INSERT INTO item_images (item_id, source, mime, data) VALUES (?1, ?2, ?3, ?4)",
+            params![item_id, source, mime, data],
+        )
+        .map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 
@@ -518,6 +603,7 @@ struct ReaderItem {
     summary: String,
     body: String,
     source_note: String,
+    images: Vec<assets::LocalImage>,
 }
 
 #[tauri::command]
@@ -537,6 +623,21 @@ fn get_reader_item_in_db(conn: &Connection, id: i64) -> Result<ReaderItem, Strin
             },
         )
         .map_err(|_| "找不到这条收藏".to_string())?;
+    let mut stmt = conn
+        .prepare("SELECT source, mime, data FROM item_images WHERE item_id = ?1")
+        .map_err(|e| e.to_string())?;
+    let images = stmt
+        .query_map([id], |row| {
+            let bytes: Vec<u8> = row.get(2)?;
+            Ok(assets::LocalImage {
+                source: row.get(0)?,
+                mime: row.get(1)?,
+                data: STANDARD.encode(bytes),
+            })
+        })
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
     Ok(ReaderItem {
         id,
         url,
@@ -544,6 +645,7 @@ fn get_reader_item_in_db(conn: &Connection, id: i64) -> Result<ReaderItem, Strin
         summary,
         body,
         source_note,
+        images,
     })
 }
 
@@ -553,18 +655,56 @@ fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String>
 }
 
 #[tauri::command]
-async fn fetch_reader_content(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String> {
+async fn fetch_reader_content(
+    app: tauri::AppHandle,
+    id: i64,
+    force: Option<bool>,
+) -> Result<ReaderItem, String> {
     let existing = get_reader_item_in_db(&database(&app)?, id)?;
-    if !existing.body.trim().is_empty() {
+    if !existing.body.trim().is_empty() && !force.unwrap_or(false) {
         return Ok(existing);
     }
-    let source = analysis::fetch_source(&existing.url).await?;
+    let key = read_key(&app)?;
+    let source = if !key.is_empty()
+        && content_kind::detect(&existing.url) == content_kind::ContentKind::Article
+    {
+        let settings = get_ai_settings(app.clone())?;
+        let result = analysis::analyze(&existing.url, &settings.model, &key, &[]).await?;
+        analysis::Source {
+            title: result.title,
+            body: result.body,
+            warning: result.warning,
+            images: result.images,
+            incomplete: result.source_incomplete,
+        }
+    } else {
+        analysis::fetch_source(&existing.url).await?
+    };
     if source.body.trim().is_empty() {
         return Err(source
             .warning
             .unwrap_or_else(|| "没有可读取的原始内容，请打开原网页。".into()));
     }
-    database(&app)?
+    if source.incomplete && !existing.body.trim().is_empty() {
+        return Err(format!(
+            "新内容不完整，已保留原有正文和图片：{}",
+            source.warning.unwrap_or_default()
+        ));
+    }
+    let decoded: Vec<_> = source
+        .images
+        .iter()
+        .map(|image| {
+            Ok((
+                image.source.clone(),
+                image.mime.clone(),
+                assets::validate(image)?,
+            ))
+        })
+        .collect::<Result<_, String>>()?;
+    let mut conn = database(&app)?;
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let changed = tx
         .execute(
             "UPDATE items SET body = ?1, source_note = ?2 WHERE id = ?3 AND url = ?4 AND body = ?5",
             params![
@@ -576,6 +716,10 @@ async fn fetch_reader_content(app: tauri::AppHandle, id: i64) -> Result<ReaderIt
             ],
         )
         .map_err(|e| e.to_string())?;
+    if changed > 0 {
+        replace_images(&tx, id, &decoded)?;
+    }
+    tx.commit().map_err(|e| e.to_string())?;
     get_reader_item_in_db(&database(&app)?, id)
 }
 
@@ -589,10 +733,20 @@ fn open_original(url: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn render_markdown(body: String, images: Vec<assets::LocalImage>) -> Result<String, String> {
+    if body.len() > 2 * 1024 * 1024 {
+        return Err("正文过长，无法渲染".into());
+    }
+    markdown::render(&body, &images)
+}
+
+#[tauri::command]
 fn delete_item(app: tauri::AppHandle, id: i64) -> Result<(), String> {
     let mut conn = database(&app)?;
     let tx = conn.transaction().map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM reader_notes WHERE item_id = ?1", [id])
+        .map_err(|e| e.to_string())?;
+    tx.execute("DELETE FROM item_images WHERE item_id = ?1", [id])
         .map_err(|e| e.to_string())?;
     tx.execute("DELETE FROM items WHERE id = ?1", [id])
         .map_err(|e| e.to_string())?;
@@ -614,6 +768,7 @@ fn main() {
             get_reader_item,
             fetch_reader_content,
             open_original,
+            render_markdown,
             set_item_state,
             list_reader_notes,
             add_reader_note,
@@ -793,6 +948,8 @@ mod tests {
                     tags: vec![],
                     body: Some("正文".into()),
                     source_note: None,
+                    images: None,
+                    source_incomplete: None,
                 },
             )
             .unwrap();
@@ -813,6 +970,8 @@ mod tests {
                 tags: vec![],
                 body: Some(String::new()),
                 source_note: Some("未获取到 README".into()),
+                images: None,
+                source_incomplete: None,
             },
         )
         .unwrap();
@@ -845,6 +1004,8 @@ mod tests {
             tags: vec![],
             body: Some(body.into()),
             source_note: note.map(str::to_string),
+            images: None,
+            source_incomplete: None,
         };
         save_item_in_db(&conn, item("公开简介", Some("README 不可用"))).unwrap();
         let saved: (String, String) = conn
@@ -867,6 +1028,13 @@ mod tests {
             })
             .unwrap();
         assert_eq!(saved, ("# README".into(), String::new()));
+        let mut complete = item("## 正文", Some("AI 格式校验失败，已保留本地转换结果"));
+        complete.source_incomplete = Some(false);
+        save_item_in_db(&conn, complete).unwrap();
+        let body: String = conn
+            .query_row("SELECT body FROM items", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(body, "## 正文");
     }
 
     #[test]
@@ -927,6 +1095,8 @@ mod tests {
                 tags: vec![],
                 body: None,
                 source_note: None,
+                images: None,
+                source_incomplete: None,
             },
         )
         .unwrap();
@@ -934,5 +1104,47 @@ mod tests {
         assert_eq!(item.title, "手工标题");
         assert!(item.body.is_empty());
         assert!(get_reader_item_in_db(&conn, 999).is_err());
+    }
+
+    #[test]
+    fn saves_images_atomically_with_their_markdown() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        let image = assets::LocalImage {
+            source: "pic.png".into(),
+            mime: "image/png".into(),
+            data: "iVBORw0KGgo=".into(),
+        };
+        let item = |body: &str, note: Option<&str>, images: Vec<assets::LocalImage>| SaveItem {
+            url: "https://example.com/a".into(),
+            title: "标题".into(),
+            summary: "".into(),
+            tags: vec![],
+            body: Some(body.into()),
+            source_note: note.map(str::to_string),
+            images: Some(images),
+            source_incomplete: None,
+        };
+        save_item_in_db(&conn, item("![图](pic.png)", None, vec![image.clone()])).unwrap();
+        let saved = get_reader_item_in_db(&conn, 1).unwrap();
+        assert_eq!(saved.body, "![图](pic.png)");
+        assert_eq!(saved.images.len(), 1);
+        assert_eq!(saved.images[0].data, image.data);
+        save_item_in_db(&conn, item("不完整", Some("部分图片失败"), vec![])).unwrap();
+        let saved = get_reader_item_in_db(&conn, 1).unwrap();
+        assert_eq!(saved.body, "![图](pic.png)");
+        assert_eq!(saved.images.len(), 1);
+        let invalid = assets::LocalImage {
+            source: "bad".into(),
+            mime: "image/png".into(),
+            data: "bm90LWltYWdl".into(),
+        };
+        assert!(save_item_in_db(&conn, item("新正文", None, vec![invalid])).is_err());
+        assert_eq!(
+            get_reader_item_in_db(&conn, 1).unwrap().body,
+            "![图](pic.png)"
+        );
+        save_item_in_db(&conn, item("新正文", None, vec![])).unwrap();
+        assert!(get_reader_item_in_db(&conn, 1).unwrap().images.is_empty());
     }
 }

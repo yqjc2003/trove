@@ -49,7 +49,6 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .menu-panel button { display: block; width: 100%; padding: 10px; background: transparent; border: 0; color: #39423d; text-align: left; font-size: 13px; }
 .search-label { display: block; margin: 15px 20px 5px; }
 .search-label input { width: 100%; background: transparent; border: 1px solid var(--rule); border-radius: 4px; padding: 8px 10px; font-size: 13px; color: inherit; }
-.list-subtitle { margin: 12px 22px 8px; color: var(--muted); font-size: 12px; }
 #library-message { margin: 0 22px; color: #9d4c42; font-size: 13px; }
 #items { padding: 0 9px 30px; color: var(--muted); font-size: 13px; }
 .item { padding: 14px 12px; border-bottom: 1px solid var(--rule); }
@@ -85,8 +84,15 @@ body.reader-fullscreen #reader { display: block; height: 100vh; height: 100dvh; 
 .reading-page[data-font="kai"] { font-family: KaiTi, STKaiti, serif; }
 .reading-page h1 { font-size: 2rem; line-height: 1.4; font-weight: 600; margin: 0 0 12px; }
 .reader-url { margin: 0 0 50px; font: 12px/1.6 "Microsoft YaHei UI", sans-serif; opacity: .65; }
-.reader-body { font-size: var(--reader-size); line-height: 1.95; white-space: pre-wrap; }
+.reader-body { font-size: var(--reader-size); line-height: 1.95; }
 .reader-body p { margin: 1.25em 0; color: inherit; }
+.reader-body pre { overflow-x: auto; padding: 14px; background: color-mix(in srgb, var(--page-background), #888 9%); font: .85em/1.6 Consolas, monospace; }
+.reader-body code { font-family: Consolas, monospace; }
+.reader-body table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
+.reader-body th, .reader-body td { padding: 6px 10px; border: 1px solid var(--rule); text-align: left; }
+.reader-body img { max-width: 100%; height: auto; }
+.reader-body blockquote { margin-left: 0; padding-left: 16px; border-left: 2px solid #a8b5ac; }
+.reader-body a { color: #416c56; }
 .reader-empty { padding: 28px 0; color: #78837b; font: 14px/1.7 "Microsoft YaHei UI", sans-serif; }
 .reader-empty .text-button { text-decoration: underline; }
 .notes-section { margin-top: 60px; padding-top: 30px; border-top: 1px solid var(--rule); font: 14px/1.5 "Microsoft YaHei UI", sans-serif; }

@@ -27,7 +27,6 @@
       </div>
     </div>
     <label class="search-label"><span class="sr-only">搜索标题、标签和正文</span><input id="search" type="search" placeholder="搜索标题、标签和正文"></label>
-    <p id="list-subtitle" class="list-subtitle">留给稍后的好文章</p>
     <p id="library-message" role="status"></p>
     <div id="items"></div>
   </main>
@@ -37,6 +36,7 @@
       <div class="reader-actions">
         <button id="back" class="reader-icon-button" type="button" aria-label="关闭阅读" title="关闭阅读"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
         <div class="reader-action-group">
+          <button id="refresh-reader-content" class="reader-icon-button" type="button" aria-label="重新获取正文" title="重新获取正文；已配置 AI 时会尝试整理格式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 9a7.5 7.5 0 0 1 13-2l2 5M19 15a7.5 7.5 0 0 1-13 2l-2-5"/></svg></button>
           <button id="toggle-fullscreen" class="reader-icon-button" type="button" aria-pressed="false" aria-label="展开阅读区" title="展开阅读区">
             <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M4 4l6 6M16 20h4v-4m0 4-6-6"/></svg>
             <svg class="shrink-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h6V4m0 6L4 4m16 10h-6v6m0-6 6 6"/></svg>
