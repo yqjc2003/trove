@@ -28,7 +28,10 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 @media (prefers-reduced-motion: reduce) { .tag-toggle-arrow { transition: none; } }
 .add-tag-button { padding: 2px 6px; border: 0; background: transparent; color: #77847c; font-size: 19px; line-height: 1; }
 .add-tag-button:hover { color: #283c30; }
-.tag-filter { min-height: 34px; overflow-wrap: anywhere; }
+.tag-row { display: flex; align-items: center; min-width: 0; }
+.tag-filter { flex: 1; width: auto; min-width: 0; min-height: 34px; overflow-wrap: anywhere; }
+.delete-tag-button { flex: none; padding: 5px 8px; border: 0; background: transparent; color: #8d9891; font-size: 16px; line-height: 1; }
+.delete-tag-button:hover { color: #9d4c42; }
 .sidebar-foot { margin: auto 0 12px; padding-top: 36px; }
 .library-content { min-width: 0; overflow-y: auto; border-right: 1px solid var(--rule); }
 .library-toolbar { min-height: 67px; display: flex; align-items: center; justify-content: space-between; padding: 0 18px 0 22px; border-bottom: 1px solid var(--rule); }

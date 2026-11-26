@@ -344,6 +344,56 @@ fn create_custom_tag(app: tauri::AppHandle, name: String) -> Result<(), String> 
     create_custom_tag_in_db(&database(&app)?, &name)
 }
 
+fn delete_desktop_tag_in_db(conn: &mut Connection, name: &str) -> Result<(), String> {
+    if name.trim().is_empty() {
+        return Err("标签不能为空".into());
+    }
+    let tx = conn.transaction().map_err(|e| e.to_string())?;
+    let rows = {
+        let mut stmt = tx
+            .prepare("SELECT id, tags FROM items WHERE json_valid(tags)")
+            .map_err(|e| e.to_string())?;
+        let rows = stmt
+            .query_map([], |row| {
+                Ok((row.get::<_, i64>(0)?, row.get::<_, String>(1)?))
+            })
+            .map_err(|e| e.to_string())?;
+        rows.collect::<Result<Vec<_>, _>>()
+            .map_err(|e| e.to_string())?
+    };
+    for (id, raw_tags) in rows {
+        let Ok(serde_json::Value::Array(mut tags)) =
+            serde_json::from_str::<serde_json::Value>(&raw_tags)
+        else {
+            continue;
+        };
+        let old_len = tags.len();
+        tags.retain(|tag| {
+            !tag.as_str()
+                .is_some_and(|value| value.eq_ignore_ascii_case(name))
+        });
+        if tags.len() != old_len {
+            let new_tags = serde_json::to_string(&tags).map_err(|e| e.to_string())?;
+            tx.execute(
+                "UPDATE items SET tags = ?1 WHERE id = ?2",
+                params![new_tags, id],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
+    tx.execute(
+        "DELETE FROM custom_tags WHERE name = ?1 COLLATE NOCASE",
+        [name],
+    )
+    .map_err(|e| e.to_string())?;
+    tx.commit().map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn delete_desktop_tag(app: tauri::AppHandle, name: String) -> Result<(), String> {
+    delete_desktop_tag_in_db(&mut database(&app)?, &name)
+}
+
 #[tauri::command]
 fn list_desktop_tags(app: tauri::AppHandle) -> Result<Vec<String>, String> {
     let conn = database(&app)?;
@@ -471,6 +521,7 @@ fn main() {
             add_reader_note,
             delete_reader_note,
             create_custom_tag,
+            delete_desktop_tag,
             list_desktop_tags,
             set_item_tags
         ])
@@ -588,5 +639,40 @@ mod tests {
             .unwrap()
             .contains(&"Rust".to_string()));
         assert!(set_item_tags_in_db(&conn, 99, vec![]).is_err());
+    }
+
+    #[test]
+    fn deleting_tag_removes_all_bindings_without_changing_other_content() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        create_custom_tag_in_db(&conn, "Rust").unwrap();
+        conn.execute("INSERT INTO items (id, url, title, body, tags, archived) VALUES (1, 'https://a.example', '标题', '正文', ?1, 1), (2, 'https://b.example', '其他', '', ?2, 0)", params![r#"["Rust","学习"]"#, r#"["rust","工具"]"#]).unwrap();
+        delete_desktop_tag_in_db(&mut conn, "RUST").unwrap();
+        assert!(!list_desktop_tags_in_db(&conn)
+            .unwrap()
+            .iter()
+            .any(|tag| tag.eq_ignore_ascii_case("rust")));
+        let item = search_items(&conn, "标题").unwrap().remove(0);
+        assert_eq!(item.tags, vec!["学习"]);
+        assert!(item.archived);
+        let body: String = conn
+            .query_row("SELECT body FROM items WHERE id = 1", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(body, "正文");
+        assert_eq!(search_items(&conn, "工具").unwrap()[0].tags, vec!["工具"]);
+    }
+
+    #[test]
+    fn deleting_tag_rolls_back_if_any_item_update_fails() {
+        let mut conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        create_custom_tag_in_db(&conn, "测试").unwrap();
+        conn.execute("INSERT INTO items (id, url, title, tags) VALUES (1, 'https://a.example', '一', ?1), (2, 'https://b.example', '二', ?1)", [r#"["测试"]"#]).unwrap();
+        conn.execute_batch("CREATE TRIGGER block_update BEFORE UPDATE ON items WHEN OLD.id = 2 BEGIN SELECT RAISE(ABORT, 'blocked'); END;").unwrap();
+        assert!(delete_desktop_tag_in_db(&mut conn, "测试").is_err());
+        assert_eq!(search_items(&conn, "测试").unwrap().len(), 2);
+        assert!(list_desktop_tags_in_db(&conn)
+            .unwrap()
+            .contains(&"测试".to_string()));
     }
 }

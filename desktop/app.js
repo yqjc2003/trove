@@ -180,6 +180,8 @@ function renderItems() {
   const tagFilters = document.querySelector('#tag-filters');
   tagFilters.replaceChildren();
   for (const tag of availableTags) {
+    const row = document.createElement('div');
+    row.className = 'tag-row';
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'tag-filter'; button.textContent = tag;
     button.classList.toggle('active', tag === selectedTag);
@@ -194,7 +196,27 @@ function renderItems() {
         renderItems();
       }
     });
-    tagFilters.append(button);
+    const remove = document.createElement('button');
+    remove.type = 'button'; remove.className = 'delete-tag-button'; remove.textContent = '×';
+    remove.setAttribute('aria-label', `删除标签 ${tag}`);
+    remove.title = `删除标签 ${tag}`;
+    remove.addEventListener('click', async () => {
+      if (!window.confirm(`删除标签“${tag}”？该标签会从所有收藏中移除，收藏本身会保留。`)) return;
+      remove.disabled = true;
+      try {
+        await invoke('delete_desktop_tag', { name: tag });
+        if (selectedTag && selectedTag.toLowerCase() === tag.toLowerCase()) {
+          selectedTag = '';
+          currentView = 'unread';
+        }
+        await refresh();
+      } catch (error) {
+        libraryMessage.textContent = String(error);
+        remove.disabled = false;
+      }
+    });
+    row.append(button, remove);
+    tagFilters.append(row);
   }
   const titles = { unread: '首页', liked: '喜欢', archive: '归档', notes: '笔记', all: '搜索结果' };
   document.querySelector('#list-heading').textContent = selectedTag || titles[currentView];
