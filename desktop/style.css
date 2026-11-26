@@ -17,6 +17,8 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .brand-subtitle { font: 12px/1.2 "Microsoft YaHei UI", sans-serif; color: #8d958e; }
 .navigation { padding-top: 12px; }
 .nav-item, .tag-filter { width: 100%; display: flex; justify-content: space-between; align-items: center; min-height: 42px; padding: 8px 12px; background: transparent; border: 0; border-radius: 6px; color: #505a54; text-align: left; font-size: 14px; }
+.nav-label { display: inline-flex; align-items: center; gap: 10px; min-width: 0; }
+.nav-icon { width: 17px; height: 17px; flex: none; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .nav-item.active, .tag-filter.active { color: #262d29; background: color-mix(in srgb, var(--page-background), #8b9990 13%); }
 .nav-item > span:last-child { color: #9ba39e; font-size: 11px; }
 .sidebar-label { margin: 32px 12px 8px; color: #9ba39e; font-size: 12px; }

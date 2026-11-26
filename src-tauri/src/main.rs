@@ -16,6 +16,7 @@ struct Item {
     created_at: String,
     liked: bool,
     archived: bool,
+    note_count: i64,
 }
 
 fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
@@ -40,7 +41,8 @@ fn initialize_database(conn: &Connection) -> Result<(), String> {
         CREATE TABLE IF NOT EXISTS reader_notes (
             id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL,
             body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
-        );",
+        );
+        CREATE INDEX IF NOT EXISTS reader_notes_item_id_idx ON reader_notes(item_id);",
     )
     .map_err(|e| e.to_string())?;
     let columns = conn
@@ -181,7 +183,7 @@ fn list_items(app: tauri::AppHandle, query: Option<String>) -> Result<Vec<Item>,
 fn search_items(conn: &Connection, query_text: &str) -> Result<Vec<Item>, String> {
     let query_text = query_text.trim();
     let mut query = conn
-        .prepare("SELECT id, url, title, created_at, summary, tags, liked, archived FROM items WHERE ?1 = '' OR instr(lower(title), lower(?1)) > 0 OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(items.tags) THEN items.tags ELSE '[]' END) WHERE instr(lower(json_each.value), lower(?1)) > 0) OR instr(lower(body), lower(?1)) > 0 ORDER BY id DESC")
+        .prepare("SELECT id, url, title, created_at, summary, tags, liked, archived, (SELECT count(*) FROM reader_notes WHERE item_id = items.id) AS note_count FROM items WHERE ?1 = '' OR instr(lower(title), lower(?1)) > 0 OR EXISTS (SELECT 1 FROM json_each(CASE WHEN json_valid(items.tags) THEN items.tags ELSE '[]' END) WHERE instr(lower(json_each.value), lower(?1)) > 0) OR instr(lower(body), lower(?1)) > 0 ORDER BY id DESC")
         .map_err(|e| e.to_string())?;
     let rows = query
         .query_map([query_text], |row| {
@@ -195,6 +197,7 @@ fn search_items(conn: &Connection, query_text: &str) -> Result<Vec<Item>, String
                 tags: serde_json::from_str(&tags).unwrap_or_default(),
                 liked: row.get(6)?,
                 archived: row.get(7)?,
+                note_count: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;
@@ -446,5 +449,26 @@ mod tests {
         assert!(search_items(&conn, "_").unwrap().is_empty());
         assert!(search_items(&conn, "[").unwrap().is_empty());
         assert_eq!(search_items(&conn, " ").unwrap().len(), 1);
+    }
+
+    #[test]
+    fn list_counts_notes_for_each_item() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        conn.execute("INSERT INTO items (id, url, title, archived) VALUES (1, 'https://example.com', '有笔记', 1), (2, 'https://example.org', '无笔记', 0)", []).unwrap();
+        conn.execute(
+            "INSERT INTO reader_notes (item_id, body) VALUES (1, '一'), (1, '二')",
+            [],
+        )
+        .unwrap();
+        let items = search_items(&conn, "").unwrap();
+        assert_eq!(
+            items.iter().find(|item| item.id == 1).unwrap().note_count,
+            2
+        );
+        assert_eq!(
+            items.iter().find(|item| item.id == 2).unwrap().note_count,
+            0
+        );
     }
 }

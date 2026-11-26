@@ -90,10 +90,10 @@ let currentView = 'unread';
 let selectedTag = '';
 let currentItem = null;
 function renderItems() {
-  document.querySelector('#count-all').textContent = allItems.length;
   document.querySelector('#count-unread').textContent = allItems.filter((item) => !item.archived).length;
   document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked).length;
   document.querySelector('#count-archive').textContent = allItems.filter((item) => item.archived).length;
+  document.querySelector('#count-notes').textContent = allItems.filter((item) => item.note_count > 0).length;
   const tags = [...new Set(allItems.flatMap((item) => item.tags))].sort((a, b) => a.localeCompare(b));
   const tagFilters = document.querySelector('#tag-filters');
   tagFilters.replaceChildren();
@@ -104,18 +104,20 @@ function renderItems() {
     button.addEventListener('click', () => { selectedTag = selectedTag === tag ? '' : tag; renderItems(); });
     tagFilters.append(button);
   }
-  const titles = { unread: '待读', liked: '喜欢', archive: '归档', all: '全部收藏' };
+  const titles = { unread: '首页', liked: '喜欢', archive: '归档', notes: '笔记', all: '搜索结果' };
   document.querySelector('#list-heading').textContent = selectedTag || titles[currentView];
-  document.querySelector('#list-subtitle').textContent = selectedTag ? '按标签筛选收藏' : '留给稍后的好文章';
+  const subtitles = { unread: '留给稍后的好文章', liked: '喜欢的文章', archive: '已归档的文章', notes: '写有阅读笔记的文章', all: '在全部收藏中搜索' };
+  document.querySelector('#list-subtitle').textContent = selectedTag ? '按标签筛选收藏' : subtitles[currentView];
   document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === currentView));
   const result = allItems.filter((item) => {
     if (selectedTag && !item.tags.includes(selectedTag)) return false;
     return currentView === 'all' || (currentView === 'unread' && !item.archived)
-      || (currentView === 'liked' && item.liked) || (currentView === 'archive' && item.archived);
+      || (currentView === 'liked' && item.liked) || (currentView === 'archive' && item.archived)
+      || (currentView === 'notes' && item.note_count > 0);
   });
   items.replaceChildren();
   document.querySelector('#count').textContent = `${result.length} 条`;
-  if (!result.length) items.textContent = '这里还没有收藏。';
+  if (!result.length) items.textContent = currentView === 'notes' ? '还没有阅读笔记。' : '这里还没有收藏。';
   for (const item of result) {
     const row = document.createElement('div'); row.className = 'item';
     row.dataset.itemId = String(item.id);
@@ -130,7 +132,7 @@ function renderItems() {
     const actions = document.createElement('div'); actions.className = 'item-actions';
     const like = document.createElement('button'); like.textContent = item.liked ? '♥ 已喜欢' : '♡ 喜欢';
     like.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'liked', value: !item.liked }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
-    const archive = document.createElement('button'); archive.textContent = item.archived ? '移回待读' : '归档';
+    const archive = document.createElement('button'); archive.textContent = item.archived ? '移回首页' : '归档';
     archive.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'archived', value: !item.archived }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
     const remove = document.createElement('button'); remove.textContent = '删除';
     remove.addEventListener('click', async () => {
@@ -147,7 +149,14 @@ function renderItems() {
   }
 }
 document.querySelectorAll('.nav-item').forEach((button) => button.addEventListener('click', () => {
-  currentView = button.dataset.view; selectedTag = ''; renderItems();
+  currentView = button.dataset.view; selectedTag = '';
+  const search = document.querySelector('#search');
+  if (search.value) {
+    search.value = '';
+    refresh().catch((error) => { libraryMessage.textContent = String(error); });
+  } else {
+    renderItems();
+  }
 }));
 let searchTimer;
 document.querySelector('#search').addEventListener('input', () => {
@@ -328,7 +337,7 @@ async function refreshNotes(itemId) {
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button'; remove.textContent = '删除笔记';
     remove.addEventListener('click', async () => {
       if (!window.confirm('删除这条笔记？')) return;
-      try { await invoke('delete_reader_note', { id: note.id, itemId }); await refreshNotes(itemId); }
+      try { await invoke('delete_reader_note', { id: note.id, itemId }); await refreshNotes(itemId); await refresh(); }
       catch (error) { document.querySelector('#note-message').textContent = String(error); }
     });
     row.append(text, date, remove); container.append(row);
@@ -343,6 +352,7 @@ document.querySelector('#note-form').addEventListener('submit', async (event) =>
     input.value = '';
     document.querySelector('#note-message').textContent = '笔记已保存。';
     await refreshNotes(itemId);
+    await refresh();
   } catch (error) { document.querySelector('#note-message').textContent = String(error); }
 });
 document.querySelector('#open-original').addEventListener('click', async () => {
