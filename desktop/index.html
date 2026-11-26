@@ -1,6 +1,6 @@
 <!doctype html>
 <html lang="zh-CN">
-<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>拾藏</title><link rel="stylesheet" href="style.css"><script src="app.js" defer></script></head>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>拾藏</title><link rel="stylesheet" href="style.css"><script type="module" src="app.js"></script></head>
 <body>
 <div class="workspace">
   <nav class="sidebar" aria-label="收藏导航">
@@ -34,7 +34,16 @@
   <main id="reader" aria-label="阅读区">
     <div id="reader-placeholder" class="reader-placeholder"><span class="placeholder-symbol">▤</span><h2>选择一篇文章</h2><p>在这里安静地阅读</p></div>
     <div id="reader-content" hidden>
-      <div class="reader-actions"><button id="back" class="text-button" type="button">× <span>关闭阅读</span></button><div class="reader-action-group"><button id="toggle-fullscreen" class="text-button" type="button" aria-pressed="false">⛶ 全屏</button><button id="open-original" class="text-button" type="button">打开原网页 ↗</button></div></div>
+      <div class="reader-actions">
+        <button id="back" class="reader-icon-button" type="button" aria-label="关闭阅读" title="关闭阅读"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
+        <div class="reader-action-group">
+          <button id="toggle-fullscreen" class="reader-icon-button" type="button" aria-pressed="false" aria-label="展开阅读区" title="展开阅读区">
+            <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M4 4l6 6M16 20h4v-4m0 4-6-6"/></svg>
+            <svg class="shrink-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 10h6V4m0 6L4 4m16 10h-6v6m0-6 6 6"/></svg>
+          </button>
+          <button id="open-original" class="reader-icon-button" type="button" aria-label="打开原网页" title="打开原网页"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M13 5h6v6m0-6-9 9M18 14v5H5V6h5"/></svg></button>
+        </div>
+      </div>
       <p id="reader-status" role="status"></p>
       <article class="reading-page" id="reading-page" aria-labelledby="reader-title">
         <h1 id="reader-title"></h1><p id="reader-url" class="reader-url"></p><div id="reader-body" class="reader-body"></div>

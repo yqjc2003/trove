@@ -56,6 +56,11 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .reader-placeholder p { margin: 10px 0; font-size: 13px; }
 .reader-actions { min-height: 67px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; }
 .reader-action-group { display: flex; align-items: center; gap: 24px; }
+.reader-icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: #6e7a72; }
+.reader-icon-button:hover { background: color-mix(in srgb, var(--page-background), #8b9990 13%); }
+.reader-icon-button svg { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+.reader-icon-button .shrink-icon, .reader-icon-button[aria-pressed="true"] .expand-icon { display: none; }
+.reader-icon-button[aria-pressed="true"] .shrink-icon { display: block; }
 #reader-status { margin: 0 30px; color: #9d4c42; font-size: 13px; }
 body.reader-fullscreen .workspace { display: block; }
 body.reader-fullscreen .sidebar, body.reader-fullscreen #library { display: none; }

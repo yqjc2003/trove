@@ -1,3 +1,5 @@
+import { captureReadingPosition, readingScrollTop } from './reader-position.mjs';
+
 const { invoke } = window.__TAURI__.core;
 const form = document.querySelector('#add-form');
 const settingsForm = document.querySelector('#ai-form');
@@ -133,7 +135,12 @@ function renderItems() {
     const remove = document.createElement('button'); remove.textContent = '删除';
     remove.addEventListener('click', async () => {
       if (!window.confirm(`删除“${item.title}”？`)) return;
-      try { await invoke('delete_item', { id: item.id }); if (currentItem?.id === item.id) await closeReader(); await refresh(); } catch (error) { libraryMessage.textContent = String(error); }
+      try {
+        await invoke('delete_item', { id: item.id });
+        if (currentItem?.id === item.id) await closeReader();
+        try { localStorage.removeItem(positionKey(item)); } catch { /* 收藏删除已成功 */ }
+        await refresh();
+      } catch (error) { libraryMessage.textContent = String(error); }
     });
     actions.append(like, archive, remove);
     info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
@@ -175,6 +182,35 @@ const size = document.querySelector('#reader-size');
 const color = document.querySelector('#reader-color');
 const theme = document.querySelector('#reader-theme');
 let readerVersion = 0;
+let layoutVersion = 0;
+let readerReady = false;
+let restoringPosition = false;
+let positionTimer;
+function positionKey(item) {
+  return `reader-position:${item.id}:${item.url}`;
+}
+function capturePosition() {
+  const rectangles = [...readerBody.children].map((paragraph) => paragraph.getBoundingClientRect());
+  return captureReadingPosition(rectangles, reader.getBoundingClientRect().top, reader.scrollTop);
+}
+function saveReaderPosition() {
+  if (!currentItem || !readerReady || restoringPosition) return;
+  try { localStorage.setItem(positionKey(currentItem), JSON.stringify(capturePosition())); } catch { /* 阅读不应因本地设置存储失败而中断 */ }
+}
+function restorePosition(position) {
+  const rectangles = [...readerBody.children].map((paragraph) => paragraph.getBoundingClientRect());
+  const next = readingScrollTop(position, rectangles, reader.getBoundingClientRect().top, reader.scrollTop);
+  if (next !== null) reader.scrollTop = next;
+}
+function loadReaderPosition(item) {
+  try { return JSON.parse(localStorage.getItem(positionKey(item)) || 'null'); } catch { return null; }
+}
+reader.addEventListener('scroll', () => {
+  if (!readerReady || restoringPosition) return;
+  clearTimeout(positionTimer);
+  positionTimer = setTimeout(saveReaderPosition, 200);
+}, { passive: true });
+window.addEventListener('pagehide', saveReaderPosition);
 let preferences = {};
 try { preferences = JSON.parse(localStorage.getItem('reader-settings') || '{}'); } catch { preferences = {}; }
 if (['serif', 'sans', 'kai'].includes(preferences.font)) font.value = preferences.font;
@@ -192,6 +228,9 @@ function applyReaderSettings() {
 [font, size, color, theme].forEach((control) => control.addEventListener('input', applyReaderSettings));
 applyReaderSettings();
 async function openReader(item) {
+  clearTimeout(positionTimer);
+  saveReaderPosition();
+  readerReady = false;
   const version = ++readerVersion;
   currentItem = item;
   readerPlaceholder.hidden = true;
@@ -216,25 +255,40 @@ async function openReader(item) {
       p.textContent = paragraph;
       readerBody.append(p);
     }
+    const savedPosition = loadReaderPosition(item);
+    requestAnimationFrame(() => {
+      if (version !== readerVersion) return;
+      restoringPosition = true;
+      restorePosition(savedPosition);
+      requestAnimationFrame(() => {
+        if (version !== readerVersion) return;
+        restoringPosition = false;
+        readerReady = true;
+      });
+    });
   } catch (error) {
     if (version === readerVersion) readerBody.textContent = String(error);
   }
 }
-async function setReaderFullscreen(enabled) {
-  fullscreenButton.disabled = true;
-  try {
-    await window.__TAURI__.window.getCurrentWindow().setFullscreen(enabled);
-    document.body.classList.toggle('reader-fullscreen', enabled);
-    fullscreenButton.textContent = enabled ? '⛶ 退出全屏' : '⛶ 全屏';
-    fullscreenButton.setAttribute('aria-pressed', String(enabled));
-    readerStatus.textContent = '';
-    return true;
-  } catch {
-    readerStatus.textContent = enabled ? '无法进入全屏，请重试。' : '无法退出全屏，请重试。';
-    return false;
-  } finally {
-    fullscreenButton.disabled = false;
-  }
+function setReaderFullscreen(enabled) {
+  const position = readerReady ? capturePosition() : null;
+  saveReaderPosition();
+  const version = readerVersion;
+  const layout = ++layoutVersion;
+  restoringPosition = true;
+  document.body.classList.toggle('reader-fullscreen', enabled);
+  fullscreenButton.setAttribute('aria-pressed', String(enabled));
+  fullscreenButton.setAttribute('aria-label', enabled ? '退出阅读区全屏' : '展开阅读区');
+  fullscreenButton.title = enabled ? '退出阅读区全屏' : '展开阅读区';
+  requestAnimationFrame(() => {
+    if (version !== readerVersion || layout !== layoutVersion) return;
+    restorePosition(position);
+    requestAnimationFrame(() => {
+      if (version !== readerVersion || layout !== layoutVersion) return;
+      restoringPosition = false;
+      saveReaderPosition();
+    });
+  });
 }
 fullscreenButton.addEventListener('click', () => {
   setReaderFullscreen(!document.body.classList.contains('reader-fullscreen'));
@@ -246,8 +300,12 @@ document.addEventListener('keydown', (event) => {
   }
 });
 async function closeReader() {
-  if (document.body.classList.contains('reader-fullscreen') && !await setReaderFullscreen(false)) return;
+  clearTimeout(positionTimer);
+  saveReaderPosition();
+  if (document.body.classList.contains('reader-fullscreen')) setReaderFullscreen(false);
   readerVersion++;
+  readerReady = false;
+  restoringPosition = false;
   currentItem = null;
   readerContent.hidden = true;
   readerPlaceholder.hidden = false;
