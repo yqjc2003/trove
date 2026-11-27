@@ -243,11 +243,16 @@ let allNotes = [];
 let currentView = 'unread';
 let selectedTags = [];
 let currentItem = null;
+document.querySelector('#clear-tag-filters').addEventListener('click', () => {
+  selectedTags = [];
+  renderItems();
+});
 function noteTime(value) {
   const date = new Date(`${value.replace(' ', 'T')}Z`);
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
 }
 function renderItems() {
+  document.querySelector('#clear-tag-filters').hidden = selectedTags.length === 0;
   document.querySelector('#count-unread').textContent = allItems.filter((item) => !item.archived).length;
   document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked && !item.archived).length;
   document.querySelector('#count-archive').textContent = allItems.filter((item) => item.archived).length;
