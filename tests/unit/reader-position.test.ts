@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { captureReadingPosition, readingScrollTop } from '../../desktop/reader-position.mjs';
+import { captureReadingPosition, readingScrollTop, waitForReaderImages } from '../../desktop/reader-position.mjs';
 
 describe('阅读位置', () => {
   it('切换宽度导致正文重新换行时保持同一段及其相对位置', () => {
@@ -21,5 +21,20 @@ describe('阅读位置', () => {
   it('段落间留白位于顶部时锚定前一段末尾', () => {
     const rectangles = [{ top: -100, bottom: -5, height: 95 }, { top: 25, bottom: 125, height: 100 }];
     expect(captureReadingPosition(rectangles, 0, 300)).toEqual({ index: 0, fraction: 1, scrollTop: 300 });
+  });
+
+  it('等待图片解码后恢复，并容忍损坏图片', async () => {
+    let finish!: () => void;
+    const pending = new Promise<void>((resolve) => { finish = resolve; });
+    let ready = false;
+    const restoring = waitForReaderImages([
+      { decode: () => pending },
+      { decode: () => Promise.reject(new Error('图片损坏')) },
+    ]).then(() => { ready = true; });
+    await Promise.resolve();
+    expect(ready).toBe(false);
+    finish();
+    await restoring;
+    expect(ready).toBe(true);
   });
 });

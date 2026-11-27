@@ -1,4 +1,4 @@
-import { captureReadingPosition, readingScrollTop } from './reader-position.mjs';
+import { captureReadingPosition, readingScrollTop, waitForReaderImages } from './reader-position.mjs';
 
 const { invoke } = window.__TAURI__.core;
 const form = document.querySelector('#add-form');
@@ -436,6 +436,9 @@ reader.addEventListener('scroll', () => {
   positionTimer = setTimeout(saveReaderPosition, 200);
 }, { passive: true });
 window.addEventListener('pagehide', saveReaderPosition);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') { clearTimeout(positionTimer); saveReaderPosition(); }
+});
 let preferences = {};
 try { preferences = JSON.parse(localStorage.getItem('reader-settings') || '{}'); } catch { preferences = {}; }
 if (['serif', 'sans', 'kai'].includes(preferences.font)) font.value = preferences.font;
@@ -456,6 +459,7 @@ async function openReader(item) {
   clearTimeout(positionTimer);
   saveReaderPosition();
   readerReady = false;
+  restoringPosition = false;
   const version = ++readerVersion;
   currentItem = item;
   readerPlaceholder.hidden = true;
@@ -487,6 +491,8 @@ async function openReader(item) {
   }
 }
 async function showReaderContent(result, item, version) {
+  readerReady = false;
+  restoringPosition = false;
   readerStatus.textContent = result.source_note || '';
   readerBody.replaceChildren();
   if (!result.body.trim() && item.content_type === 'video' && result.summary.trim()) {
@@ -494,14 +500,16 @@ async function showReaderContent(result, item, version) {
     readerBody.append(paragraph);
     readerStatus.textContent = result.source_note || '未获取到视频原始简介，显示保存的摘要。';
     readerEmpty.hidden = true;
-    return;
+  } else {
+    readerEmpty.hidden = !!result.body.trim();
+    if (!result.body.trim()) return;
+    const html = await invoke('render_markdown', { body: result.body, images: result.images || [] });
+    if (version !== readerVersion) return;
+    // HTML 由 Rust 的 Markdown 渲染器和白名单清理器共同生成。
+    readerBody.innerHTML = html;
+    await waitForReaderImages(readerBody.querySelectorAll('img'));
+    if (version !== readerVersion) return;
   }
-  readerEmpty.hidden = !!result.body.trim();
-  if (!result.body.trim()) return;
-  const html = await invoke('render_markdown', { body: result.body, images: result.images || [] });
-  if (version !== readerVersion) return;
-  // HTML 由 Rust 的 Markdown 渲染器和白名单清理器共同生成。
-  readerBody.innerHTML = html;
   const savedPosition = loadReaderPosition(item);
   requestAnimationFrame(() => {
     if (version !== readerVersion) return;
