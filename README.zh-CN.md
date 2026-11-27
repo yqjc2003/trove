@@ -1,24 +1,52 @@
-# 拾藏 CatchLinger
+# 拾藏 · CatchLinger
 
-本地优先的收藏和阅读客户端。Rust + Tauri 使用操作系统 WebView；网页正文、图片、标签和批注保存在本地 SQLite。可选配置 DeepSeek 为收录内容生成摘要和已有标签。
+[English](README.md) | **简体中文**
 
-## 开发
+拾藏是本地优先的桌面收藏与阅读应用，用于收录链接、阅读文章和整理笔记。客户端基于 Rust 和 Tauri，使用操作系统自带的 WebView，不内嵌 Chrome，也不依赖在线账号或托管后端。收藏保存在本机 SQLite 中。
 
-Windows 需要 Rust、Microsoft C++ Build Tools（含 Windows SDK）和 WebView2 Runtime，以及 Node.js、pnpm。
+## 主要功能
+
+- 收录文章链接、视频链接、代码库及手写 Markdown 笔记。客户端提取网页正文、公开代码库 README 或可读取的视频介绍；无法提取时仍可保存链接并手工补充信息。
+- 离线阅读已保存的 Markdown 正文和本地图片，调整字体、字号、文字颜色和背景，并自动记录阅读位置。音频和视频不会保存到本地。
+- 使用已有标签、喜欢和归档整理内容；支持标签组合筛选，以及按标题、标签和正文搜索。在阅读器中选择文字或代码可添加批注，并在「笔记」中按文章查看。
+- 可选配置 DeepSeek，生成摘要、从已有标签中选择最多三个标签，并在条件允许时优化 Markdown 排版；不配置 AI 也可以保存内容。
+- 可选启用本地 MCP 服务，让 Agent、内置 Skill 和浏览器扩展将网址交给桌面客户端收录。
+
+图片保存有数量和大小限制；需要登录或依赖 JavaScript 渲染的网站可能无法完整读取。启用 DeepSeek 后，参与分析的网页内容会发送给该服务。详细说明和限制见[桌面端文档](desktop/README.md)。
+
+## 开始使用
+
+Windows 环境需要 Node.js、pnpm、Rust、Microsoft C++ Build Tools（含 Windows SDK）和 WebView2 Runtime。安装后在项目根目录运行：
 
 ```sh
 pnpm install
 pnpm desktop:dev
 ```
 
-`pnpm build` 构建桌面程序；`pnpm lint && pnpm typecheck && pnpm test` 检查前端和 Skill，`cargo test --locked --manifest-path src-tauri/Cargo.toml` 检查 Rust。数据目录说明见 [桌面端说明](desktop/README.md)。
+如需 AI 功能，可在「设置 → AI 设置」中配置 DeepSeek。点击「＋」收录网址或手写文章。通过本地 MCP 收录时，需要保持桌面客户端运行。
 
-## 本地 MCP 与 Skill
+```sh
+pnpm build                 # 构建桌面程序，不生成安装包
+pnpm lint
+pnpm typecheck
+pnpm test
+cargo test --locked --manifest-path src-tauri/Cargo.toml
+```
 
-在客户端「设置 → 本地 MCP」启用服务。地址固定为 `http://127.0.0.1:46917/mcp`；密钥在同一设置页面查看。服务需要客户端运行，仅监听本机，默认关闭。外部 Agent 通过 Streamable HTTP 连接时配置 `Authorization: Bearer <本地密钥>`；不要把密钥提交、发送到远程服务或写进项目文件。
+## 本地 MCP、Skill 与浏览器扩展
 
-提供 `catchlinger_save`、`catchlinger_search`、`catchlinger_list_tags`。`catchlinger_save` 接收 `url`，客户端抓取和分析内容并保存；重复链接不会覆盖已有收藏。配置、数据和密钥属于当前操作系统用户。
+在客户端「设置 → 本地 MCP」启用服务。服务默认关闭，仅监听 `127.0.0.1:46917`，随客户端退出而停止；开启后下次启动客户端会自动恢复。访问密钥可在同一设置页面查看。
 
-仓库的 [catch-and-linger Skill](skills/catch-and-linger/SKILL.md) 可使用 MCP 或 Node 脚本提交网址。Windows 下运行 `pnpm skill:install` 可将其安装到当前用户的 Agent 技能目录。浏览器扩展位于 [extension](extension)，通过本地 MCP 将当前网址交给客户端；在扩展设置中填写客户端的本地 MCP 密钥。
+MCP 客户端使用 Streamable HTTP 连接 `http://127.0.0.1:46917/mcp`，请求头设置为 `Authorization: Bearer <本地密钥>`。服务提供 `catchlinger_save`、`catchlinger_search` 和 `catchlinger_list_tags`；重复收录已有网址不会覆盖原收藏。请妥善保管密钥，不要提交到仓库。
 
-手工备份与 WebDAV 云同步尚未实现；Microsoft 账号同步也尚未实现。原 Web 服务、Supabase、线上 REST/MCP 和迁移文件已移除，不会自动迁移旧云端数据。
+[catch-and-linger Skill](skills/catch-and-linger/SKILL.md) 可将网址交给正在运行的客户端。Windows 下执行 `pnpm skill:install` 可为当前用户安装 Skill。[浏览器扩展](extension/)同样通过本地 MCP 工作：以未打包扩展方式加载后，在扩展设置中填写本地密钥。
+
+## 数据与限制
+
+SQLite 数据库和归档图片位于应用的本地数据目录，AI 和 MCP 密钥保存在该目录的 `.env.local`；阅读位置保存在本地 WebView 存储中。开发或隔离测试可使用环境变量 `CATCHLINGER_DATA_DIR` 指定其他绝对路径，此操作不会迁移已有数据。
+
+手工备份、WebDAV 同步和 Microsoft 账号同步尚未实现；旧托管服务的数据不会自动迁移。收录、隐私和存储细节见[桌面端文档](desktop/README.md)。
+
+## 许可
+
+[Apache License 2.0](LICENSE)
