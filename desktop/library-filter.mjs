@@ -15,3 +15,7 @@ export function matchesLibraryView(item, view, selectedTags) {
     default: return false;
   }
 }
+
+export function countTagItems(items, view, tag) {
+  return items.filter((item) => matchesLibraryView(item, view, [tag])).length;
+}

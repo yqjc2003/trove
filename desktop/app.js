@@ -1,7 +1,7 @@
 import { captureReadingPosition, readingScrollTop, waitForReaderImages } from './reader-position.mjs';
 import { selectionAnchor, imageAnchor, findAnnotation } from './annotation-anchor.mjs';
 import { measureReadingText, estimateReadingProgress } from './reading-estimate.mjs';
-import { matchesLibraryView, toggleTag } from './library-filter.mjs';
+import { countTagItems, matchesLibraryView, toggleTag } from './library-filter.mjs';
 
 const { invoke } = window.__TAURI__.core;
 const form = document.querySelector('#add-form');
@@ -263,7 +263,10 @@ function renderItems() {
     const row = document.createElement('div');
     row.className = 'tag-row';
     const button = document.createElement('button');
-    button.type = 'button'; button.className = 'tag-filter'; button.textContent = tag;
+    button.type = 'button'; button.className = 'tag-filter';
+    const name = document.createElement('span'); name.className = 'tag-name'; name.textContent = tag;
+    const count = document.createElement('span'); count.className = 'tag-count'; count.textContent = `(${countTagItems(allItems, currentView, tag)})`;
+    button.append(name, count);
     const selected = selectedTags.some((value) => value.toLowerCase() === tag.toLowerCase());
     button.classList.toggle('active', selected);
     button.setAttribute('aria-pressed', String(selected));

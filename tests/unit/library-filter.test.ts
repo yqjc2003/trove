@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { matchesLibraryView, toggleTag } from '../../desktop/library-filter.mjs';
+import { countTagItems, matchesLibraryView, toggleTag } from '../../desktop/library-filter.mjs';
 
 describe('桌面收藏筛选', () => {
   const item = { tags: ['工具', 'Rust'], liked: true, archived: false, note_count: 0, content_type: 'article' };
@@ -25,5 +25,13 @@ describe('桌面收藏筛选', () => {
     expect(matchesLibraryView({ ...item, note_count: 1 }, 'notes', ['工具'])).toBe(true);
     expect(matchesLibraryView({ ...item, content_type: 'note' }, 'notes', ['工具'])).toBe(true);
     expect(matchesLibraryView({ ...item, note_count: 1 }, 'notes', ['博客'])).toBe(false);
+  });
+
+  it('标签数量按当前入口统计，每条收藏只计一次', () => {
+    const items = [item, { ...item, tags: ['工具', '工具'], archived: true }, { ...item, tags: ['其他'], liked: false }];
+    expect(countTagItems(items, 'unread', '工具')).toBe(1);
+    expect(countTagItems(items, 'liked', '工具')).toBe(1);
+    expect(countTagItems(items, 'archive', '工具')).toBe(1);
+    expect(countTagItems(items, 'notes', '工具')).toBe(0);
   });
 });
