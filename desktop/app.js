@@ -310,7 +310,10 @@ function renderItems() {
       heading.addEventListener('click', () => openReader(item)); group.append(heading);
       for (const note of allNotes.filter((entry) => entry.item_id === item.id)) {
         const button = document.createElement('button'); button.type = 'button'; button.className = 'annotation-list-entry';
-        const text = document.createElement('span'); text.textContent = note.body;
+        if (note.anchor_text) {
+          const quote = document.createElement('span'); quote.className = 'annotation-list-quote'; quote.textContent = note.anchor_text; button.append(quote);
+        }
+        const text = document.createElement('span'); text.className = 'annotation-list-body'; text.textContent = note.body;
         const date = document.createElement('small'); date.textContent = noteTime(note.created_at);
         button.append(text, date); button.addEventListener('click', () => openReader(item, note)); group.append(button);
       }
