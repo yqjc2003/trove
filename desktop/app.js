@@ -1,5 +1,6 @@
 import { captureReadingPosition, readingScrollTop, waitForReaderImages } from './reader-position.mjs';
 import { selectionAnchor, imageAnchor, findAnnotation } from './annotation-anchor.mjs';
+import { measureReadingText, estimateReadingProgress } from './reading-estimate.mjs';
 
 const { invoke } = window.__TAURI__.core;
 const form = document.querySelector('#add-form');
@@ -423,6 +424,7 @@ const fullscreenButton = document.querySelector('#toggle-fullscreen');
 const readerStatus = document.querySelector('#reader-status');
 const page = document.querySelector('#reading-page');
 const readerBody = document.querySelector('#reader-body');
+const readingEstimate = document.querySelector('#reading-estimate');
 const readerEmpty = document.querySelector('#reader-empty');
 const retryReaderContent = document.querySelector('#retry-reader-content');
 const refreshReaderContent = document.querySelector('#refresh-reader-content');
@@ -445,6 +447,21 @@ let layoutVersion = 0;
 let readerReady = false;
 let restoringPosition = false;
 let positionTimer;
+let readingBlocks = [];
+let estimateFrame = 0;
+function updateReadingEstimate() {
+  estimateFrame = 0;
+  if (!currentItem || !readingBlocks.length) { readingEstimate.hidden = true; return; }
+  const rectangles = [...readerBody.children].map((element) => element.getBoundingClientRect());
+  const viewportTop = reader.getBoundingClientRect().top + document.querySelector('.reader-actions').offsetHeight;
+  const { totalChars, remainingMinutes } = estimateReadingProgress(readingBlocks, rectangles, viewportTop);
+  readingEstimate.hidden = !totalChars;
+  readingEstimate.textContent = `共 ${totalChars.toLocaleString()} 字 · ${remainingMinutes <= 0 ? '已读完' : `剩余约 ${Math.max(1, Math.ceil(remainingMinutes))} 分钟`}`;
+  readingEstimate.title = '估算速度：中文约每分钟 400 字，其他文字约每分钟 200 词';
+}
+function scheduleReadingEstimate() {
+  if (!estimateFrame) estimateFrame = requestAnimationFrame(updateReadingEstimate);
+}
 function positionKey(item) {
   return `reader-position:${item.id}:${item.url}`;
 }
@@ -465,10 +482,12 @@ function loadReaderPosition(item) {
   try { return JSON.parse(localStorage.getItem(positionKey(item)) || 'null'); } catch { return null; }
 }
 reader.addEventListener('scroll', () => {
+  scheduleReadingEstimate();
   if (!readerReady || restoringPosition) return;
   clearTimeout(positionTimer);
   positionTimer = setTimeout(saveReaderPosition, 200);
 }, { passive: true });
+window.addEventListener('resize', scheduleReadingEstimate);
 function closeAnnotationMenu() { annotationMenu.hidden = true; }
 readerBody.addEventListener('contextmenu', (event) => {
   const selection = window.getSelection();
@@ -566,6 +585,7 @@ function applyReaderSettings() {
   page.style.setProperty('--reader-color', color.value);
   document.querySelector('#size-value').textContent = `${size.value} px`;
   localStorage.setItem('reader-settings', JSON.stringify({ font: font.value, size: size.value, color: color.value, theme: theme.value }));
+  scheduleReadingEstimate();
 }
 [font, size, color, theme].forEach((control) => control.addEventListener('input', applyReaderSettings));
 applyReaderSettings();
@@ -576,6 +596,8 @@ async function openReader(item, annotation = null) {
   restoringPosition = false;
   const version = ++readerVersion;
   currentItem = item;
+  readingBlocks = [];
+  readingEstimate.hidden = true;
   selectedAnchor = null;
   closeAnnotationMenu();
   if (window.CSS?.highlights) CSS.highlights.delete('reader-annotations');
@@ -610,6 +632,8 @@ async function openReader(item, annotation = null) {
 async function showReaderContent(result, item, version, annotation = null) {
   readerReady = false;
   restoringPosition = false;
+  readingBlocks = [];
+  readingEstimate.hidden = true;
   readerStatus.textContent = result.source_note || '';
   readerBody.replaceChildren();
   if (!result.body.trim() && item.content_type === 'video' && result.summary.trim()) {
@@ -627,6 +651,8 @@ async function showReaderContent(result, item, version, annotation = null) {
     await waitForReaderImages(readerBody.querySelectorAll('img'));
     if (version !== readerVersion) return;
   }
+  readingBlocks = [...readerBody.children].map((element) => measureReadingText(element.textContent || ''));
+  scheduleReadingEstimate();
   refreshNotes(item.id).catch((error) => { document.querySelector('#note-message').textContent = String(error); });
   const savedPosition = loadReaderPosition(item);
   requestAnimationFrame(() => {
@@ -704,6 +730,8 @@ async function closeReader() {
   readerReady = false;
   restoringPosition = false;
   currentItem = null;
+  readingBlocks = [];
+  readingEstimate.hidden = true;
   readerContent.hidden = true;
   readerPlaceholder.hidden = false;
   document.body.classList.remove('reading-active');
