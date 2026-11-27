@@ -425,11 +425,14 @@ const retryReaderContent = document.querySelector('#retry-reader-content');
 const refreshReaderContent = document.querySelector('#refresh-reader-content');
 const readerTitle = document.querySelector('#reader-title');
 const readerUrl = document.querySelector('#reader-url');
-const annotationButton = document.querySelector('#add-annotation');
 const annotationDialog = document.querySelector('#annotation-dialog');
 const annotationForm = document.querySelector('#annotation-form');
+const annotationMenu = document.querySelector('#annotation-context-menu');
+const contextCopy = document.querySelector('#context-copy');
+const contextAnnotate = document.querySelector('#context-annotate');
 let selectedAnchor = null;
 let editingAnnotation = null;
+let contextRange = null;
 const font = document.querySelector('#reader-font');
 const size = document.querySelector('#reader-size');
 const color = document.querySelector('#reader-color');
@@ -463,15 +466,44 @@ reader.addEventListener('scroll', () => {
   clearTimeout(positionTimer);
   positionTimer = setTimeout(saveReaderPosition, 200);
 }, { passive: true });
-function captureSelection() {
-  const anchor = selectionAnchor(readerBody, window.getSelection());
-  if (!anchor) return;
-  readerBody.querySelectorAll('.annotation-selected-image').forEach((image) => image.classList.remove('annotation-selected-image'));
+function closeAnnotationMenu() { annotationMenu.hidden = true; }
+readerBody.addEventListener('contextmenu', (event) => {
+  const selection = window.getSelection();
+  const image = event.target instanceof HTMLImageElement ? event.target : null;
+  const anchor = image ? imageAnchor(readerBody, image) : selectionAnchor(readerBody, selection);
+  if (!anchor) { closeAnnotationMenu(); return; }
+  event.preventDefault();
   selectedAnchor = anchor;
-  annotationButton.disabled = false;
-}
-readerBody.addEventListener('mouseup', captureSelection);
-readerBody.addEventListener('keyup', captureSelection);
+  contextRange = !image && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
+  readerBody.querySelectorAll('.annotation-selected-image').forEach((node) => node.classList.remove('annotation-selected-image'));
+  if (image) image.classList.add('annotation-selected-image');
+  contextCopy.hidden = !!image;
+  annotationMenu.hidden = false;
+  const rect = contextRange?.getBoundingClientRect();
+  const x = event.clientX || rect?.left || 0; const y = event.clientY || rect?.bottom || 0;
+  annotationMenu.style.left = `${Math.max(0, Math.min(x, window.innerWidth - annotationMenu.offsetWidth - 8))}px`;
+  annotationMenu.style.top = `${Math.max(0, Math.min(y, window.innerHeight - annotationMenu.offsetHeight - 8))}px`;
+});
+annotationMenu.addEventListener('mousedown', (event) => event.preventDefault());
+contextAnnotate.addEventListener('click', () => { closeAnnotationMenu(); if (selectedAnchor && currentItem) openAnnotationEditor(); });
+contextCopy.addEventListener('click', async () => {
+  closeAnnotationMenu();
+  try {
+    let copied = false;
+    if (navigator.clipboard?.writeText) {
+      try { await navigator.clipboard.writeText(selectedAnchor.text); copied = true; } catch { /* WebView 可能禁用 Clipboard API */ }
+    }
+    if (!copied) {
+      if (contextRange) { const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(contextRange); }
+      if (!document.execCommand('copy')) throw new Error('复制失败');
+    }
+  } catch { readerStatus.textContent = '复制失败，请使用 Ctrl+C 重试。'; }
+});
+document.addEventListener('pointerdown', (event) => { if (!annotationMenu.contains(event.target)) closeAnnotationMenu(); });
+reader.addEventListener('scroll', closeAnnotationMenu, { passive: true });
+document.addEventListener('keydown', (event) => {
+  if (!annotationMenu.hidden && event.key === 'Escape') { event.preventDefault(); closeAnnotationMenu(); }
+});
 function openAnnotationEditor(note = null) {
   editingAnnotation = note;
   document.querySelector('#annotation-heading').textContent = note ? '编辑笔记' : '添加批注';
@@ -480,7 +512,6 @@ function openAnnotationEditor(note = null) {
   document.querySelector('#annotation-message').textContent = '';
   annotationDialog.showModal();
 }
-annotationButton.addEventListener('click', () => { if (selectedAnchor && currentItem) openAnnotationEditor(); });
 document.querySelector('#close-annotation').addEventListener('click', () => annotationDialog.close());
 annotationForm.addEventListener('submit', async (event) => {
   event.preventDefault();
@@ -493,7 +524,7 @@ annotationForm.addEventListener('submit', async (event) => {
     if (editingAnnotation) await invoke('edit_reader_note', { id: editingAnnotation.id, itemId, body });
     else await invoke('add_annotation', { itemId, body, anchor: selectedAnchor });
     annotationDialog.close();
-    selectedAnchor = null; annotationButton.disabled = true;
+    selectedAnchor = null;
     readerBody.querySelectorAll('.annotation-selected-image').forEach((image) => image.classList.remove('annotation-selected-image'));
     await refreshNotes(itemId); await refresh();
   } catch (error) { document.querySelector('#annotation-message').textContent = String(error); }
@@ -543,7 +574,7 @@ async function openReader(item, annotation = null) {
   const version = ++readerVersion;
   currentItem = item;
   selectedAnchor = null;
-  annotationButton.disabled = true;
+  closeAnnotationMenu();
   if (window.CSS?.highlights) CSS.highlights.delete('reader-annotations');
   readerPlaceholder.hidden = true;
   readerContent.hidden = false;
@@ -627,15 +658,6 @@ async function retrieveReaderContent(force) {
 retryReaderContent.addEventListener('click', () => retrieveReaderContent(false));
 refreshReaderContent.addEventListener('click', () => retrieveReaderContent(true));
 readerBody.addEventListener('click', async (event) => {
-  if (event.target instanceof HTMLImageElement) {
-    event.preventDefault();
-    const anchor = imageAnchor(readerBody, event.target);
-    if (anchor) {
-      readerBody.querySelectorAll('.annotation-selected-image').forEach((image) => image.classList.remove('annotation-selected-image'));
-      event.target.classList.add('annotation-selected-image'); selectedAnchor = anchor; annotationButton.disabled = false;
-    }
-    return;
-  }
   const link = event.target.closest('a');
   if (!link) return;
   event.preventDefault();

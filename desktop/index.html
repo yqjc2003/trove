@@ -36,7 +36,6 @@
       <div class="reader-actions">
         <button id="back" class="reader-icon-button" type="button" aria-label="关闭阅读" title="关闭阅读"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 5l14 14M19 5L5 19"/></svg></button>
         <div class="reader-action-group">
-          <button id="add-annotation" class="reader-icon-button" type="button" aria-label="为选中内容添加批注" title="先选择正文、代码或图片，再添加批注" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 4h16v12H9l-5 4z M8 8h8 M8 11h5"/></svg></button>
           <button id="refresh-reader-content" class="reader-icon-button" type="button" aria-label="重新获取正文" title="重新获取正文；已配置 AI 时会尝试整理格式"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M20 7v5h-5M4 17v-5h5M5 9a7.5 7.5 0 0 1 13-2l2 5M19 15a7.5 7.5 0 0 1-13 2l-2-5"/></svg></button>
           <button id="toggle-fullscreen" class="reader-icon-button" type="button" aria-pressed="false" aria-label="展开阅读区" title="展开阅读区">
             <svg class="expand-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 4H4v4M4 4l6 6M16 20h4v-4m0 4-6-6"/></svg>
@@ -49,11 +48,12 @@
       <article class="reading-page" id="reading-page" aria-labelledby="reader-title">
         <h1 id="reader-title"></h1><p id="reader-url" class="reader-url"></p><button id="open-video" class="text-button video-link" type="button" hidden>打开视频 ↗</button><div id="reader-body" class="reader-body"></div>
         <div id="reader-empty" class="reader-empty" hidden><p>暂无保存的正文，请通过上方的图标打开原网页访问。</p><button id="retry-reader-content" class="text-button" type="button">尝试重新获取正文</button></div>
-        <section class="notes-section"><h2>阅读笔记</h2><p class="hint">选择正文、代码或点击图片，再点击阅读区顶部的批注图标，即可为选中内容添加批注。</p><form id="note-form"><label for="note-input">记录你的想法</label><textarea id="note-input" maxlength="10000" rows="3" required></textarea><button type="submit">保存笔记</button></form><p id="note-message" role="status"></p><div id="notes"></div></section>
+        <section class="notes-section"><h2>阅读笔记</h2><p class="hint">选择正文或代码，或在图片上点击右键，然后选择“添加批注”。</p><form id="note-form"><label for="note-input">记录你的想法</label><textarea id="note-input" maxlength="10000" rows="3" required></textarea><button type="submit">保存笔记</button></form><p id="note-message" role="status"></p><div id="notes"></div></section>
       </article>
     </div>
   </main>
 </div>
+<div id="annotation-context-menu" class="annotation-context-menu" role="menu" aria-label="阅读操作" hidden><button id="context-copy" type="button" role="menuitem">复制 <span>Ctrl+C</span></button><button id="context-annotate" type="button" role="menuitem">添加批注</button></div>
 <dialog id="annotation-dialog" aria-labelledby="annotation-heading">
   <div class="dialog-head"><h2 id="annotation-heading">添加批注</h2><button id="close-annotation" class="text-button" type="button" aria-label="关闭">✕</button></div>
   <form id="annotation-form" class="stack"><div><p class="hint">选中内容</p><blockquote id="annotation-quote" class="annotation-quote"></blockquote></div><label>批注<textarea id="annotation-input" maxlength="10000" rows="5" required></textarea></label><div><button type="submit">保存批注</button></div></form><p id="annotation-message" role="status"></p>
