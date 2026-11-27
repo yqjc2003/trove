@@ -302,8 +302,7 @@ function renderItems() {
     row.addEventListener('click', (event) => { if (!event.target.closest('button')) openReader(item); });
     const info = document.createElement('div');
     const title = document.createElement('button'); title.type = 'button'; title.className = 'item-title'; title.textContent = item.title;
-    const direct = ['repo', 'profile', 'video'].includes(item.content_type);
-    title.title = direct ? '打开原网页' : '打开阅读器';
+    title.title = '打开阅读器';
     title.addEventListener('click', () => openReader(item));
     const url = document.createElement('small'); url.className = 'item-source';
     const type = item.content_type === 'profile' ? 'repo' : item.content_type;
@@ -317,11 +316,6 @@ function renderItems() {
     const summary = document.createElement('p'); summary.textContent = item.summary;
     const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
     const actions = document.createElement('div'); actions.className = 'item-actions';
-    if (direct) {
-      const source = document.createElement('button'); source.type = 'button'; source.textContent = '查看内容';
-      source.addEventListener('click', () => openReader(item, true));
-      actions.append(source);
-    }
     const editTags = document.createElement('button'); editTags.textContent = '编辑收藏';
     editTags.addEventListener('click', () => openTagEditor(item));
     const like = document.createElement('button'); like.textContent = item.liked ? '♥ 已喜欢' : '♡ 喜欢';
@@ -440,12 +434,7 @@ function applyReaderSettings() {
 }
 [font, size, color, theme].forEach((control) => control.addEventListener('input', applyReaderSettings));
 applyReaderSettings();
-async function openReader(item, viewSource = false) {
-  if (!viewSource && ['repo', 'profile', 'video'].includes(item.content_type)) {
-    try { await invoke('open_original', { url: item.url }); }
-    catch (error) { libraryMessage.textContent = String(error); }
-    return;
-  }
+async function openReader(item) {
   clearTimeout(positionTimer);
   saveReaderPosition();
   readerReady = false;
@@ -458,8 +447,9 @@ async function openReader(item, viewSource = false) {
   readerTitle.textContent = item.title;
   readerUrl.textContent = item.url;
   document.querySelector('#open-original').hidden = !item.url;
+  document.querySelector('#open-video').hidden = item.content_type !== 'video' || !item.url;
   refreshReaderContent.hidden = !item.url;
-  document.querySelector('#reader-empty p').textContent = item.url ? '暂无保存的正文，请通过上方的图标打开原网页访问。' : '暂无正文，可通过“编辑收藏”填写文章内容。';
+  document.querySelector('#reader-empty p').textContent = !item.url ? '暂无正文，可通过“编辑收藏”填写文章内容。' : item.content_type === 'video' ? '暂无保存的视频简介，可尝试重新获取或打开原视频。' : item.content_type === 'repo' ? '暂无保存的项目内容，可尝试重新获取或打开原网页。' : '暂无保存的正文，请通过上方的图标打开原网页访问。';
   retryReaderContent.hidden = !item.url;
   readerBody.textContent = '正在读取正文……';
   readerEmpty.hidden = true;
@@ -481,6 +471,13 @@ async function openReader(item, viewSource = false) {
 async function showReaderContent(result, item, version) {
   readerStatus.textContent = result.source_note || '';
   readerBody.replaceChildren();
+  if (!result.body.trim() && item.content_type === 'video' && result.summary.trim()) {
+    const paragraph = document.createElement('p'); paragraph.textContent = result.summary;
+    readerBody.append(paragraph);
+    readerStatus.textContent = result.source_note || '未获取到视频原始简介，显示保存的摘要。';
+    readerEmpty.hidden = true;
+    return;
+  }
   readerEmpty.hidden = !!result.body.trim();
   if (!result.body.trim()) return;
   const html = await invoke('render_markdown', { body: result.body, images: result.images || [] });
@@ -602,6 +599,10 @@ document.querySelector('#note-form').addEventListener('submit', async (event) =>
   } catch (error) { document.querySelector('#note-message').textContent = String(error); }
 });
 document.querySelector('#open-original').addEventListener('click', async () => {
+  try { await invoke('open_original', { url: currentItem.url }); }
+  catch (error) { readerStatus.textContent = String(error); }
+});
+document.querySelector('#open-video').addEventListener('click', async () => {
   try { await invoke('open_original', { url: currentItem.url }); }
   catch (error) { readerStatus.textContent = String(error); }
 });

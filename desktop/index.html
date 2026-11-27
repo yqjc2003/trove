@@ -46,7 +46,7 @@
       </div>
       <p id="reader-status" role="status"></p>
       <article class="reading-page" id="reading-page" aria-labelledby="reader-title">
-        <h1 id="reader-title"></h1><p id="reader-url" class="reader-url"></p><div id="reader-body" class="reader-body"></div>
+        <h1 id="reader-title"></h1><p id="reader-url" class="reader-url"></p><button id="open-video" class="text-button video-link" type="button" hidden>打开视频 ↗</button><div id="reader-body" class="reader-body"></div>
         <div id="reader-empty" class="reader-empty" hidden><p>暂无保存的正文，请通过上方的图标打开原网页访问。</p><button id="retry-reader-content" class="text-button" type="button">尝试重新获取正文</button></div>
         <section class="notes-section"><h2>阅读笔记</h2><form id="note-form"><label for="note-input">记录你的想法</label><textarea id="note-input" maxlength="10000" rows="3" required></textarea><button type="submit">保存笔记</button></form><p id="note-message" role="status"></p><div id="notes"></div></section>
       </article>

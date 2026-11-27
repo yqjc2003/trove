@@ -86,6 +86,8 @@ body.reader-fullscreen #reader { display: block; height: 100vh; height: 100dvh; 
 .reading-page[data-font="kai"] { font-family: KaiTi, STKaiti, serif; }
 .reading-page h1 { font-size: 2rem; line-height: 1.4; font-weight: 600; margin: 0 0 12px; }
 .reader-url { margin: 0 0 50px; font: 12px/1.6 "Microsoft YaHei UI", sans-serif; opacity: .65; }
+.reader-url:has(+ .video-link:not([hidden])) { margin-bottom: 14px; }
+.video-link { margin-bottom: 24px; color: #416c56; text-decoration: underline; }
 .reader-body { font-size: var(--reader-size); line-height: 1.95; }
 .reader-body p { margin: 1.25em 0; color: inherit; }
 .reader-body pre { overflow-x: auto; padding: 14px; background: color-mix(in srgb, var(--page-background), #888 9%); font: .85em/1.6 Consolas, monospace; }

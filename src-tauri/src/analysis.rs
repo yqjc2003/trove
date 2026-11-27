@@ -370,6 +370,68 @@ async fn fetch_github_source(target: GithubTarget) -> Result<Source, String> {
     }
 }
 
+fn gitlab_project(raw_url: &str) -> Option<String> {
+    let url = Url::parse(raw_url).ok()?;
+    if !matches!(url.scheme(), "http" | "https")
+        || !matches!(url.host_str(), Some("gitlab.com" | "www.gitlab.com"))
+    {
+        return None;
+    }
+    let parts: Vec<_> = url
+        .path_segments()?
+        .take_while(|part| *part != "-")
+        .filter(|part| !part.is_empty())
+        .collect();
+    if parts.len() < 2
+        || parts.iter().any(|part| {
+            !part
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))
+                || *part == "."
+                || *part == ".."
+        })
+    {
+        return None;
+    }
+    Some(parts.join("/").trim_end_matches(".git").to_string())
+}
+
+async fn fetch_gitlab_source(project: &str) -> Result<Source, String> {
+    for filename in ["README.md", "Readme.md", "readme.md"] {
+        let mut api = Url::parse("https://gitlab.com/api/v4/").unwrap();
+        api.path_segments_mut()
+            .unwrap()
+            .pop_if_empty()
+            .push("projects")
+            .push(project)
+            .push("repository")
+            .push("files")
+            .push(filename)
+            .push("raw");
+        api.query_pairs_mut().append_pair("ref", "HEAD");
+        if let Ok(body) = fetch_html(api.as_str(), false).await {
+            if body.trim().is_empty()
+                || body
+                    .trim_start()
+                    .to_ascii_lowercase()
+                    .starts_with("<!doctype html")
+            {
+                continue;
+            }
+            let base = format!("https://gitlab.com/{project}/-/raw/HEAD/{filename}");
+            let (images, skipped) = crate::assets::archive(&body, &base).await;
+            return Ok(Source {
+                title: project.to_string(),
+                body,
+                warning: (skipped > 0).then(|| format!("有 {skipped} 张 README 图片无法保存。")),
+                images,
+                incomplete: skipped > 0,
+            });
+        }
+    }
+    Err("未能读取 GitLab 项目的 Markdown README".into())
+}
+
 pub async fn fetch_source(raw_url: &str) -> Result<Source, String> {
     let content_type = content_kind::detect(raw_url);
     if content_type == ContentKind::Article {
@@ -405,6 +467,24 @@ pub async fn fetch_source(raw_url: &str) -> Result<Source, String> {
                     title,
                     body,
                     warning,
+                    images: vec![],
+                    incomplete: true,
+                });
+            }
+        }
+    }
+    if let Some(project) = gitlab_project(raw_url) {
+        match fetch_gitlab_source(&project).await {
+            Ok(source) => return Ok(source),
+            Err(error) => {
+                let html = fetch_html(raw_url, true)
+                    .await
+                    .map_err(|_| format!("{error}，且无法读取网页简介"))?;
+                let (title, body) = extract_link_metadata(&html)?;
+                return Ok(Source {
+                    title,
+                    body,
+                    warning: Some(format!("{error}；已使用网页简介，内容可能不完整。")),
                     images: vec![],
                     incomplete: true,
                 });
@@ -577,6 +657,23 @@ pub async fn analyze(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn recognizes_gitlab_project_paths() {
+        assert_eq!(
+            gitlab_project("https://gitlab.com/group/subgroup/project/-/tree/main"),
+            Some("group/subgroup/project".into())
+        );
+        assert_eq!(
+            gitlab_project("https://gitlab.com/group/project.git"),
+            Some("group/project".into())
+        );
+        assert_eq!(
+            gitlab_project("https://gitlab.com.evil.test/group/project"),
+            None
+        );
+        assert_eq!(gitlab_project("https://gitlab.com/group"), None);
+    }
     #[test]
     fn extracts_title_and_body_without_scripts() {
         let (title, body) = extract_page("<html><head><title> Hello   World </title></head><body><p>正文</p><script>ignore me</script><style>.x{}</style><p>内容</p></body></html>").unwrap();
