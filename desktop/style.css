@@ -77,12 +77,18 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .item-actions svg { width: 17px; height: 17px; fill: none; stroke: currentColor; stroke-width: 1.4; stroke-linecap: round; stroke-linejoin: round; }
 .item-actions button.active svg { fill: currentColor; }
 .item-actions button:hover { color: #243a2d; }
+.annotation-group { padding: 15px 12px; border-bottom: 1px solid var(--rule); }
+.annotation-group-title { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: #303a34; font-weight: 600; text-align: left; overflow-wrap: anywhere; }
+.annotation-list-entry { display: block; width: 100%; margin-top: 10px; padding: 7px 10px; border: 0; border-left: 2px solid var(--rule); background: transparent; color: #56645c; text-align: left; overflow-wrap: anywhere; }
+.annotation-list-entry:hover { border-left-color: #71877a; background: color-mix(in srgb, var(--page-background), #8b9990 8%); }
+.annotation-list-entry span { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.5; }
+.annotation-list-entry small { margin-top: 3px; }
 #reader { min-width: 0; overflow-y: auto; background: var(--page-background); }
 .reader-placeholder { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #8c9790; }
 .placeholder-symbol { font-size: 36px; color: #b6c0b9; }
 .reader-placeholder h2 { margin: 18px 0 0; color: #47564c; font-size: 18px; }
 .reader-placeholder p { margin: 10px 0; font-size: 13px; }
-.reader-actions { min-height: 67px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; }
+.reader-actions { position: sticky; top: 0; z-index: 2; min-height: 67px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; background: var(--page-background); }
 .reader-action-group { display: flex; align-items: center; gap: 24px; }
 .reader-icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: #6e7a72; }
 .reader-icon-button:hover { background: color-mix(in srgb, var(--page-background), #8b9990 13%); }
@@ -109,6 +115,10 @@ body.reader-fullscreen #reader { display: block; height: 100vh; height: 100dvh; 
 .reader-body table { display: block; max-width: 100%; overflow-x: auto; border-collapse: collapse; }
 .reader-body th, .reader-body td { padding: 6px 10px; border: 1px solid var(--rule); text-align: left; }
 .reader-body img { max-width: 100%; height: auto; }
+.reader-body img.annotation-selected-image { outline: 2px solid #648773; outline-offset: 3px; }
+.reader-body img.annotated-image { outline: 2px solid #ccb775; outline-offset: 2px; }
+.reader-body img.annotation-selected-image { outline-color: #648773; }
+::highlight(reader-annotations) { background-color: #f1e4a7; color: inherit; }
 .reader-body blockquote { margin-left: 0; padding-left: 16px; border-left: 2px solid #a8b5ac; }
 .reader-body a { color: #416c56; }
 .reader-empty { padding: 28px 0; color: #78837b; font: 14px/1.7 "Microsoft YaHei UI", sans-serif; }
@@ -120,6 +130,9 @@ body.reader-fullscreen #reader { display: block; height: 100vh; height: 100dvh; 
 .note { padding: 18px 0; border-top: 1px solid var(--rule); white-space: pre-wrap; }
 .note p { margin: 0 0 8px; }
 .note small { color: #7e8982; margin-right: 16px; }
+.note .text-button { margin-right: 12px; }
+.note-quote, .annotation-quote { display: block; max-width: 100%; margin: 0 0 12px; padding: 8px 12px; border: 0; border-left: 2px solid #a8b5ac; background: transparent; color: #718077; font: 13px/1.6 "Microsoft YaHei UI", sans-serif; text-align: left; white-space: pre-wrap; overflow-wrap: anywhere; }
+.note-quote { max-height: 7em; overflow: hidden; }
 label { display: grid; gap: 8px; font-size: 14px; }
 input, textarea, select { min-width: 0; padding: 10px 12px; color: #28312c; background: var(--page-background); border: 1px solid #b7c1ba; border-radius: 3px; }
 dialog { width: min(600px, calc(100% - 40px)); max-height: 90vh; overflow-y: auto; padding: 28px; color: #28312c; background: var(--page-background); border: 1px solid #b7c1ba; }

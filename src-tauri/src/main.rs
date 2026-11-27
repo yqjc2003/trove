@@ -64,6 +64,28 @@ fn initialize_database(conn: &Connection) -> Result<(), String> {
         CREATE INDEX IF NOT EXISTS reader_notes_item_id_idx ON reader_notes(item_id);",
     )
     .map_err(|e| e.to_string())?;
+    let note_columns = conn
+        .prepare("PRAGMA table_info(reader_notes)")
+        .map_err(|e| e.to_string())?
+        .query_map([], |row| row.get::<_, String>(1))
+        .map_err(|e| e.to_string())?
+        .collect::<Result<Vec<_>, _>>()
+        .map_err(|e| e.to_string())?;
+    for (name, definition) in [
+        ("anchor_text", "TEXT NOT NULL DEFAULT ''"),
+        ("start_offset", "INTEGER"),
+        ("end_offset", "INTEGER"),
+        ("element_index", "INTEGER"),
+        ("updated_at", "TEXT NOT NULL DEFAULT ''"),
+    ] {
+        if !note_columns.iter().any(|column| column == name) {
+            conn.execute(
+                &format!("ALTER TABLE reader_notes ADD COLUMN {name} {definition}"),
+                [],
+            )
+            .map_err(|e| e.to_string())?;
+        }
+    }
     let columns = conn
         .prepare("PRAGMA table_info(items)")
         .map_err(|e| e.to_string())?
@@ -326,29 +348,114 @@ fn set_item_state(
 #[derive(Serialize)]
 struct ReaderNote {
     id: i64,
+    item_id: i64,
     body: String,
     created_at: String,
+    updated_at: String,
+    anchor_text: String,
+    start_offset: Option<i64>,
+    end_offset: Option<i64>,
+    element_index: Option<i64>,
 }
 
-#[tauri::command]
-fn list_reader_notes(app: tauri::AppHandle, item_id: i64) -> Result<Vec<ReaderNote>, String> {
-    let conn = database(&app)?;
-    let mut stmt = conn
-        .prepare(
-            "SELECT id, body, created_at FROM reader_notes WHERE item_id = ?1 ORDER BY id DESC",
-        )
-        .map_err(|e| e.to_string())?;
+fn list_notes_in_db(conn: &Connection, item_id: Option<i64>) -> Result<Vec<ReaderNote>, String> {
+    let mut stmt = conn.prepare("SELECT id, item_id, body, created_at, updated_at, anchor_text, start_offset, end_offset, element_index FROM reader_notes WHERE (?1 IS NULL OR item_id = ?1) ORDER BY item_id DESC, start_offset IS NULL, start_offset, id").map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map([item_id], |row| {
             Ok(ReaderNote {
                 id: row.get(0)?,
-                body: row.get(1)?,
-                created_at: row.get(2)?,
+                item_id: row.get(1)?,
+                body: row.get(2)?,
+                created_at: row.get(3)?,
+                updated_at: row.get(4)?,
+                anchor_text: row.get(5)?,
+                start_offset: row.get(6)?,
+                end_offset: row.get(7)?,
+                element_index: row.get(8)?,
             })
         })
         .map_err(|e| e.to_string())?;
     rows.collect::<Result<Vec<_>, _>>()
         .map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+fn list_reader_notes(app: tauri::AppHandle, item_id: i64) -> Result<Vec<ReaderNote>, String> {
+    list_notes_in_db(&database(&app)?, Some(item_id))
+}
+
+#[tauri::command]
+fn list_all_reader_notes(app: tauri::AppHandle) -> Result<Vec<ReaderNote>, String> {
+    list_notes_in_db(&database(&app)?, None)
+}
+
+#[derive(Deserialize)]
+struct AnnotationAnchor {
+    text: String,
+    start: i64,
+    end: i64,
+    element_index: Option<i64>,
+}
+
+fn add_annotation_in_db(
+    conn: &Connection,
+    item_id: i64,
+    body: &str,
+    anchor: AnnotationAnchor,
+) -> Result<(), String> {
+    let body = body.trim();
+    if body.is_empty() || body.chars().count() > 10000 {
+        return Err("批注不能为空，且不能超过 10000 字".into());
+    }
+    if anchor.start < 0
+        || anchor.end < anchor.start
+        || anchor.end > 4 * 1024 * 1024
+        || anchor.text.chars().count() > 10000
+        || anchor
+            .element_index
+            .is_some_and(|i| !(0..=100000).contains(&i))
+        || (anchor.element_index.is_none()
+            && (anchor.start == anchor.end || anchor.text.is_empty()))
+    {
+        return Err("选中的内容无效或过长".into());
+    }
+    let changed = conn.execute("INSERT INTO reader_notes (item_id, body, anchor_text, start_offset, end_offset, element_index) SELECT id, ?1, ?2, ?3, ?4, ?5 FROM items WHERE id = ?6", params![body, anchor.text, anchor.start, anchor.end, anchor.element_index, item_id]).map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err("找不到这条收藏".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn add_annotation(
+    app: tauri::AppHandle,
+    item_id: i64,
+    body: String,
+    anchor: AnnotationAnchor,
+) -> Result<(), String> {
+    add_annotation_in_db(&database(&app)?, item_id, &body, anchor)
+}
+
+fn edit_note_in_db(conn: &Connection, id: i64, item_id: i64, body: &str) -> Result<(), String> {
+    let body = body.trim();
+    if body.is_empty() || body.chars().count() > 10000 {
+        return Err("批注不能为空，且不能超过 10000 字".into());
+    }
+    let changed = conn.execute("UPDATE reader_notes SET body = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND item_id = ?3", params![body, id, item_id]).map_err(|e| e.to_string())?;
+    if changed == 0 {
+        return Err("找不到这条笔记".into());
+    }
+    Ok(())
+}
+
+#[tauri::command]
+fn edit_reader_note(
+    app: tauri::AppHandle,
+    id: i64,
+    item_id: i64,
+    body: String,
+) -> Result<(), String> {
+    edit_note_in_db(&database(&app)?, id, item_id, &body)
 }
 
 #[tauri::command]
@@ -850,6 +957,9 @@ fn main() {
             render_markdown,
             set_item_state,
             list_reader_notes,
+            list_all_reader_notes,
+            add_annotation,
+            edit_reader_note,
             add_reader_note,
             delete_reader_note,
             create_custom_tag,
@@ -864,6 +974,51 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn annotation_migration_order_edit_and_legacy_notes() {
+        let conn = Connection::open_in_memory().unwrap();
+        conn.execute_batch("CREATE TABLE reader_notes (id INTEGER PRIMARY KEY, item_id INTEGER NOT NULL, body TEXT NOT NULL, created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP); INSERT INTO reader_notes(item_id,body) VALUES (1,'旧笔记');").unwrap();
+        initialize_database(&conn).unwrap();
+        conn.execute("INSERT INTO items (id, url, title, body) VALUES (1, 'https://example.com', '文章', '正文')", []).unwrap();
+        for (text, start) in [("后", 20), ("前", 3)] {
+            add_annotation_in_db(
+                &conn,
+                1,
+                text,
+                AnnotationAnchor {
+                    text: text.into(),
+                    start,
+                    end: start + 1,
+                    element_index: None,
+                },
+            )
+            .unwrap();
+        }
+        let notes = list_notes_in_db(&conn, Some(1)).unwrap();
+        assert_eq!(
+            notes.iter().map(|n| n.body.as_str()).collect::<Vec<_>>(),
+            ["前", "后", "旧笔记"]
+        );
+        edit_note_in_db(&conn, notes[0].id, 1, "修改").unwrap();
+        let updated = list_notes_in_db(&conn, Some(1)).unwrap();
+        assert_eq!(updated[0].body, "修改");
+        assert!(!updated[0].updated_at.is_empty());
+        assert_eq!(updated[0].anchor_text, "前");
+        assert!(edit_note_in_db(&conn, notes[0].id, 2, "错误文章").is_err());
+        assert!(add_annotation_in_db(
+            &conn,
+            1,
+            "笔记",
+            AnnotationAnchor {
+                text: "".into(),
+                start: 0,
+                end: 0,
+                element_index: None
+            }
+        )
+        .is_err());
+    }
 
     #[test]
     fn migrates_types_and_saves_multiple_editable_notes_without_urls() {

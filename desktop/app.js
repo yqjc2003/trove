@@ -1,4 +1,5 @@
 import { captureReadingPosition, readingScrollTop, waitForReaderImages } from './reader-position.mjs';
+import { selectionAnchor, imageAnchor, findAnnotation } from './annotation-anchor.mjs';
 
 const { invoke } = window.__TAURI__.core;
 const form = document.querySelector('#add-form');
@@ -223,20 +224,27 @@ form.elements.url.addEventListener('blur', () => {
 let refreshVersion = 0;
 async function refresh() {
   const version = ++refreshVersion;
-  const [result, tags] = await Promise.all([
+  const [result, tags, notes] = await Promise.all([
     invoke('list_items', { query: document.querySelector('#search').value }),
     invoke('list_desktop_tags'),
+    invoke('list_all_reader_notes'),
   ]);
   if (version !== refreshVersion) return;
   libraryMessage.textContent = '';
   allItems = result;
+  allNotes = notes;
   availableTags = tags.sort((a, b) => a.localeCompare(b));
   renderItems();
 }
 let allItems = [];
+let allNotes = [];
 let currentView = 'unread';
 let selectedTag = '';
 let currentItem = null;
+function noteTime(value) {
+  const date = new Date(`${value.replace(' ', 'T')}Z`);
+  return Number.isNaN(date.getTime()) ? value : date.toLocaleString();
+}
 function renderItems() {
   document.querySelector('#count-unread').textContent = allItems.filter((item) => !item.archived).length;
   document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked).length;
@@ -295,6 +303,21 @@ function renderItems() {
   items.replaceChildren();
   document.querySelector('#count').textContent = `${result.length} 条`;
   if (!result.length) items.textContent = currentView === 'notes' ? '还没有阅读笔记。' : '这里还没有收藏。';
+  if (currentView === 'notes') {
+    for (const item of result) {
+      const group = document.createElement('section'); group.className = 'annotation-group';
+      const heading = document.createElement('button'); heading.type = 'button'; heading.className = 'annotation-group-title'; heading.textContent = item.title;
+      heading.addEventListener('click', () => openReader(item)); group.append(heading);
+      for (const note of allNotes.filter((entry) => entry.item_id === item.id)) {
+        const button = document.createElement('button'); button.type = 'button'; button.className = 'annotation-list-entry';
+        const text = document.createElement('span'); text.textContent = note.body;
+        const date = document.createElement('small'); date.textContent = noteTime(note.created_at);
+        button.append(text, date); button.addEventListener('click', () => openReader(item, note)); group.append(button);
+      }
+      items.append(group);
+    }
+    return;
+  }
   for (const item of result) {
     const row = document.createElement('div'); row.className = 'item';
     row.dataset.itemId = String(item.id);
@@ -402,6 +425,11 @@ const retryReaderContent = document.querySelector('#retry-reader-content');
 const refreshReaderContent = document.querySelector('#refresh-reader-content');
 const readerTitle = document.querySelector('#reader-title');
 const readerUrl = document.querySelector('#reader-url');
+const annotationButton = document.querySelector('#add-annotation');
+const annotationDialog = document.querySelector('#annotation-dialog');
+const annotationForm = document.querySelector('#annotation-form');
+let selectedAnchor = null;
+let editingAnnotation = null;
 const font = document.querySelector('#reader-font');
 const size = document.querySelector('#reader-size');
 const color = document.querySelector('#reader-color');
@@ -416,7 +444,7 @@ function positionKey(item) {
 }
 function capturePosition() {
   const rectangles = [...readerBody.children].map((paragraph) => paragraph.getBoundingClientRect());
-  return captureReadingPosition(rectangles, reader.getBoundingClientRect().top, reader.scrollTop);
+  return captureReadingPosition(rectangles, reader.getBoundingClientRect().top + document.querySelector('.reader-actions').offsetHeight, reader.scrollTop);
 }
 function saveReaderPosition() {
   if (!currentItem || !readerReady || restoringPosition) return;
@@ -424,7 +452,7 @@ function saveReaderPosition() {
 }
 function restorePosition(position) {
   const rectangles = [...readerBody.children].map((paragraph) => paragraph.getBoundingClientRect());
-  const next = readingScrollTop(position, rectangles, reader.getBoundingClientRect().top, reader.scrollTop);
+  const next = readingScrollTop(position, rectangles, reader.getBoundingClientRect().top + document.querySelector('.reader-actions').offsetHeight, reader.scrollTop);
   if (next !== null) reader.scrollTop = next;
 }
 function loadReaderPosition(item) {
@@ -435,6 +463,58 @@ reader.addEventListener('scroll', () => {
   clearTimeout(positionTimer);
   positionTimer = setTimeout(saveReaderPosition, 200);
 }, { passive: true });
+function captureSelection() {
+  const anchor = selectionAnchor(readerBody, window.getSelection());
+  if (!anchor) return;
+  readerBody.querySelectorAll('.annotation-selected-image').forEach((image) => image.classList.remove('annotation-selected-image'));
+  selectedAnchor = anchor;
+  annotationButton.disabled = false;
+}
+readerBody.addEventListener('mouseup', captureSelection);
+readerBody.addEventListener('keyup', captureSelection);
+function openAnnotationEditor(note = null) {
+  editingAnnotation = note;
+  document.querySelector('#annotation-heading').textContent = note ? '编辑笔记' : '添加批注';
+  document.querySelector('#annotation-quote').textContent = note ? (note.anchor_text || '普通阅读笔记') : selectedAnchor.text;
+  document.querySelector('#annotation-input').value = note?.body || '';
+  document.querySelector('#annotation-message').textContent = '';
+  annotationDialog.showModal();
+}
+annotationButton.addEventListener('click', () => { if (selectedAnchor && currentItem) openAnnotationEditor(); });
+document.querySelector('#close-annotation').addEventListener('click', () => annotationDialog.close());
+annotationForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!currentItem) return;
+  const itemId = currentItem.id;
+  const body = document.querySelector('#annotation-input').value;
+  const submit = annotationForm.querySelector('[type="submit"]');
+  submit.disabled = true;
+  try {
+    if (editingAnnotation) await invoke('edit_reader_note', { id: editingAnnotation.id, itemId, body });
+    else await invoke('add_annotation', { itemId, body, anchor: selectedAnchor });
+    annotationDialog.close();
+    selectedAnchor = null; annotationButton.disabled = true;
+    readerBody.querySelectorAll('.annotation-selected-image').forEach((image) => image.classList.remove('annotation-selected-image'));
+    await refreshNotes(itemId); await refresh();
+  } catch (error) { document.querySelector('#annotation-message').textContent = String(error); }
+  finally { submit.disabled = false; }
+});
+function jumpToAnnotation(note) {
+  if (note.start_offset === null || note.start_offset === undefined) {
+    document.querySelector('#notes').scrollIntoView({ block: 'start' });
+    return;
+  }
+  const target = findAnnotation(readerBody, note);
+  if (!target) { readerStatus.textContent = '原文内容已变化，无法准确定位这条批注；批注内容仍然保留。'; return; }
+  readerBody.querySelectorAll('.annotation-selected-image').forEach((image) => image.classList.remove('annotation-selected-image'));
+  if (target.element) {
+    target.element.classList.add('annotation-selected-image'); target.element.scrollIntoView({ block: 'center' });
+  } else {
+    const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(target.range);
+    const rect = target.range.getBoundingClientRect();
+    reader.scrollTop += rect.top - reader.getBoundingClientRect().top - reader.clientHeight / 3;
+  }
+}
 window.addEventListener('pagehide', saveReaderPosition);
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') { clearTimeout(positionTimer); saveReaderPosition(); }
@@ -455,13 +535,16 @@ function applyReaderSettings() {
 }
 [font, size, color, theme].forEach((control) => control.addEventListener('input', applyReaderSettings));
 applyReaderSettings();
-async function openReader(item) {
+async function openReader(item, annotation = null) {
   clearTimeout(positionTimer);
   saveReaderPosition();
   readerReady = false;
   restoringPosition = false;
   const version = ++readerVersion;
   currentItem = item;
+  selectedAnchor = null;
+  annotationButton.disabled = true;
+  if (window.CSS?.highlights) CSS.highlights.delete('reader-annotations');
   readerPlaceholder.hidden = true;
   readerContent.hidden = false;
   document.body.classList.add('reading-active');
@@ -485,12 +568,12 @@ async function openReader(item) {
   try {
     const result = await invoke('get_reader_item', { id: item.id });
     if (version !== readerVersion) return;
-    await showReaderContent(result, item, version);
+    await showReaderContent(result, item, version, annotation);
   } catch (error) {
     if (version === readerVersion) readerBody.textContent = String(error);
   }
 }
-async function showReaderContent(result, item, version) {
+async function showReaderContent(result, item, version, annotation = null) {
   readerReady = false;
   restoringPosition = false;
   readerStatus.textContent = result.source_note || '';
@@ -502,7 +585,7 @@ async function showReaderContent(result, item, version) {
     readerEmpty.hidden = true;
   } else {
     readerEmpty.hidden = !!result.body.trim();
-    if (!result.body.trim()) return;
+    if (!result.body.trim()) { if (annotation) jumpToAnnotation(annotation); return; }
     const html = await invoke('render_markdown', { body: result.body, images: result.images || [] });
     if (version !== readerVersion) return;
     // HTML 由 Rust 的 Markdown 渲染器和白名单清理器共同生成。
@@ -510,6 +593,7 @@ async function showReaderContent(result, item, version) {
     await waitForReaderImages(readerBody.querySelectorAll('img'));
     if (version !== readerVersion) return;
   }
+  refreshNotes(item.id).catch((error) => { document.querySelector('#note-message').textContent = String(error); });
   const savedPosition = loadReaderPosition(item);
   requestAnimationFrame(() => {
     if (version !== readerVersion) return;
@@ -519,6 +603,7 @@ async function showReaderContent(result, item, version) {
       if (version !== readerVersion) return;
       restoringPosition = false;
       readerReady = true;
+      if (annotation) jumpToAnnotation(annotation);
     });
   });
 }
@@ -542,6 +627,15 @@ async function retrieveReaderContent(force) {
 retryReaderContent.addEventListener('click', () => retrieveReaderContent(false));
 refreshReaderContent.addEventListener('click', () => retrieveReaderContent(true));
 readerBody.addEventListener('click', async (event) => {
+  if (event.target instanceof HTMLImageElement) {
+    event.preventDefault();
+    const anchor = imageAnchor(readerBody, event.target);
+    if (anchor) {
+      readerBody.querySelectorAll('.annotation-selected-image').forEach((image) => image.classList.remove('annotation-selected-image'));
+      event.target.classList.add('annotation-selected-image'); selectedAnchor = anchor; annotationButton.disabled = false;
+    }
+    return;
+  }
   const link = event.target.closest('a');
   if (!link) return;
   event.preventDefault();
@@ -599,17 +693,30 @@ async function refreshNotes(itemId) {
   if (!currentItem || currentItem.id !== itemId || readerContent.hidden) return;
   const container = document.querySelector('#notes');
   container.replaceChildren();
+  readerBody.querySelectorAll('.annotated-image').forEach((image) => image.classList.remove('annotated-image'));
+  const ranges = [];
+  for (const note of notes) {
+    const target = findAnnotation(readerBody, note);
+    if (target?.range) ranges.push(target.range);
+    if (target?.element) target.element.classList.add('annotated-image');
+  }
+  if (window.CSS?.highlights && window.Highlight) CSS.highlights.set('reader-annotations', new Highlight(...ranges));
   for (const note of notes) {
     const row = document.createElement('div'); row.className = 'note';
+    if (note.anchor_text) {
+      const quote = document.createElement('button'); quote.type = 'button'; quote.className = 'note-quote'; quote.textContent = note.anchor_text;
+      quote.title = '定位原文'; quote.addEventListener('click', () => jumpToAnnotation(note)); row.append(quote);
+    }
     const text = document.createElement('p'); text.textContent = note.body;
-    const date = document.createElement('small'); date.textContent = note.created_at;
+    const date = document.createElement('small'); date.textContent = note.updated_at ? `${noteTime(note.created_at)} · 修改于 ${noteTime(note.updated_at)}` : noteTime(note.created_at);
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'text-button'; edit.textContent = '编辑'; edit.addEventListener('click', () => openAnnotationEditor(note));
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button'; remove.textContent = '删除笔记';
     remove.addEventListener('click', async () => {
       if (!window.confirm('删除这条笔记？')) return;
       try { await invoke('delete_reader_note', { id: note.id, itemId }); await refreshNotes(itemId); await refresh(); }
       catch (error) { document.querySelector('#note-message').textContent = String(error); }
     });
-    row.append(text, date, remove); container.append(row);
+    row.append(text, date, edit, remove); container.append(row);
   }
 }
 document.querySelector('#note-form').addEventListener('submit', async (event) => {
