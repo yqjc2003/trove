@@ -404,8 +404,8 @@ fn add_annotation_in_db(
     anchor: AnnotationAnchor,
 ) -> Result<(), String> {
     let body = body.trim();
-    if body.is_empty() || body.chars().count() > 10000 {
-        return Err("批注不能为空，且不能超过 10000 字".into());
+    if body.chars().count() > 10000 {
+        return Err("批注不能超过 10000 字".into());
     }
     if anchor.start < 0
         || anchor.end < anchor.start
@@ -438,8 +438,23 @@ fn add_annotation(
 
 fn edit_note_in_db(conn: &Connection, id: i64, item_id: i64, body: &str) -> Result<(), String> {
     let body = body.trim();
-    if body.is_empty() || body.chars().count() > 10000 {
-        return Err("批注不能为空，且不能超过 10000 字".into());
+    if body.chars().count() > 10000 {
+        return Err("批注不能超过 10000 字".into());
+    }
+    if body.is_empty() {
+        let anchored: Option<bool> = conn
+            .query_row(
+                "SELECT start_offset IS NOT NULL FROM reader_notes WHERE id = ?1 AND item_id = ?2",
+                params![id, item_id],
+                |row| row.get(0),
+            )
+            .optional()
+            .map_err(|e| e.to_string())?;
+        match anchored {
+            Some(true) => {}
+            Some(false) => return Err("普通阅读笔记不能为空".into()),
+            None => return Err("找不到这条笔记".into()),
+        }
     }
     let changed = conn.execute("UPDATE reader_notes SET body = ?1, updated_at = CURRENT_TIMESTAMP WHERE id = ?2 AND item_id = ?3", params![body, id, item_id]).map_err(|e| e.to_string())?;
     if changed == 0 {
@@ -1077,6 +1092,24 @@ mod tests {
         assert!(!updated[0].updated_at.is_empty());
         assert_eq!(updated[0].anchor_text, "前");
         assert!(edit_note_in_db(&conn, notes[0].id, 2, "错误文章").is_err());
+        edit_note_in_db(&conn, notes[0].id, 1, "  ").unwrap();
+        assert_eq!(list_notes_in_db(&conn, Some(1)).unwrap()[0].body, "");
+        assert!(edit_note_in_db(&conn, notes[2].id, 1, "").is_err());
+        add_annotation_in_db(
+            &conn,
+            1,
+            "",
+            AnnotationAnchor {
+                text: "引用".into(),
+                start: 1,
+                end: 3,
+                element_index: None,
+            },
+        )
+        .unwrap();
+        let saved = list_notes_in_db(&conn, Some(1)).unwrap();
+        assert_eq!(saved[0].anchor_text, "引用");
+        assert_eq!(saved[0].body, "");
         assert!(add_annotation_in_db(
             &conn,
             1,

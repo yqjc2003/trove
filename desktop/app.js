@@ -312,9 +312,9 @@ function renderItems() {
         if (note.anchor_text) {
           const quote = document.createElement('span'); quote.className = 'annotation-list-quote'; quote.textContent = note.anchor_text; button.append(quote);
         }
-        const text = document.createElement('span'); text.className = 'annotation-list-body'; text.textContent = note.body;
         const date = document.createElement('small'); date.textContent = noteTime(note.created_at);
-        button.append(text, date); button.addEventListener('click', () => openReader(item, note)); group.append(button);
+        if (note.body) { const text = document.createElement('span'); text.className = 'annotation-list-body'; text.textContent = note.body; button.append(text); }
+        button.append(date); button.addEventListener('click', () => openReader(item, note)); group.append(button);
       }
       items.append(group);
     }
@@ -582,6 +582,7 @@ function openAnnotationEditor(note = null) {
   document.querySelector('#annotation-heading').textContent = note ? '编辑笔记' : '添加批注';
   document.querySelector('#annotation-quote').textContent = note ? (note.anchor_text || '普通阅读笔记') : selectedAnchor.text;
   document.querySelector('#annotation-input').value = note?.body || '';
+  document.querySelector('#annotation-input').required = !!note && note.start_offset === null;
   document.querySelector('#annotation-message').textContent = '';
   annotationDialog.showModal();
 }
@@ -822,7 +823,7 @@ async function refreshNotes(itemId) {
       const quote = document.createElement('button'); quote.type = 'button'; quote.className = 'note-quote'; quote.textContent = note.anchor_text;
       quote.title = '定位原文'; quote.addEventListener('click', () => jumpToAnnotation(note)); row.append(quote);
     }
-    const text = document.createElement('p'); text.textContent = note.body;
+    if (note.body) { const text = document.createElement('p'); text.textContent = note.body; row.append(text); }
     const date = document.createElement('small'); date.textContent = note.updated_at ? `${noteTime(note.created_at)} · 修改于 ${noteTime(note.updated_at)}` : noteTime(note.created_at);
     const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'text-button'; edit.textContent = '编辑'; edit.addEventListener('click', () => openAnnotationEditor(note));
     const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button'; remove.textContent = '删除笔记';
@@ -831,7 +832,7 @@ async function refreshNotes(itemId) {
       try { await invoke('delete_reader_note', { id: note.id, itemId }); await refreshNotes(itemId); await refresh(); }
       catch (error) { document.querySelector('#note-message').textContent = String(error); }
     });
-    row.append(text, date, edit, remove); container.append(row);
+    row.append(date, edit, remove); container.append(row);
   }
 }
 document.querySelector('#note-form').addEventListener('submit', async (event) => {
