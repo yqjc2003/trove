@@ -85,12 +85,14 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .annotation-list-body { display: -webkit-box; overflow: hidden; -webkit-line-clamp: 2; -webkit-box-orient: vertical; line-height: 1.5; }
 .annotation-list-entry small { margin-top: 3px; }
 #reader { min-width: 0; overflow-y: auto; background: var(--page-background); }
+#reader-content { display: flex; flex-direction: column; min-height: 100%; }
 .reader-placeholder { min-height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; color: #8c9790; }
 .placeholder-symbol { font-size: 36px; color: #b6c0b9; }
 .reader-placeholder h2 { margin: 18px 0 0; color: #47564c; font-size: 18px; }
 .reader-placeholder p { margin: 10px 0; font-size: 13px; }
 .reader-actions { position: sticky; top: 0; z-index: 2; min-height: 67px; display: flex; justify-content: space-between; align-items: center; padding: 0 30px; background: var(--page-background); }
-.reading-estimate { position: fixed; z-index: 2; right: 20px; bottom: 16px; padding: 5px 8px; color: #78837b; background: var(--page-background); font: 12px/1.4 "Microsoft YaHei UI", sans-serif; pointer-events: none; }
+.reader-bottom-bar { position: sticky; bottom: 0; z-index: 2; display: flex; align-items: center; justify-content: flex-end; min-height: 34px; margin-top: auto; padding: 0 20px; border-top: 1px solid var(--rule); background: var(--page-background); }
+.reading-estimate { color: #78837b; font: 12px/1.4 "Microsoft YaHei UI", sans-serif; }
 .reader-action-group { display: flex; align-items: center; gap: 24px; }
 .reader-icon-button { display: inline-grid; place-items: center; width: 36px; height: 36px; padding: 8px; border: 0; border-radius: 4px; background: transparent; color: #6e7a72; }
 .reader-icon-button:hover { background: color-mix(in srgb, var(--page-background), #8b9990 13%); }
