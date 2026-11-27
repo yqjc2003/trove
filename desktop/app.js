@@ -663,10 +663,12 @@ async function openReader(item, annotation = null) {
   document.querySelectorAll('.item').forEach((row) => row.classList.toggle('selected', row.dataset.itemId === String(item.id)));
   readerTitle.textContent = item.title;
   readerUrl.textContent = item.url;
-  document.querySelector('#open-original').hidden = !item.url;
+  document.querySelector('#reader-url-container').hidden = !item.url;
+  if (item.url) readerUrl.href = item.url;
+  else readerUrl.removeAttribute('href');
   document.querySelector('#open-video').hidden = item.content_type !== 'video' || !item.url;
   refreshReaderContent.hidden = !item.url;
-  document.querySelector('#reader-empty p').textContent = !item.url ? '暂无正文，可通过“编辑收藏”填写文章内容。' : item.content_type === 'video' ? '暂无保存的视频简介，可尝试重新获取或打开原视频。' : item.content_type === 'repo' ? '暂无保存的项目内容，可尝试重新获取或打开原网页。' : '暂无保存的正文，请通过上方的图标打开原网页访问。';
+  document.querySelector('#reader-empty p').textContent = !item.url ? '暂无正文，可通过“编辑收藏”填写文章内容。' : item.content_type === 'video' ? '暂无保存的视频简介，可尝试重新获取或打开原视频。' : item.content_type === 'repo' ? '暂无保存的项目内容，可尝试重新获取或打开原网页。' : '暂无保存的正文，请通过标题下的链接访问原网页。';
   retryReaderContent.hidden = !item.url;
   readerBody.textContent = '正在读取正文……';
   readerEmpty.hidden = true;
@@ -847,7 +849,8 @@ document.querySelector('#note-form').addEventListener('submit', async (event) =>
     await refresh();
   } catch (error) { document.querySelector('#note-message').textContent = String(error); }
 });
-document.querySelector('#open-original').addEventListener('click', async () => {
+readerUrl.addEventListener('click', async (event) => {
+  event.preventDefault();
   try { await invoke('open_original', { url: currentItem.url }); }
   catch (error) { readerStatus.textContent = String(error); }
 });
