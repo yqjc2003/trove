@@ -23,10 +23,13 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 .nav-item > span:last-child { color: #9ba39e; font-size: 11px; }
 .sidebar-heading { display: flex; align-items: center; justify-content: space-between; margin: 32px 5px 8px 12px; }
 .tag-toggle { display: inline-flex; align-items: center; gap: 5px; padding: 4px 0; border: 0; background: transparent; color: #818d85; font-size: 12px; text-align: left; }
-.tag-toggle-arrow { display: inline-block; transition: transform 120ms ease; }
+.tag-toggle-arrow { display: inline-block; transition: transform 120ms ease, opacity 160ms ease; }
 .tag-toggle[aria-expanded="false"] .tag-toggle-arrow { transform: rotate(-90deg); }
-@media (prefers-reduced-motion: reduce) { .tag-toggle-arrow { transition: none; } }
-.add-tag-button { padding: 2px 6px; border: 0; background: transparent; color: #77847c; font-size: 19px; line-height: 1; }
+.add-tag-button { padding: 2px 6px; border: 0; background: transparent; color: #77847c; font-size: 19px; line-height: 1; transition: opacity 160ms ease; }
+.sidebar-heading .tag-toggle-arrow, .sidebar-heading .add-tag-button { opacity: 0; }
+.sidebar-heading:hover .tag-toggle-arrow, .sidebar-heading:hover .add-tag-button, .sidebar-heading:focus-within .tag-toggle-arrow, .sidebar-heading:focus-within .add-tag-button { opacity: 1; }
+@media (hover: none) { .sidebar-heading .tag-toggle-arrow, .sidebar-heading .add-tag-button { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { .tag-toggle-arrow, .add-tag-button { transition: none; } }
 .add-tag-button:hover { color: #283c30; }
 .tag-row { display: flex; align-items: center; min-width: 0; }
 .tag-filter { flex: 1; width: auto; min-width: 0; min-height: 34px; overflow-wrap: anywhere; }
