@@ -19,5 +19,8 @@ htmd = "0.5"
 pulldown-cmark = "0.13"
 ammonia = "4"
 base64 = "0.22"
-tokio = { version = "1", features = ["net", "time"] }
+tokio = { version = "1", features = ["net", "time", "sync"] }
 futures-util = "0.3"
+axum = "0.8"
+rmcp = { version = "3.12", features = ["transport-streamable-http-server"] }
+uuid = { version = "1", features = ["v4"] }

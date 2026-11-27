@@ -15,7 +15,7 @@
     <div class="sidebar-foot">
       <details id="settings-menu" class="settings-menu">
         <summary aria-label="打开应用设置" title="设置"><span aria-hidden="true">⚙</span> 设置</summary>
-        <div class="menu-panel"><button id="open-reader-settings" type="button">阅读设置</button><button id="open-ai" type="button">AI 设置</button><button type="button" disabled>云同步（尚未开放）</button></div>
+        <div class="menu-panel"><button id="open-reader-settings" type="button">阅读设置</button><button id="open-ai" type="button">AI 设置</button><button id="open-mcp" type="button">本地 MCP</button><button type="button" disabled>云同步（尚未开放）</button></div>
       </details>
     </div>
   </nav>
@@ -107,5 +107,9 @@
     <label>API Key<input name="apiKey" type="password" autocomplete="off" placeholder="输入 DeepSeek API Key"></label>
     <p class="hint" id="key-status">密钥保存在本机，不会显示已有密钥。</p><div><button type="submit">保存设置</button></div>
   </form><p id="settings-message" role="status"></p>
+</dialog>
+<dialog id="mcp-dialog" aria-labelledby="mcp-heading">
+  <div class="dialog-head"><h2 id="mcp-heading">本地 MCP 服务</h2><button id="close-mcp" class="text-button" type="button" aria-label="关闭">✕</button></div>
+  <form id="mcp-form" class="stack"><label class="mcp-switch"><input id="mcp-enabled" type="checkbox">启动时启用本地 MCP 服务</label><p class="hint">服务只监听本机，外部 Agent 需使用连接地址和密钥。关闭客户端或关闭服务后无法连接。</p><label>连接地址<input id="mcp-url" readonly></label><label>访问密钥<input id="mcp-token" type="password" readonly placeholder="启用服务后生成"></label><button id="show-mcp-token" class="text-button" type="button">显示密钥</button><div><button type="submit">保存设置</button></div></form><p id="mcp-message" role="status"></p>
 </dialog>
 </body></html>

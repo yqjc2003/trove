@@ -1,28 +1,11 @@
 import { defineConfig, globalIgnores } from 'eslint/config';
-import nextVitals from 'eslint-config-next/core-web-vitals';
-import nextTs from 'eslint-config-next/typescript';
+import globals from 'globals';
 
 export default defineConfig([
-  ...nextVitals,
-  ...nextTs,
-  globalIgnores([
-    '.next/**',
-    'node_modules/**',
-    'out/**',
-    'build/**',
-    'coverage/**',
-    'next-env.d.ts',
-    'src-tauri/target/**',
-    'src-tauri/gen/**',
-    // Skill 脚本是独立的零依赖 Node 工具，不参与 Next 应用构建
-    'skills/**',
-  ]),
+  globalIgnores(['node_modules/**', '.next/**', 'src-tauri/target/**', 'src-tauri/gen/**', 'coverage/**']),
   {
-    rules: {
-      '@typescript-eslint/no-unused-vars': [
-        'error',
-        { argsIgnorePattern: '^_', varsIgnorePattern: '^_' },
-      ],
-    },
+    files: ['desktop/**/*.{js,mjs}', 'extension/*.js', 'skills/**/*.mjs'],
+    languageOptions: { ecmaVersion: 'latest', sourceType: 'module', globals: { ...globals.browser, ...globals.node, ...globals.webextensions, chrome: 'readonly', Highlight: 'readonly' } },
+    rules: { 'no-undef': 'error' },
   },
 ]);

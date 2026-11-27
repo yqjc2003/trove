@@ -13,6 +13,7 @@ const settingsMessage = document.querySelector('#settings-message');
 const analyzeButton = document.querySelector('#analyze');
 const saveButton = form.querySelector('[type="submit"]');
 const aiDialog = document.querySelector('#ai-dialog');
+const mcpDialog = document.querySelector('#mcp-dialog');
 const readerSettingsDialog = document.querySelector('#reader-settings-dialog');
 const addDialog = document.querySelector('#add-dialog');
 const createTagDialog = document.querySelector('#create-tag-dialog');
@@ -116,6 +117,37 @@ document.querySelector('#open-ai').addEventListener('click', () => {
   aiDialog.showModal();
 });
 document.querySelector('#close-ai').addEventListener('click', () => aiDialog.close());
+async function showMcpSettings() {
+  const settings = await invoke('get_mcp_settings');
+  document.querySelector('#mcp-enabled').checked = settings.enabled;
+  document.querySelector('#mcp-url').value = settings.url;
+  document.querySelector('#mcp-token').value = settings.token;
+  document.querySelector('#mcp-message').textContent = settings.error || '';
+}
+document.querySelector('#open-mcp').addEventListener('click', async () => {
+  document.querySelector('#settings-menu').open = false;
+  mcpDialog.showModal();
+  try { await showMcpSettings(); } catch (error) { document.querySelector('#mcp-message').textContent = String(error); }
+});
+document.querySelector('#close-mcp').addEventListener('click', () => mcpDialog.close());
+document.querySelector('#show-mcp-token').addEventListener('click', (event) => {
+  const field = document.querySelector('#mcp-token'); field.type = field.type === 'password' ? 'text' : 'password';
+  event.currentTarget.textContent = field.type === 'password' ? '显示密钥' : '隐藏密钥';
+});
+document.querySelector('#mcp-form').addEventListener('submit', async (event) => {
+  event.preventDefault(); const submit = event.currentTarget.querySelector('[type="submit"]'); submit.disabled = true;
+  try {
+    const requested = document.querySelector('#mcp-enabled').checked;
+    const result = await invoke('set_mcp_enabled', { enabled: requested });
+    await showMcpSettings();
+    document.querySelector('#mcp-message').textContent = result.error || (result.enabled === requested ? '设置已保存。' : '服务未能启动，请检查端口后重试。');
+  }
+  catch (error) {
+    try { await showMcpSettings(); } catch { /* 保留原始错误 */ }
+    document.querySelector('#mcp-message').textContent = String(error);
+  }
+  finally { submit.disabled = false; }
+});
 document.querySelector('#open-reader-settings').addEventListener('click', () => {
   document.querySelector('#settings-menu').open = false;
   readerSettingsDialog.showModal();
@@ -406,6 +438,7 @@ form.addEventListener('submit', async (event) => {
 });
 refreshSettings().catch((error) => { settingsMessage.textContent = String(error); });
 refresh().catch((error) => { libraryMessage.textContent = String(error); });
+window.__TAURI__.event.listen('collection-changed', () => { refresh().catch((error) => { libraryMessage.textContent = String(error); }); });
 
 const reader = document.querySelector('#reader');
 const readerContent = document.querySelector('#reader-content');

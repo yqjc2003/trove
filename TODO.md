@@ -1,5 +1,7 @@
 # Trove 未来功能规划（TODO）
 
+> 历史文档：下方内容基于已移除的 Web / Supabase 架构，不代表当前桌面客户端的实现或路线图。当前能力与运行方式见 [README.zh-CN.md](README.zh-CN.md)。
+
 > 更新时间：2026-11-13 · 状态：进行中
 > 本文只列**尚未实现**的能力。已实现的部分见 [README.md](README.md) 与 [DESIGN.md](DESIGN.md)。
 > 每条都标注了与 [AGENTS.md](AGENTS.md) 硬性约束的关系——**凡是冲突的，先改约束再动代码**，

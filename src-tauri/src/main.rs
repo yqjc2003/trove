@@ -3,6 +3,7 @@
 mod analysis;
 mod assets;
 mod content_kind;
+mod local_mcp;
 mod markdown;
 use base64::{engine::general_purpose::STANDARD, Engine};
 use rusqlite::OptionalExtension;
@@ -13,6 +14,7 @@ use tauri::Manager;
 use url::Url;
 
 static DATABASE_INIT: Mutex<()> = Mutex::new(());
+static SECRET_FILE: Mutex<()> = Mutex::new(());
 
 #[derive(Serialize)]
 struct Item {
@@ -29,7 +31,16 @@ struct Item {
 }
 
 fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
-    let dir = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
+    let dir = match std::env::var_os("CATCHLINGER_DATA_DIR") {
+        Some(value) if !value.is_empty() => {
+            let path = std::path::PathBuf::from(value);
+            if !path.is_absolute() {
+                return Err("CATCHLINGER_DATA_DIR 必须是绝对路径".into());
+            }
+            path
+        }
+        _ => app.path().app_local_data_dir().map_err(|e| e.to_string())?,
+    };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
 }
@@ -185,17 +196,40 @@ struct AiSettings {
 }
 
 fn read_key(app: &tauri::AppHandle) -> Result<String, String> {
+    read_secret(app, "DEEPSEEK_API_KEY")
+}
+
+fn read_secret(app: &tauri::AppHandle, key: &str) -> Result<String, String> {
+    let _guard = SECRET_FILE.lock().map_err(|_| "无法读取密钥".to_string())?;
     let path = data_dir(app)?.join(".env.local");
     let contents = match std::fs::read_to_string(path) {
         Ok(s) => s,
         Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(String::new()),
-        Err(e) => return Err(format!("无法读取 AI 密钥：{e}")),
+        Err(e) => return Err(format!("无法读取本地密钥：{e}")),
     };
     Ok(contents
         .lines()
-        .find_map(|line| line.strip_prefix("DEEPSEEK_API_KEY="))
+        .find_map(|line| line.strip_prefix(&format!("{key}=")))
         .unwrap_or("")
         .to_string())
+}
+
+fn write_secret(app: &tauri::AppHandle, key: &str, value: &str) -> Result<(), String> {
+    let _guard = SECRET_FILE.lock().map_err(|_| "无法保存密钥".to_string())?;
+    let path = data_dir(app)?.join(".env.local");
+    let contents = match std::fs::read_to_string(&path) {
+        Ok(value) => value,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
+        Err(_) => return Err("无法读取密钥文件".into()),
+    };
+    let prefix = format!("{key}=");
+    let mut lines: Vec<String> = contents
+        .lines()
+        .filter(|line| !line.starts_with(&prefix))
+        .map(str::to_string)
+        .collect();
+    lines.push(format!("{prefix}{value}"));
+    std::fs::write(path, format!("{}\n", lines.join("\n"))).map_err(|_| "无法保存密钥".to_string())
 }
 
 #[tauri::command]
@@ -239,11 +273,7 @@ fn save_ai_settings(
         return Err("API Key 格式无效".into());
     }
     if !key.is_empty() {
-        std::fs::write(
-            data_dir(&app)?.join(".env.local"),
-            format!("DEEPSEEK_API_KEY={key}\n"),
-        )
-        .map_err(|_| "无法保存 AI 密钥".to_string())?;
+        write_secret(&app, "DEEPSEEK_API_KEY", key)?;
     } else if read_key(&app)?.is_empty() {
         return Err("请输入 DeepSeek API Key".into());
     }
@@ -558,6 +588,14 @@ fn create_note_article(app: tauri::AppHandle, note: NewNoteArticle) -> Result<()
 }
 
 fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
+    save_item_in_db_with_options(conn, item, false).map(|_| ())
+}
+
+fn save_item_in_db_with_options(
+    conn: &Connection,
+    item: SaveItem,
+    only_new: bool,
+) -> Result<bool, String> {
     let parsed = Url::parse(item.url.trim()).map_err(|_| "请输入有效的网址".to_string())?;
     if !matches!(parsed.scheme(), "http" | "https") || parsed.host_str().is_none() {
         return Err("仅支持 HTTP 或 HTTPS 网址".into());
@@ -604,6 +642,9 @@ fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
         )
         .optional()
         .map_err(|e| e.to_string())?;
+    if only_new && old_body.is_some() {
+        return Ok(false);
+    }
     let replace_source =
         !body.is_empty() && (!source_incomplete || old_body.as_deref().unwrap_or("").is_empty());
     tx.execute(
@@ -621,7 +662,7 @@ fn save_item_in_db(conn: &Connection, item: SaveItem) -> Result<(), String> {
         replace_images(&tx, id, &decoded)?;
     }
     tx.commit().map_err(|e| e.to_string())?;
-    Ok(())
+    Ok(true)
 }
 
 fn replace_images(
@@ -999,7 +1040,17 @@ fn delete_item(app: tauri::AppHandle, id: i64) -> Result<(), String> {
 
 fn main() {
     tauri::Builder::default()
+        .manage(local_mcp::McpState::default())
+        .setup(|app| {
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                local_mcp::restore_on_start(handle);
+            });
+            Ok(())
+        })
         .invoke_handler(tauri::generate_handler![
+            local_mcp::get_mcp_settings,
+            local_mcp::set_mcp_enabled,
             list_items,
             save_item,
             create_note_article,
@@ -1033,6 +1084,51 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn local_agent_does_not_overwrite_existing_collection() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        conn.execute("INSERT INTO items (id,url,title,summary,tags,body,liked,archived) VALUES (1,'https://example.com/','原题','原摘要','[\"原标签\"]','手工正文',1,1)", []).unwrap();
+        let incoming = SaveItem {
+            url: "https://example.com/".into(),
+            title: "新标题".into(),
+            summary: "新摘要".into(),
+            tags: vec!["新标签".into()],
+            body: Some("新正文".into()),
+            source_note: None,
+            images: None,
+            source_incomplete: Some(false),
+        };
+        assert!(!save_item_in_db_with_options(&conn, incoming, true).unwrap());
+        let row: (String, String, String, String, bool, bool) = conn
+            .query_row(
+                "SELECT title,summary,tags,body,liked,archived FROM items WHERE id=1",
+                [],
+                |r| {
+                    Ok((
+                        r.get(0)?,
+                        r.get(1)?,
+                        r.get(2)?,
+                        r.get(3)?,
+                        r.get(4)?,
+                        r.get(5)?,
+                    ))
+                },
+            )
+            .unwrap();
+        assert_eq!(
+            row,
+            (
+                "原题".into(),
+                "原摘要".into(),
+                "[\"原标签\"]".into(),
+                "手工正文".into(),
+                true,
+                true
+            )
+        );
+    }
 
     #[test]
     fn edits_reader_body_without_losing_images_notes_or_concurrent_changes() {
