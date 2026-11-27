@@ -302,7 +302,7 @@ function renderItems() {
     row.addEventListener('click', (event) => { if (!event.target.closest('button')) openReader(item); });
     const info = document.createElement('div');
     const title = document.createElement('button'); title.type = 'button'; title.className = 'item-title';
-    title.title = '打开阅读器';
+    title.title = item.title;
     title.addEventListener('click', () => openReader(item));
     const url = document.createElement('small'); url.className = 'item-source';
     const type = item.content_type === 'profile' ? 'repo' : item.content_type;
