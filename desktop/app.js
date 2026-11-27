@@ -314,15 +314,31 @@ function renderItems() {
     const address = document.createElement('span'); address.textContent = item.url || '';
     url.title = label; url.append(icon, address);
     const summary = document.createElement('p'); summary.textContent = item.summary;
-    const tags = document.createElement('small'); tags.textContent = item.tags.join(' / ');
+    const footer = document.createElement('div'); footer.className = 'item-footer';
+    const tags = document.createElement('div'); tags.className = 'item-tags';
+    for (const name of item.tags.slice(0, 3)) {
+      const tag = document.createElement('span'); tag.className = 'item-tag'; tag.textContent = name; tag.title = name; tags.append(tag);
+    }
+    if (item.tags.length > 3) {
+      const more = document.createElement('span'); more.className = 'item-tags-more'; more.textContent = '…';
+      more.title = item.tags.slice(3).join('、'); more.setAttribute('aria-label', `还有 ${item.tags.length - 3} 个标签：${more.title}`); tags.append(more);
+    }
     const actions = document.createElement('div'); actions.className = 'item-actions';
-    const editTags = document.createElement('button'); editTags.textContent = '编辑收藏';
+    function actionButton(label, path, active = false) {
+      const button = document.createElement('button'); button.type = 'button'; button.title = label; button.setAttribute('aria-label', label);
+      if (active) button.classList.add('active');
+      const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg'); svg.setAttribute('viewBox', '0 0 24 24'); svg.setAttribute('aria-hidden', 'true');
+      const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); shape.setAttribute('d', path); svg.append(shape); button.append(svg);
+      return button;
+    }
+    const editTags = actionButton('编辑收藏', 'M4 20h4l11-11-4-4L4 16z M13 7l4 4');
     editTags.addEventListener('click', () => openTagEditor(item));
-    const like = document.createElement('button'); like.textContent = item.liked ? '♥ 已喜欢' : '♡ 喜欢';
+    const like = actionButton(item.liked ? '取消喜欢' : '喜欢', 'M20.5 8.8c0 4.2-8.5 10.1-8.5 10.1S3.5 13 3.5 8.8a4.5 4.5 0 0 1 8.5-2.1 4.5 4.5 0 0 1 8.5 2.1Z', item.liked);
+    like.setAttribute('aria-pressed', String(item.liked));
     like.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'liked', value: !item.liked }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
-    const archive = document.createElement('button'); archive.textContent = item.archived ? '移回首页' : '归档';
+    const archive = actionButton(item.archived ? '移回首页' : '归档', item.archived ? 'M4 5h16v4H4z M5.5 9v10h13V9 M9 15l3-3 3 3 M12 12v5' : 'M4 5h16v4H4z M5.5 9v10h13V9 M9 13h6');
     archive.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'archived', value: !item.archived }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
-    const remove = document.createElement('button'); remove.textContent = '删除';
+    const remove = actionButton('删除', 'M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13 M10 11v5 M14 11v5');
     remove.addEventListener('click', async () => {
       if (!window.confirm(`删除“${item.title}”？`)) return;
       try {
@@ -333,7 +349,8 @@ function renderItems() {
       } catch (error) { libraryMessage.textContent = String(error); }
     });
     actions.append(like, archive, editTags, remove);
-    info.append(title, url, summary, tags, actions); row.append(info); items.append(row);
+    footer.append(tags, actions);
+    info.append(title, url, summary, footer); row.append(info); items.append(row);
   }
 }
 document.querySelectorAll('.nav-item').forEach((button) => button.addEventListener('click', () => {
