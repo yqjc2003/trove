@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { annotationsAtPoint, resolveTextOffsets } from '../../desktop/annotation-anchor.mjs';
+import { annotationPopoverPosition, annotationsAtPoint, resolveTextOffsets } from '../../desktop/annotation-anchor.mjs';
 
 describe('批注原文定位', () => {
   it('按 UTF-16 偏移定位选中的文本和代码', () => {
@@ -23,5 +23,10 @@ describe('批注原文定位', () => {
     expect(annotationsAtPoint(entries, 20, 25).map((note: { id: number }) => note.id)).toEqual([1, 2]);
     expect(annotationsAtPoint(entries, 100, 100, image).map((note: { id: number }) => note.id)).toEqual([3]);
     expect(annotationsAtPoint(entries, 100, 100)).toEqual([]);
+  });
+
+  it('批注气泡优先显示在选区下方，空间不足时显示在上方并限制边界', () => {
+    expect(annotationPopoverPosition(100, 100, 200, 120, 500, 500)).toEqual({ left: 76, top: 110, arrowX: 24, placement: 'below' });
+    expect(annotationPopoverPosition(490, 480, 200, 120, 500, 500)).toEqual({ left: 292, top: 350, arrowX: 188, placement: 'above' });
   });
 });

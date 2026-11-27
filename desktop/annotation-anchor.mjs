@@ -65,3 +65,14 @@ export function annotationsAtPoint(annotations, x, y, targetElement = null) {
       rect.width > 0 && rect.height > 0 && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom);
   }).map(({ note }) => note);
 }
+
+/** Place the annotation bubble beside its anchor while keeping it inside the window. */
+export function annotationPopoverPosition(x, y, width, height, viewportWidth, viewportHeight) {
+  const margin = 8; const gap = 10;
+  const left = Math.max(margin, Math.min(x - 24, viewportWidth - width - margin));
+  const below = y + gap + height <= viewportHeight - margin || y - gap - height < margin;
+  const desiredTop = below ? y + gap : y - gap - height;
+  const top = Math.max(margin, Math.min(desiredTop, viewportHeight - height - margin));
+  const arrowX = Math.max(12, Math.min(x - left, width - 12));
+  return { left, top, arrowX, placement: below ? 'below' : 'above' };
+}

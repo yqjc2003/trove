@@ -1,5 +1,5 @@
 import { captureReadingPosition, readingScrollTop, waitForReaderImages } from './reader-position.mjs';
-import { selectionAnchor, imageAnchor, findAnnotation, annotationsAtPoint } from './annotation-anchor.mjs';
+import { selectionAnchor, imageAnchor, findAnnotation, annotationsAtPoint, annotationPopoverPosition } from './annotation-anchor.mjs';
 import { measureReadingText, estimateReadingProgress } from './reading-estimate.mjs';
 import { countTagItems, matchesLibraryView, toggleTag } from './library-filter.mjs';
 
@@ -564,8 +564,11 @@ function showAnnotationPopover(notes, x, y) {
     entry.append(body, date, edit, remove); annotationPopoverContent.append(entry);
   }
   annotationPopover.hidden = false;
-  annotationPopover.style.left = `${Math.max(8, Math.min(x + 10, window.innerWidth - annotationPopover.offsetWidth - 8))}px`;
-  annotationPopover.style.top = `${Math.max(8, Math.min(y + 10, window.innerHeight - annotationPopover.offsetHeight - 8))}px`;
+  const position = annotationPopoverPosition(x, y, annotationPopover.offsetWidth, annotationPopover.offsetHeight, window.innerWidth, window.innerHeight);
+  annotationPopover.style.left = `${position.left}px`;
+  annotationPopover.style.top = `${position.top}px`;
+  annotationPopover.style.setProperty('--annotation-arrow-x', `${position.arrowX}px`);
+  annotationPopover.dataset.placement = position.placement;
 }
 readerBody.addEventListener('contextmenu', (event) => {
   const selection = window.getSelection();
