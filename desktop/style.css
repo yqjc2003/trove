@@ -53,8 +53,10 @@ button:focus-visible, summary:focus-visible, input:focus-visible, textarea:focus
 #items { padding: 0 9px 30px; color: var(--muted); font-size: 13px; }
 .item { padding: 14px 12px; border-bottom: 1px solid var(--rule); }
 .item.selected { background: color-mix(in srgb, var(--page-background), #94a79c 13%); border-radius: 6px; }
-.item-title { display: block; width: 100%; padding: 0; background: transparent; border: 0; text-align: left; font-size: 15px; line-height: 1.45; font-weight: 600; color: #303a34; overflow-wrap: anywhere; }
-.item-title:hover { text-decoration: underline; }
+.item-title { display: flex; align-items: flex-start; gap: 6px; width: 100%; padding: 0; background: transparent; border: 0; text-align: left; font-size: 15px; line-height: 1.45; font-weight: 600; color: #303a34; overflow-wrap: anywhere; }
+.item-title span { min-width: 0; }
+.item-title:hover span { text-decoration: underline; }
+.item-title .item-kind-icon { margin-top: 3px; }
 .item small { display: block; margin-top: 6px; font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
 .item .item-source { display: flex; align-items: flex-start; gap: 6px; }
 .item-source span { min-width: 0; overflow-wrap: anywhere; }

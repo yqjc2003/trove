@@ -301,7 +301,7 @@ function renderItems() {
     row.classList.toggle('selected', currentItem?.id === item.id);
     row.addEventListener('click', (event) => { if (!event.target.closest('button')) openReader(item); });
     const info = document.createElement('div');
-    const title = document.createElement('button'); title.type = 'button'; title.className = 'item-title'; title.textContent = item.title;
+    const title = document.createElement('button'); title.type = 'button'; title.className = 'item-title';
     title.title = '打开阅读器';
     title.addEventListener('click', () => openReader(item));
     const url = document.createElement('small'); url.className = 'item-source';
@@ -311,8 +311,9 @@ function renderItems() {
     const icon = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
     icon.setAttribute('viewBox', '0 0 24 24'); icon.setAttribute('role', 'img'); icon.setAttribute('aria-label', label); icon.classList.add('item-kind-icon');
     const shape = document.createElementNS('http://www.w3.org/2000/svg', 'path'); shape.setAttribute('d', path); icon.append(shape);
+    const titleText = document.createElement('span'); titleText.textContent = item.title; title.append(icon, titleText);
     const address = document.createElement('span'); address.textContent = item.url || '';
-    url.title = label; url.append(icon, address);
+    url.append(address);
     const summary = document.createElement('p'); summary.textContent = item.summary;
     const footer = document.createElement('div'); footer.className = 'item-footer';
     const tags = document.createElement('div'); tags.className = 'item-tags';
