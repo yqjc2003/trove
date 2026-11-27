@@ -27,11 +27,14 @@ pnpm desktop:dev
 
 ```sh
 pnpm build                 # 构建桌面程序，不生成安装包
+pnpm desktop:build         # 生成 Windows NSIS 安装程序
 pnpm lint
 pnpm typecheck
 pnpm test
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 ```
+
+Windows 安装程序生成在 `src-tauri/target/release/bundle/nsis/`。首次构建可能下载 NSIS 打包工具。安装程序使用系统 WebView2 Runtime；如果电脑尚未安装，可能需要联网安装该运行时。
 
 ## 本地 MCP、Skill 与浏览器扩展
 

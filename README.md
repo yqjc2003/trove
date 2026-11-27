@@ -27,11 +27,14 @@ Use **Settings → AI settings** to configure DeepSeek if desired. Use **+** to 
 
 ```sh
 pnpm build                 # Build the desktop executable without an installer
+pnpm desktop:build         # Build a Windows NSIS installer
 pnpm lint
 pnpm typecheck
 pnpm test
 cargo test --locked --manifest-path src-tauri/Cargo.toml
 ```
+
+The Windows installer is written to `src-tauri/target/release/bundle/nsis/`. Building it may download the NSIS packaging tools. The installer uses the system WebView2 Runtime and may need network access to install it if missing.
 
 ## Local MCP, Skill, and browser extension
 
