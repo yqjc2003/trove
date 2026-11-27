@@ -836,6 +836,49 @@ fn get_reader_item(app: tauri::AppHandle, id: i64) -> Result<ReaderItem, String>
     get_reader_item_in_db(&database(&app)?, id)
 }
 
+fn update_reader_body_in_db(
+    conn: &Connection,
+    id: i64,
+    expected_body: &str,
+    body: &str,
+) -> Result<ReaderItem, String> {
+    if body.len() > 2 * 1024 * 1024 {
+        return Err("正文过长，不能超过 2 MiB".into());
+    }
+    let changed = conn
+        .execute(
+            "UPDATE items SET body = ?1 WHERE id = ?2 AND body = ?3",
+            params![body, id, expected_body],
+        )
+        .map_err(|e| e.to_string())?;
+    if changed == 0 {
+        let exists = conn
+            .query_row(
+                "SELECT EXISTS(SELECT 1 FROM items WHERE id = ?1)",
+                [id],
+                |r| r.get::<_, bool>(0),
+            )
+            .map_err(|e| e.to_string())?;
+        return Err(if exists {
+            "正文已被其他操作修改，请复制当前编辑内容后重新打开文章。"
+        } else {
+            "找不到这条收藏"
+        }
+        .into());
+    }
+    get_reader_item_in_db(conn, id)
+}
+
+#[tauri::command]
+fn update_reader_body(
+    app: tauri::AppHandle,
+    id: i64,
+    expected_body: String,
+    body: String,
+) -> Result<ReaderItem, String> {
+    update_reader_body_in_db(&database(&app)?, id, &expected_body, &body)
+}
+
 #[tauri::command]
 async fn fetch_reader_content(
     app: tauri::AppHandle,
@@ -952,6 +995,7 @@ fn main() {
             analyze_url,
             classify_url,
             get_reader_item,
+            update_reader_body,
             fetch_reader_content,
             open_original,
             render_markdown,
@@ -974,6 +1018,33 @@ fn main() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn edits_reader_body_without_losing_images_notes_or_concurrent_changes() {
+        let conn = Connection::open_in_memory().unwrap();
+        initialize_database(&conn).unwrap();
+        conn.execute("INSERT INTO items (id, url, title, body) VALUES (1, 'https://example.com', '标题', '旧正文')", []).unwrap();
+        conn.execute(
+            "INSERT INTO reader_notes (item_id, body) VALUES (1, '笔记')",
+            [],
+        )
+        .unwrap();
+        conn.execute("INSERT INTO item_images (item_id, source, mime, data) VALUES (1, 'pic.png', 'image/png', x'1234')", []).unwrap();
+        let updated = update_reader_body_in_db(&conn, 1, "旧正文", "# 新正文").unwrap();
+        assert_eq!(updated.body, "# 新正文");
+        assert_eq!(updated.images.len(), 1);
+        assert_eq!(list_notes_in_db(&conn, Some(1)).unwrap().len(), 1);
+        assert!(update_reader_body_in_db(&conn, 1, "旧正文", "过期修改").is_err());
+        assert_eq!(get_reader_item_in_db(&conn, 1).unwrap().body, "# 新正文");
+        assert_eq!(
+            update_reader_body_in_db(&conn, 1, "# 新正文", "")
+                .unwrap()
+                .body,
+            ""
+        );
+        assert!(update_reader_body_in_db(&conn, 99, "", "文本").is_err());
+        assert!(update_reader_body_in_db(&conn, 1, "", &"x".repeat(2 * 1024 * 1024 + 1)).is_err());
+    }
 
     #[test]
     fn annotation_migration_order_edit_and_legacy_notes() {

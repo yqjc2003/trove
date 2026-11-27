@@ -117,6 +117,12 @@ body.reader-fullscreen #reader { display: block; height: 100vh; height: 100dvh; 
 .reader-url:has(+ .video-link:not([hidden])) { margin-bottom: 14px; }
 .video-link { margin-bottom: 24px; color: #416c56; text-decoration: underline; }
 .reader-body { font-size: var(--reader-size); line-height: 1.95; }
+.reader-editor { display: grid; gap: 12px; font: 14px/1.5 "Microsoft YaHei UI", sans-serif; }
+.reader-editor textarea { width: 100%; min-height: 55vh; resize: vertical; font: 14px/1.7 Consolas, "Microsoft YaHei UI", monospace; }
+.reader-editor-actions { display: flex; justify-content: flex-end; gap: 10px; }
+.reader-editor-actions button { padding: 8px 14px; border: 1px solid #b7c1ba; border-radius: 3px; background: transparent; color: #39423d; }
+.reader-editor-actions button[type="submit"] { border-color: #345b48; background: #345b48; color: white; }
+#reader-edit-message { margin: 0; color: #9d4c42; font-size: 13px; }
 .reader-body p { margin: 1.25em 0; color: inherit; }
 .reader-body pre { overflow-x: auto; padding: 14px; background: color-mix(in srgb, var(--page-background), #888 9%); font: .85em/1.6 Consolas, monospace; }
 .reader-body code { font-family: Consolas, monospace; }

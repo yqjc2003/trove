@@ -80,6 +80,8 @@ function renderTagChoices() {
 }
 editTagsInput.addEventListener('input', renderTagChoices);
 async function openTagEditor(item) {
+  if (!mayLeaveReaderEditor()) return;
+  if (readerEditing) await leaveReaderEditor();
   editingItem = item;
   document.querySelector('#edit-item-title').value = item.title;
   document.querySelector('#edit-item-summary').value = item.summary;
@@ -364,8 +366,10 @@ function renderItems() {
     archive.addEventListener('click', async () => { try { await invoke('set_item_state', { id: item.id, field: 'archived', value: !item.archived }); await refresh(); } catch (error) { libraryMessage.textContent = String(error); } });
     const remove = actionButton('删除', 'M4 7h16 M9 7V4h6v3 M6 7l1 13h10l1-13 M10 11v5 M14 11v5');
     remove.addEventListener('click', async () => {
+      if (currentItem?.id === item.id && !mayLeaveReaderEditor()) return;
       if (!window.confirm(`删除“${item.title}”？`)) return;
       try {
+        if (currentItem?.id === item.id && readerEditing) setReaderEditing(false);
         await invoke('delete_item', { id: item.id });
         if (currentItem?.id === item.id) await closeReader();
         try { localStorage.removeItem(positionKey(item)); } catch { /* 收藏删除已成功 */ }
@@ -410,6 +414,12 @@ const fullscreenButton = document.querySelector('#toggle-fullscreen');
 const readerStatus = document.querySelector('#reader-status');
 const page = document.querySelector('#reading-page');
 const readerBody = document.querySelector('#reader-body');
+const editReaderButton = document.querySelector('#edit-reader-body');
+const readerEditor = document.querySelector('#reader-editor');
+const readerEditorInput = document.querySelector('#reader-editor-input');
+const saveReaderEdit = document.querySelector('#save-reader-edit');
+const cancelReaderEdit = document.querySelector('#cancel-reader-edit');
+const readerNotesSection = document.querySelector('.notes-section');
 const readingEstimate = document.querySelector('#reading-estimate');
 const readerEmpty = document.querySelector('#reader-empty');
 const retryReaderContent = document.querySelector('#retry-reader-content');
@@ -433,6 +443,61 @@ let layoutVersion = 0;
 let readerReady = false;
 let restoringPosition = false;
 let positionTimer;
+let currentReaderData = null;
+let readerEditing = false;
+let readerSaving = false;
+function mayLeaveReaderEditor() {
+  if (readerSaving) return false;
+  return !readerEditing || readerEditorInput.value === currentReaderData?.body || window.confirm('正文有未保存的修改，确定放弃吗？');
+}
+function setReaderEditing(editing) {
+  readerEditing = editing;
+  readerEditor.hidden = !editing;
+  readerBody.hidden = editing;
+  readerNotesSection.hidden = editing;
+  readerEmpty.hidden = editing || !!currentReaderData?.body.trim();
+  editReaderButton.hidden = editing;
+  refreshReaderContent.hidden = editing || !currentItem?.url;
+  readingEstimate.hidden = editing;
+}
+async function leaveReaderEditor() {
+  setReaderEditing(false);
+  if (currentItem && currentReaderData) await showReaderContent(currentReaderData, currentItem, readerVersion);
+}
+editReaderButton.addEventListener('click', () => {
+  if (!currentItem || !currentReaderData || readerEditing) return;
+  clearTimeout(positionTimer); saveReaderPosition();
+  readerReady = false;
+  closeAnnotationMenu();
+  readerEditorInput.value = currentReaderData.body;
+  document.querySelector('#reader-edit-message').textContent = '';
+  readerStatus.textContent = '';
+  setReaderEditing(true);
+  readerEditorInput.focus();
+});
+cancelReaderEdit.addEventListener('click', async () => {
+  if (mayLeaveReaderEditor()) await leaveReaderEditor();
+});
+readerEditor.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  if (!currentItem || !currentReaderData || readerSaving) return;
+  const item = currentItem; const version = readerVersion; const body = readerEditorInput.value;
+  document.querySelector('#reader-edit-message').textContent = '';
+  readerSaving = true; saveReaderEdit.disabled = true; cancelReaderEdit.disabled = true;
+  try {
+    const result = await invoke('update_reader_body', { id: item.id, expectedBody: currentReaderData.body, body });
+    if (version !== readerVersion) return;
+    currentReaderData = result;
+    setReaderEditing(false);
+    await showReaderContent(result, item, version);
+    await refresh().catch((error) => { libraryMessage.textContent = String(error); });
+    if (version === readerVersion) readerStatus.textContent = '正文已保存。';
+  } catch (error) { if (version === readerVersion) (readerEditing ? document.querySelector('#reader-edit-message') : readerStatus).textContent = String(error); }
+  finally { readerSaving = false; saveReaderEdit.disabled = false; cancelReaderEdit.disabled = false; }
+});
+window.addEventListener('beforeunload', (event) => {
+  if (readerEditing && readerEditorInput.value !== currentReaderData?.body) { event.preventDefault(); event.returnValue = ''; }
+});
 let readingBlocks = [];
 let estimateFrame = 0;
 function updateReadingEstimate() {
@@ -576,12 +641,16 @@ function applyReaderSettings() {
 [font, size, color, theme].forEach((control) => control.addEventListener('input', applyReaderSettings));
 applyReaderSettings();
 async function openReader(item, annotation = null) {
+  if (!mayLeaveReaderEditor()) return;
+  if (readerEditing) setReaderEditing(false);
   clearTimeout(positionTimer);
   saveReaderPosition();
   readerReady = false;
   restoringPosition = false;
   const version = ++readerVersion;
   currentItem = item;
+  currentReaderData = null;
+  editReaderButton.disabled = true;
   readingBlocks = [];
   readingEstimate.hidden = true;
   selectedAnchor = null;
@@ -616,6 +685,8 @@ async function openReader(item, annotation = null) {
   }
 }
 async function showReaderContent(result, item, version, annotation = null) {
+  currentReaderData = result;
+  editReaderButton.disabled = true;
   readerReady = false;
   restoringPosition = false;
   readingBlocks = [];
@@ -629,7 +700,7 @@ async function showReaderContent(result, item, version, annotation = null) {
     readerEmpty.hidden = true;
   } else {
     readerEmpty.hidden = !!result.body.trim();
-    if (!result.body.trim()) { if (annotation) jumpToAnnotation(annotation); return; }
+    if (!result.body.trim()) { editReaderButton.disabled = false; if (annotation) jumpToAnnotation(annotation); return; }
     const html = await invoke('render_markdown', { body: result.body, images: result.images || [] });
     if (version !== readerVersion) return;
     // HTML 由 Rust 的 Markdown 渲染器和白名单清理器共同生成。
@@ -649,23 +720,25 @@ async function showReaderContent(result, item, version, annotation = null) {
       if (version !== readerVersion) return;
       restoringPosition = false;
       readerReady = true;
+      editReaderButton.disabled = false;
       if (annotation) jumpToAnnotation(annotation);
     });
   });
 }
 async function retrieveReaderContent(force) {
-  if (!currentItem) return;
+  if (!currentItem || readerEditing) return;
   if (force && !window.confirm('重新获取会替换当前保存的正文和图片。继续吗？')) return;
   const item = currentItem;
   const version = readerVersion;
   retryReaderContent.disabled = true;
   refreshReaderContent.disabled = true;
+  editReaderButton.disabled = true;
   readerStatus.textContent = '正在重新获取正文……';
   try {
     const result = await invoke('fetch_reader_content', { id: item.id, force });
     if (version === readerVersion) await showReaderContent(result, item, version);
   } catch (error) {
-    if (version === readerVersion) readerStatus.textContent = `无法获取正文：${String(error)}`;
+    if (version === readerVersion) { readerStatus.textContent = `无法获取正文：${String(error)}`; editReaderButton.disabled = !currentReaderData; }
   } finally {
     if (version === readerVersion) { retryReaderContent.disabled = false; refreshReaderContent.disabled = false; }
   }
@@ -709,6 +782,8 @@ document.addEventListener('keydown', (event) => {
   }
 });
 async function closeReader() {
+  if (!mayLeaveReaderEditor()) return;
+  if (readerEditing) setReaderEditing(false);
   clearTimeout(positionTimer);
   saveReaderPosition();
   if (document.body.classList.contains('reader-fullscreen')) setReaderFullscreen(false);
@@ -716,6 +791,7 @@ async function closeReader() {
   readerReady = false;
   restoringPosition = false;
   currentItem = null;
+  currentReaderData = null;
   readingBlocks = [];
   readingEstimate.hidden = true;
   readerContent.hidden = true;
