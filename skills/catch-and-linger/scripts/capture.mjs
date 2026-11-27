@@ -12,7 +12,7 @@ export function localEndpoint(value = 'http://127.0.0.1:46917/mcp') {
 
 function dataDirectory() {
   if (process.env.CATCHLINGER_DATA_DIR) return process.env.CATCHLINGER_DATA_DIR;
-  if (process.platform === 'win32') return join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'tech.sxyicheng.catchlinger');
+  if (process.platform === 'win32') return join(process.env.LOCALAPPDATA || join(homedir(), 'AppData', 'Local'), 'catchlinger');
   if (process.platform === 'darwin') return join(homedir(), 'Library', 'Application Support', 'tech.sxyicheng.catchlinger');
   return join(process.env.XDG_DATA_HOME || join(homedir(), '.local', 'share'), 'tech.sxyicheng.catchlinger');
 }

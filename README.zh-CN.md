@@ -48,6 +48,8 @@ MCP 客户端使用 Streamable HTTP 连接 `http://127.0.0.1:46917/mcp`，请求
 
 SQLite 数据库和归档图片位于应用的本地数据目录，AI 和 MCP 密钥保存在该目录的 `.env.local`；阅读位置保存在本地 WebView 存储中。开发或隔离测试可使用环境变量 `CATCHLINGER_DATA_DIR` 指定其他绝对路径，此操作不会迁移已有数据。
 
+Windows 默认数据目录为 `%LOCALAPPDATA%\catchlinger`。首次启动时会从旧目录 `tech.sxyicheng.catchlinger` 复制数据库和密钥，已存在的新文件不会被覆盖；旧目录继续保留，也用于兼容原有阅读位置。升级前请退出旧版客户端。
+
 手工备份、WebDAV 同步和 Microsoft 账号同步尚未实现；旧托管服务的数据不会自动迁移。收录、隐私和存储细节见[桌面端文档](desktop/README.md)。
 
 ## 许可

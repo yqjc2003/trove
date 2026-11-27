@@ -9,5 +9,5 @@
     "windows": [{ "title": "拾藏", "width": 1100, "height": 760, "minWidth": 680, "minHeight": 480 }],
     "security": { "csp": "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' asset: data:; connect-src ipc: http://ipc.localhost" }
   },
-  "bundle": { "active": true, "targets": ["nsis"], "icon": ["icons/icon.ico"] }
+  "bundle": { "active": true, "publisher": "catchlinger", "targets": ["nsis"], "icon": ["icons/icon.ico"] }
 }

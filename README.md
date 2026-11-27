@@ -48,6 +48,8 @@ The [catch-and-linger Skill](skills/catch-and-linger/SKILL.md) sends URLs to the
 
 The SQLite database and archived images live in the application's local data directory; AI and MCP secrets are stored in its `.env.local`. Reading positions use local WebView storage. For development or isolated testing, `CATCHLINGER_DATA_DIR` can select a different absolute data directory; this does not migrate existing data.
 
+On Windows, the default data directory is `%LOCALAPPDATA%\catchlinger`. On first launch the app copies the database and secrets from the former `tech.sxyicheng.catchlinger` directory without overwriting existing files. The old directory is retained and continues to hold existing reading positions. Quit the previous version before upgrading.
+
 Manual backup, WebDAV synchronization, and Microsoft account synchronization are not yet implemented. Data from the former hosted service is not automatically migrated. See [desktop documentation](desktop/README.md) for capture, privacy, and storage details.
 
 ## License

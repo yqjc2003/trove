@@ -15,6 +15,8 @@ use url::Url;
 
 static DATABASE_INIT: Mutex<()> = Mutex::new(());
 static SECRET_FILE: Mutex<()> = Mutex::new(());
+#[cfg(target_os = "windows")]
+static DATA_MIGRATION: Mutex<()> = Mutex::new(());
 
 #[derive(Serialize)]
 struct Item {
@@ -39,10 +41,61 @@ fn data_dir(app: &tauri::AppHandle) -> Result<std::path::PathBuf, String> {
             }
             path
         }
-        _ => app.path().app_local_data_dir().map_err(|e| e.to_string())?,
+        _ => {
+            let old = app.path().app_local_data_dir().map_err(|e| e.to_string())?;
+            #[cfg(target_os = "windows")]
+            {
+                let parent = old.parent().ok_or("无法确定本地数据目录")?;
+                let new = parent.join("catchlinger");
+                migrate_windows_data(&old, &new)?;
+                new
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                old
+            }
+        }
     };
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir)
+}
+
+#[cfg(target_os = "windows")]
+fn migrate_windows_data(old: &std::path::Path, new: &std::path::Path) -> Result<(), String> {
+    let _guard = DATA_MIGRATION.lock().map_err(|_| "无法迁移本地数据")?;
+    std::fs::create_dir_all(new).map_err(|e| format!("无法创建数据目录：{e}"))?;
+    let old_secret = old.join(".env.local");
+    let new_secret = new.join(".env.local");
+    if old_secret.is_file() && !new_secret.exists() {
+        use std::io::Write;
+        let contents = std::fs::read(old_secret).map_err(|e| format!("无法读取旧密钥：{e}"))?;
+        let mut output = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(new_secret)
+            .map_err(|e| format!("无法迁移密钥：{e}"))?;
+        output
+            .write_all(&contents)
+            .map_err(|e| format!("无法迁移密钥：{e}"))?;
+    }
+    let old_db = old.join("trove.sqlite3");
+    let new_db = new.join("trove.sqlite3");
+    if old_db.is_file() && !new_db.exists() {
+        let temporary = new.join(format!("migration-{}.sqlite3", uuid::Uuid::new_v4()));
+        let result: Result<(), String> = (|| {
+            let db =
+                Connection::open_with_flags(old_db, rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY)
+                    .map_err(|e| format!("无法读取旧数据库：{e}"))?;
+            db.execute("VACUUM INTO ?1", [temporary.to_string_lossy().as_ref()])
+                .map_err(|e| format!("无法迁移数据库：{e}"))?;
+            std::fs::hard_link(&temporary, &new_db)
+                .map_err(|e| format!("无法保存迁移后的数据库：{e}"))?;
+            Ok(())
+        })();
+        let _ = std::fs::remove_file(&temporary);
+        result?;
+    }
+    Ok(())
 }
 
 fn database(app: &tauri::AppHandle) -> Result<Connection, String> {
@@ -1083,6 +1136,42 @@ fn main() {
 
 #[cfg(test)]
 mod tests {
+    #[cfg(target_os = "windows")]
+    #[test]
+    fn migrates_local_data_without_overwriting_existing_data() {
+        let root =
+            std::env::temp_dir().join(format!("catchlinger-migration-{}", uuid::Uuid::new_v4()));
+        let old = root.join("old");
+        let new = root.join("new");
+        std::fs::create_dir_all(&old).unwrap();
+        std::fs::write(old.join(".env.local"), "test secret").unwrap();
+        let db = super::Connection::open(old.join("trove.sqlite3")).unwrap();
+        db.execute_batch("CREATE TABLE test (value TEXT); INSERT INTO test VALUES ('existing');")
+            .unwrap();
+        super::migrate_windows_data(&old, &new).unwrap();
+        assert_eq!(
+            std::fs::read_to_string(new.join(".env.local")).unwrap(),
+            "test secret"
+        );
+        let copied = super::Connection::open(new.join("trove.sqlite3")).unwrap();
+        assert_eq!(
+            copied
+                .query_row("SELECT value FROM test", [], |row| row.get::<_, String>(0))
+                .unwrap(),
+            "existing"
+        );
+        copied.execute("UPDATE test SET value = 'new'", []).unwrap();
+        super::migrate_windows_data(&old, &new).unwrap();
+        assert_eq!(
+            copied
+                .query_row("SELECT value FROM test", [], |row| row.get::<_, String>(0))
+                .unwrap(),
+            "new"
+        );
+        drop(copied);
+        drop(db);
+        std::fs::remove_dir_all(root).unwrap();
+    }
     use super::*;
 
     #[test]
