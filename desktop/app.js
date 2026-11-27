@@ -1,6 +1,7 @@
 import { captureReadingPosition, readingScrollTop, waitForReaderImages } from './reader-position.mjs';
 import { selectionAnchor, imageAnchor, findAnnotation } from './annotation-anchor.mjs';
 import { measureReadingText, estimateReadingProgress } from './reading-estimate.mjs';
+import { matchesLibraryView, toggleTag } from './library-filter.mjs';
 
 const { invoke } = window.__TAURI__.core;
 const form = document.querySelector('#add-form');
@@ -240,7 +241,7 @@ async function refresh() {
 let allItems = [];
 let allNotes = [];
 let currentView = 'unread';
-let selectedTag = '';
+let selectedTags = [];
 let currentItem = null;
 function noteTime(value) {
   const date = new Date(`${value.replace(' ', 'T')}Z`);
@@ -248,7 +249,7 @@ function noteTime(value) {
 }
 function renderItems() {
   document.querySelector('#count-unread').textContent = allItems.filter((item) => !item.archived).length;
-  document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked).length;
+  document.querySelector('#count-liked').textContent = allItems.filter((item) => item.liked && !item.archived).length;
   document.querySelector('#count-archive').textContent = allItems.filter((item) => item.archived).length;
   document.querySelector('#count-notes').textContent = allItems.filter((item) => item.note_count > 0 || item.content_type === 'note').length;
   const tagFilters = document.querySelector('#tag-filters');
@@ -258,17 +259,12 @@ function renderItems() {
     row.className = 'tag-row';
     const button = document.createElement('button');
     button.type = 'button'; button.className = 'tag-filter'; button.textContent = tag;
-    button.classList.toggle('active', tag === selectedTag);
+    const selected = selectedTags.some((value) => value.toLowerCase() === tag.toLowerCase());
+    button.classList.toggle('active', selected);
+    button.setAttribute('aria-pressed', String(selected));
     button.addEventListener('click', () => {
-      selectedTag = selectedTag === tag ? '' : tag;
-      currentView = selectedTag ? 'all' : 'unread';
-      const search = document.querySelector('#search');
-      if (search.value) {
-        search.value = '';
-        refresh().catch((error) => { libraryMessage.textContent = String(error); });
-      } else {
-        renderItems();
-      }
+      selectedTags = toggleTag(selectedTags, tag);
+      renderItems();
     });
     const remove = document.createElement('button');
     remove.type = 'button'; remove.className = 'delete-tag-button'; remove.textContent = '×';
@@ -279,10 +275,7 @@ function renderItems() {
       remove.disabled = true;
       try {
         await invoke('delete_desktop_tag', { name: tag });
-        if (selectedTag && selectedTag.toLowerCase() === tag.toLowerCase()) {
-          selectedTag = '';
-          currentView = 'unread';
-        }
+        selectedTags = selectedTags.filter((value) => value.toLowerCase() !== tag.toLowerCase());
         await refresh();
       } catch (error) {
         libraryMessage.textContent = String(error);
@@ -292,15 +285,10 @@ function renderItems() {
     row.append(button, remove);
     tagFilters.append(row);
   }
-  const titles = { unread: '首页', liked: '喜欢', archive: '归档', notes: '笔记', all: '搜索结果' };
-  document.querySelector('#list-heading').textContent = selectedTag || titles[currentView];
+  const titles = { unread: '首页', liked: '喜欢', archive: '归档', notes: '笔记' };
+  document.querySelector('#list-heading').textContent = titles[currentView];
   document.querySelectorAll('.nav-item').forEach((button) => button.classList.toggle('active', button.dataset.view === currentView));
-  const result = allItems.filter((item) => {
-    if (selectedTag && !item.tags.some((tag) => tag.toLowerCase() === selectedTag.toLowerCase())) return false;
-    return currentView === 'all' || (currentView === 'unread' && !item.archived)
-      || (currentView === 'liked' && item.liked) || (currentView === 'archive' && item.archived)
-      || (currentView === 'notes' && (item.note_count > 0 || item.content_type === 'note'));
-  });
+  const result = allItems.filter((item) => matchesLibraryView(item, currentView, selectedTags));
   items.replaceChildren();
   document.querySelector('#count').textContent = `${result.length} 条`;
   if (!result.length) items.textContent = currentView === 'notes' ? '还没有阅读笔记。' : '这里还没有收藏。';
@@ -382,21 +370,11 @@ function renderItems() {
   }
 }
 document.querySelectorAll('.nav-item').forEach((button) => button.addEventListener('click', () => {
-  currentView = button.dataset.view; selectedTag = '';
-  const search = document.querySelector('#search');
-  if (search.value) {
-    search.value = '';
-    refresh().catch((error) => { libraryMessage.textContent = String(error); });
-  } else {
-    renderItems();
-  }
+  currentView = button.dataset.view;
+  renderItems();
 }));
 let searchTimer;
 document.querySelector('#search').addEventListener('input', () => {
-  if (document.querySelector('#search').value.trim()) {
-    currentView = 'all';
-    selectedTag = '';
-  }
   clearTimeout(searchTimer);
   searchTimer = setTimeout(() => refresh().catch((error) => { libraryMessage.textContent = String(error); }), 180);
 });
