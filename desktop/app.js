@@ -1,5 +1,5 @@
 import { captureReadingPosition, readingScrollTop, waitForReaderImages } from './reader-position.mjs';
-import { selectionAnchor, imageAnchor, findAnnotation } from './annotation-anchor.mjs';
+import { selectionAnchor, imageAnchor, findAnnotation, annotationsAtPoint } from './annotation-anchor.mjs';
 import { measureReadingText, estimateReadingProgress } from './reading-estimate.mjs';
 import { countTagItems, matchesLibraryView, toggleTag } from './library-filter.mjs';
 
@@ -431,6 +431,9 @@ const annotationForm = document.querySelector('#annotation-form');
 const annotationMenu = document.querySelector('#annotation-context-menu');
 const contextCopy = document.querySelector('#context-copy');
 const contextAnnotate = document.querySelector('#context-annotate');
+const annotationPopover = document.querySelector('#annotation-popover');
+const annotationPopoverContent = document.querySelector('#annotation-popover-content');
+let resolvedAnnotations = [];
 let selectedAnchor = null;
 let editingAnnotation = null;
 let contextRange = null;
@@ -540,12 +543,37 @@ reader.addEventListener('scroll', () => {
 }, { passive: true });
 window.addEventListener('resize', scheduleReadingEstimate);
 function closeAnnotationMenu() { annotationMenu.hidden = true; }
+function closeAnnotationPopover() { annotationPopover.hidden = true; }
+document.querySelector('#close-annotation-popover').addEventListener('click', closeAnnotationPopover);
+function showAnnotationPopover(notes, x, y) {
+  const itemId = currentItem.id;
+  closeAnnotationMenu();
+  annotationPopoverContent.replaceChildren();
+  for (const note of notes) {
+    const entry = document.createElement('div'); entry.className = 'annotation-popover-entry';
+    const body = document.createElement('p'); body.textContent = note.body || '仅收藏原文';
+    const date = document.createElement('small'); date.textContent = note.updated_at ? `${noteTime(note.created_at)} · 修改于 ${noteTime(note.updated_at)}` : noteTime(note.created_at);
+    const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'text-button'; edit.textContent = '编辑';
+    edit.addEventListener('click', () => { closeAnnotationPopover(); openAnnotationEditor(note); });
+    const remove = document.createElement('button'); remove.type = 'button'; remove.className = 'text-button'; remove.textContent = '删除';
+    remove.addEventListener('click', async () => {
+      if (!window.confirm('删除这条笔记？')) return;
+      try { await invoke('delete_reader_note', { id: note.id, itemId }); closeAnnotationPopover(); await refreshNotes(itemId); await refresh(); }
+      catch (error) { readerStatus.textContent = String(error); }
+    });
+    entry.append(body, date, edit, remove); annotationPopoverContent.append(entry);
+  }
+  annotationPopover.hidden = false;
+  annotationPopover.style.left = `${Math.max(8, Math.min(x + 10, window.innerWidth - annotationPopover.offsetWidth - 8))}px`;
+  annotationPopover.style.top = `${Math.max(8, Math.min(y + 10, window.innerHeight - annotationPopover.offsetHeight - 8))}px`;
+}
 readerBody.addEventListener('contextmenu', (event) => {
   const selection = window.getSelection();
   const image = event.target instanceof HTMLImageElement ? event.target : null;
   const anchor = image ? imageAnchor(readerBody, image) : selectionAnchor(readerBody, selection);
   if (!anchor) { closeAnnotationMenu(); return; }
   event.preventDefault();
+  closeAnnotationPopover();
   selectedAnchor = anchor;
   contextRange = !image && selection.rangeCount ? selection.getRangeAt(0).cloneRange() : null;
   readerBody.querySelectorAll('.annotation-selected-image').forEach((node) => node.classList.remove('annotation-selected-image'));
@@ -572,10 +600,14 @@ contextCopy.addEventListener('click', async () => {
     }
   } catch { readerStatus.textContent = '复制失败，请使用 Ctrl+C 重试。'; }
 });
-document.addEventListener('pointerdown', (event) => { if (!annotationMenu.contains(event.target)) closeAnnotationMenu(); });
-reader.addEventListener('scroll', closeAnnotationMenu, { passive: true });
+document.addEventListener('pointerdown', (event) => {
+  if (!annotationMenu.contains(event.target)) closeAnnotationMenu();
+  if (!annotationPopover.contains(event.target)) closeAnnotationPopover();
+});
+reader.addEventListener('scroll', () => { closeAnnotationMenu(); closeAnnotationPopover(); }, { passive: true });
 document.addEventListener('keydown', (event) => {
   if (!annotationMenu.hidden && event.key === 'Escape') { event.preventDefault(); closeAnnotationMenu(); }
+  else if (!annotationPopover.hidden && event.key === 'Escape') { event.preventDefault(); event.stopImmediatePropagation(); closeAnnotationPopover(); }
 });
 function openAnnotationEditor(note = null) {
   editingAnnotation = note;
@@ -650,6 +682,8 @@ async function openReader(item, annotation = null) {
   restoringPosition = false;
   const version = ++readerVersion;
   currentItem = item;
+  closeAnnotationPopover();
+  resolvedAnnotations = [];
   currentReaderData = null;
   editReaderButton.disabled = true;
   readingBlocks = [];
@@ -688,6 +722,8 @@ async function openReader(item, annotation = null) {
   }
 }
 async function showReaderContent(result, item, version, annotation = null) {
+  closeAnnotationPopover();
+  resolvedAnnotations = [];
   currentReaderData = result;
   editReaderButton.disabled = true;
   readerReady = false;
@@ -749,6 +785,11 @@ async function retrieveReaderContent(force) {
 retryReaderContent.addEventListener('click', () => retrieveReaderContent(false));
 refreshReaderContent.addEventListener('click', () => retrieveReaderContent(true));
 readerBody.addEventListener('click', async (event) => {
+  const selection = window.getSelection();
+  if (selection?.isCollapsed) {
+    const notes = annotationsAtPoint(resolvedAnnotations, event.clientX, event.clientY, event.target);
+    if (notes.length) { event.preventDefault(); showAnnotationPopover(notes, event.clientX, event.clientY); return; }
+  }
   const link = event.target.closest('a');
   if (!link) return;
   event.preventDefault();
@@ -794,6 +835,8 @@ async function closeReader() {
   readerReady = false;
   restoringPosition = false;
   currentItem = null;
+  closeAnnotationPopover();
+  resolvedAnnotations = [];
   currentReaderData = null;
   readingBlocks = [];
   readingEstimate.hidden = true;
@@ -813,8 +856,10 @@ async function refreshNotes(itemId) {
   container.replaceChildren();
   readerBody.querySelectorAll('.annotated-image').forEach((image) => image.classList.remove('annotated-image'));
   const ranges = [];
+  resolvedAnnotations = [];
   for (const note of notes) {
     const target = findAnnotation(readerBody, note);
+    if (target) resolvedAnnotations.push({ note, target });
     if (target?.range) ranges.push(target.range);
     if (target?.element) target.element.classList.add('annotated-image');
   }

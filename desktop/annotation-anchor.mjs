@@ -53,3 +53,15 @@ export function findAnnotation(root, note) {
   }
   return null;
 }
+
+/**
+ * Find all annotations whose visible text rectangles contain the clicked point.
+ * @param {unknown} targetElement
+ */
+export function annotationsAtPoint(annotations, x, y, targetElement = null) {
+  return annotations.filter(({ target }) => {
+    if (target.element) return target.element === targetElement;
+    return target.range && Array.from(target.range.getClientRects()).some((rect) =>
+      rect.width > 0 && rect.height > 0 && x >= rect.left && x <= rect.right && y >= rect.top && y <= rect.bottom);
+  }).map(({ note }) => note);
+}
